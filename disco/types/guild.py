@@ -546,8 +546,7 @@ class Guild(SlottedModel, Permissible):
         """
         return self.client.api.guilds_channels_create(
             self.id, ChannelType.GUILD_TEXT, name=name, permission_overwrites=permission_overwrites,
-            parent_id=parent_id, nsfw=nsfw, position=position, reason=reason,
-        )
+            parent_id=parent_id, nsfw=nsfw, position=position, reason=reason)
 
     def create_voice_channel(
             self,
@@ -556,13 +555,14 @@ class Guild(SlottedModel, Permissible):
             parent_id=None,
             bitrate=None,
             user_limit=None,
-            position=None):
+            position=None,
+            reason=None):
         """
         Creates a voice channel within the guild.
         """
         return self.client.api.guilds_channels_create(
             self.id, ChannelType.GUILD_VOICE, name=name, permission_overwrites=permission_overwrites,
-            parent_id=parent_id, bitrate=bitrate, user_limit=user_limit, position=position, reason=None)
+            parent_id=parent_id, bitrate=bitrate, user_limit=user_limit, position=position, reason=reason)
 
     def leave(self):
         return self.client.api.users_me_guilds_delete(self.id)
