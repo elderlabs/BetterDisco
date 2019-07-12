@@ -16,14 +16,36 @@ class DefaultAvatars(object):
     ALL = [BLURPLE, GREY, GREEN, ORANGE, RED]
 
 
+class UserFlags(object):
+    NONE = 0
+    DISCORD_EMPLOYEE = 1 << 0
+    DISCORD_PARTNER = 1 << 1
+    HS_EVENTS = 1 << 2
+    BUG_HUNTER = 1 << 3
+    HS_BRAVERY = 1 << 6
+    HS_BRILLIANCE = 1 << 7
+    HS_BALANCE = 1 << 8
+    EARLY_SUPPORTER = 1 << 9
+    TEAM_USER = 1 << 10
+
+
+class PremiumType(object):
+    CLASSIC = 1
+    NITRO = 2
+
+
 class User(SlottedModel, with_equality('id'), with_hash('id')):
     id = Field(snowflake)
     username = Field(text)
-    avatar = Field(text)
     discriminator = Field(text)
+    avatar = Field(text)
     bot = Field(bool, default=False)
+    mfa_enabled = Field(bool)
+    locale = Field(text)
     verified = Field(bool)
     email = Field(text)
+    flags = Field(int)
+    premium_type = Field(int)
 
     presence = Field(None)
 
@@ -62,7 +84,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
         return u'<User {} ({})>'.format(self.id, self)
 
 
-class GameType(object):
+class ActivityTypes(object):
     DEFAULT = 0
     STREAMING = 1
     LISTENING = 2
@@ -77,25 +99,31 @@ class Status(object):
     OFFLINE = 'OFFLINE'
 
 
-class Party(SlottedModel):
+class ClientStatus(object):
+    DESKTOP = 'DESKTOP'
+    MOBILE = 'MOBILE'
+    WEB = 'WEB'
+
+
+class ActivityParty(SlottedModel):
     id = Field(text)
     size = ListField(int)
 
 
-class Assets(SlottedModel):
+class ActivityAssets(SlottedModel):
     large_image = Field(text)
     large_text = Field(text)
     small_image = Field(text)
     small_text = Field(text)
 
 
-class Secrets(SlottedModel):
+class ActivitySecrets(SlottedModel):
     join = Field(text)
     spectate = Field(text)
     match = Field(text)
 
 
-class Timestamps(SlottedModel):
+class ActivityTimestamps(SlottedModel):
     start = Field(int)
     end = Field(int)
 
@@ -108,22 +136,35 @@ class Timestamps(SlottedModel):
         return datetime.utcfromtimestamp(self.end / 1000)
 
 
-class Game(SlottedModel):
-    type = Field(enum(GameType))
+class ActivityFlags(object):
+    INSTANCE = 1 << 0
+    JOIN = 1 << 1
+    SPECTATE = 1 << 2
+    JOIN_REQUEST = 1 << 3
+    SYNC = 1 << 4
+    PLAY = 1 << 5
+
+
+class Activity(SlottedModel):
     name = Field(text)
+    type = Field(enum(ActivityTypes))
     url = Field(text)
-    timestamps = Field(Timestamps)
+    timestamps = Field(ActivityTimestamps)
     application_id = Field(text)
     details = Field(text)
     state = Field(text)
-    party = Field(Party)
-    assets = Field(Assets)
-    secrets = Field(Secrets)
+    party = Field(ActivityParty)
+    assets = Field(ActivityAssets)
+    secrets = Field(ActivitySecrets)
     instance = Field(bool)
     flags = Field(int)
 
 
 class Presence(SlottedModel):
     user = Field(User, alias='user', ignore_dump=['presence'])
-    game = Field(Game)
+    roles = ListField(snowflake)
+    game = Field(Activity)
+    guild_id = Field(snowflake)
     status = Field(enum(Status))
+    activity = Field(Activity, 'application_id')
+    client_status = Field(enum(ClientStatus))

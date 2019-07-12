@@ -6,7 +6,7 @@ from six.moves import map
 from disco.util.snowflake import to_snowflake
 from disco.util.functional import one_or_many, chunks
 from disco.types.user import User
-from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, text, cached_property
+from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, text, cached_property
 from disco.types.permissions import Permissions, Permissible, PermissionValue
 
 
@@ -120,19 +120,23 @@ class Channel(SlottedModel, Permissible):
         Channel permissions overwrites.
     """
     id = Field(snowflake)
+    type = Field(enum(ChannelType))
     guild_id = Field(snowflake)
+    position = Field(int)
+    permission_overwrites = AutoDictField(PermissionOverwrite, 'id', alias='permission_overwrites')
     name = Field(text)
     topic = Field(text)
+    nsfw = Field(bool)
     last_message_id = Field(snowflake)
-    position = Field(int)
     bitrate = Field(int)
     user_limit = Field(int)
-    recipients = AutoDictField(User, 'id')
-    nsfw = Field(bool)
-    type = Field(enum(ChannelType))
-    overwrites = AutoDictField(PermissionOverwrite, 'id', alias='permission_overwrites')
-    parent_id = Field(snowflake)
     rate_limit_per_user = Field(int)
+    recipients = AutoDictField(User, 'id')
+    icon = Field(text)
+    owner_id = Field(snowflake)
+    application_id = Field(snowflake)
+    parent_id = Field(snowflake)
+    last_pin_timestamp = Field(datetime)
 
     def __init__(self, *args, **kwargs):
         super(Channel, self).__init__(*args, **kwargs)
@@ -140,7 +144,7 @@ class Channel(SlottedModel, Permissible):
 
     def after_load(self):
         # TODO: hackfix
-        self.attach(six.itervalues(self.overwrites), {'channel_id': self.id, 'channel': self})
+        self.attach(six.itervalues(self.permission_overwrites), {'channel_id': self.id, 'channel': self})
 
     def __str__(self):
         return u'#{}'.format(self.name) if self.name else six.text_type(self.id)
@@ -164,18 +168,18 @@ class Channel(SlottedModel, Permissible):
         base = self.guild.get_permissions(member)
 
         # First grab and apply the everyone overwrite
-        everyone = self.overwrites.get(self.guild_id)
+        everyone = self.permission_overwrites.get(self.guild_id)
         if everyone:
             base -= everyone.deny
             base += everyone.allow
 
         for role_id in member.roles:
-            overwrite = self.overwrites.get(role_id)
+            overwrite = self.permission_overwrites.get(role_id)
             if overwrite:
                 base -= overwrite.deny
                 base += overwrite.allow
 
-        ow_member = self.overwrites.get(member.user.id)
+        ow_member = self.permission_overwrites.get(member.user.id)
         if ow_member:
             base -= ow_member.deny
             base += ow_member.allow

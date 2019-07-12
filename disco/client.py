@@ -5,7 +5,7 @@ from disco.state import State, StateConfig
 from disco.api.client import APIClient
 from disco.gateway.client import GatewayClient
 from disco.gateway.packets import OPCode
-from disco.types.user import Status, Game
+from disco.types.user import Status, Activity
 from disco.util.config import Config
 from disco.util.emitter import Emitter
 from disco.util.logging import LoggingClass
@@ -122,7 +122,7 @@ class Client(LoggingClass):
         since : float
             How long the client has been afk for (in seconds).
         """
-        if game and not isinstance(game, Game):
+        if game and not isinstance(game, Activity):
             raise TypeError('Game must be a Game model')
 
         if status is Status.IDLE and not since:

@@ -11,6 +11,7 @@ from disco.types.base import (
 from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
 from disco.types.user import User
+from disco.types.guild import GuildMember
 
 
 class MessageType(object):
@@ -70,8 +71,23 @@ class Emoji(SlottedModel):
 class MessageReactionEmoji(Emoji):
     """
     Represents a emoji which was used as a reaction on a message.
+
+    Attributes
+    ----------
+    count : int
+        The number of users who reacted with this emoji.
+    me : bool
+        Whether the current user reacted with this emoji.
+    emoji : `MessageReactionEmoji`
+        The emoji which was reacted.
     """
-    pass
+    id = Field(snowflake)
+    name = Field(text)
+    roles = ListField(snowflake)
+    user = Field(User)
+    require_colons = Field(bool)
+    managed = Field(bool)
+    animated = Field(bool)
 
 
 class MessageReaction(SlottedModel):
@@ -80,16 +96,16 @@ class MessageReaction(SlottedModel):
 
     Attributes
     ----------
-    emoji : `MessageReactionEmoji`
-        The emoji which was reacted.
     count : int
         The number of users who reacted with this emoji.
     me : bool
         Whether the current user reacted with this emoji.
+    emoji : `MessageReactionEmoji`
+        The emoji which was reacted.
     """
-    emoji = Field(MessageReactionEmoji)
     count = Field(int)
     me = Field(bool)
+    emoji = Field(MessageReactionEmoji)
 
 
 class MessageApplication(SlottedModel):
@@ -159,15 +175,15 @@ class MessageEmbedImage(SlottedModel):
         The URL for the image.
     proxy_url : str
         A proxy URL for the image, set by Discord.
-    width : int
-        The width of the image, set by Discord.
     height : int
         The height of the image, set by Discord.
+    width : int
+        The width of the image, set by Discord.
     """
     url = Field(text)
     proxy_url = Field(text)
-    width = Field(int)
     height = Field(int)
+    width = Field(int)
 
 
 class MessageEmbedThumbnail(SlottedModel):
@@ -180,15 +196,15 @@ class MessageEmbedThumbnail(SlottedModel):
         The thumbnail URL.
     proxy_url : str
         A proxy URL for the thumbnail, set by Discord.
-    width : int
-        The width of the thumbnail, set by Discord.
     height : int
         The height of the thumbnail, set by Discord.
+    width : int
+        The width of the thumbnail, set by Discord.
     """
     url = Field(text)
     proxy_url = Field(text)
-    width = Field(int)
     height = Field(int)
+    width = Field(int)
 
 
 class MessageEmbedVideo(SlottedModel):
@@ -199,14 +215,19 @@ class MessageEmbedVideo(SlottedModel):
     ----------
     url : str
         The URL for the video.
-    width : int
-        The width of the video, set by Discord.
     height : int
         The height of the video, set by Discord.
+    width : int
+        The width of the video, set by Discord.
     """
     url = Field(text)
     height = Field(int)
     width = Field(int)
+
+
+class MessageEmbedProvider(SlottedModel):
+    name = Field(text)
+    url = Field(text)
 
 
 class MessageEmbedAuthor(SlottedModel):
@@ -274,6 +295,8 @@ class MessageEmbed(SlottedModel):
         The thumbnail of the embed.
     video : `MessageEmbedVideo`
         The video of the embed.
+    provider : "MessageEmbedProvider'
+        The provider of the embed.
     author : `MessageEmbedAuthor`
         The author of the embed.
     fields : list[`MessageEmbedField]`
@@ -289,6 +312,7 @@ class MessageEmbed(SlottedModel):
     image = Field(MessageEmbedImage)
     thumbnail = Field(MessageEmbedThumbnail)
     video = Field(MessageEmbedVideo)
+    provider = Field(MessageEmbedProvider)
     author = Field(MessageEmbedAuthor)
     fields = ListField(MessageEmbedField)
 
@@ -339,12 +363,12 @@ class MessageAttachment(SlottedModel):
         The id of this attachment.
     filename : str
         The filename of this attachment.
+    size : int
+        Size of the attachment.
     url : str
         The URL of this attachment.
     proxy_url : str
         The URL to proxy through when downloading the attachment.
-    size : int
-        Size of the attachment.
     height : int
         Height of the attachment.
     width : int
@@ -352,9 +376,9 @@ class MessageAttachment(SlottedModel):
     """
     id = Field(str)
     filename = Field(text)
+    size = Field(int)
     url = Field(text)
     proxy_url = Field(text)
-    size = Field(int)
     height = Field(int)
     width = Field(int)
 
@@ -369,14 +393,14 @@ class Message(SlottedModel):
         The ID of this message.
     channel_id : snowflake
         The channel ID this message was sent in.
-    type : `MessageType`
-        Type of the message.
+    guild_id : snowflake
+        The server ID this message was sent in.
     author : :class:`disco.types.user.User`
         The author of this message.
+    member : GuildMember
+        Member properties for the message's author.
     content : str
         The unicode contents of this message.
-    nonce : str
-        The nonce of this message.
     timestamp : datetime
         When this message was created.
     edited_timestamp : datetime?
@@ -385,18 +409,24 @@ class Message(SlottedModel):
         Whether this is a TTS (text-to-speech) message.
     mention_everyone : bool
         Whether this message has an @everyone which mentions everyone.
-    pinned : bool
-        Whether this message is pinned in the channel.
     mentions : dict[snowflake, `User`]
         Users mentioned within this message.
     mention_roles : list[snowflake]
         IDs for roles mentioned within this message.
-    embeds : list[`MessageEmbed`]
-        Embeds for this message.
     attachments : dict[`MessageAttachment`]
         Attachments for this message.
+    embeds : list[`MessageEmbed`]
+        Embeds for this message.
     reactions : list[`MessageReaction`]
         Reactions for this message.
+    nonce : str
+        The nonce of this message.
+    pinned : bool
+        Whether this message is pinned in the channel.
+    webhook_id : snowflake
+        The id if the message is a webhook.
+    type : `MessageType`
+        Type of the message.
     activity : `MessageActivity`
         The activity of a Rich Presence-related chat embed.
     application : `MessageApplication`
@@ -404,21 +434,23 @@ class Message(SlottedModel):
     """
     id = Field(snowflake)
     channel_id = Field(snowflake)
-    webhook_id = Field(snowflake)
-    type = Field(enum(MessageType))
+    guild_id = Field(snowflake)
     author = Field(User)
+    member = Field(GuildMember)
     content = Field(text)
-    nonce = Field(snowflake)
     timestamp = Field(datetime)
     edited_timestamp = Field(datetime)
     tts = Field(bool)
     mention_everyone = Field(bool)
-    pinned = Field(bool)
     mentions = AutoDictField(User, 'id')
     mention_roles = ListField(snowflake)
-    embeds = ListField(MessageEmbed)
     attachments = AutoDictField(MessageAttachment, 'id')
+    embeds = ListField(MessageEmbed)
     reactions = ListField(MessageReaction)
+    nonce = Field(snowflake)
+    pinned = Field(bool)
+    webhook_id = Field(snowflake)
+    type = Field(enum(MessageType))
     activity = Field(MessageActivity)
     application = Field(MessageApplication)
 
