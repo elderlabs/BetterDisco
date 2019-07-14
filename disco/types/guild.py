@@ -8,7 +8,7 @@ from disco.types.base import (
     SlottedModel, Field, ListField, AutoDictField, DictField, snowflake, text, enum, datetime,
     cached_property,
 )
-from disco.types.user import User, Presence
+from disco.types.user import User
 from disco.types.voice import VoiceState
 from disco.types.channel import Channel, ChannelType
 from disco.types.message import Emoji
