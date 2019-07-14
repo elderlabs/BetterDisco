@@ -11,7 +11,6 @@ from disco.types.base import (
 from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
 from disco.types.user import User
-from disco.types.guild import GuildMember
 
 
 class MessageType(object):
@@ -397,8 +396,6 @@ class Message(SlottedModel):
         The server ID this message was sent in.
     author : :class:`disco.types.user.User`
         The author of this message.
-    member : GuildMember
-        Member properties for the message's author.
     content : str
         The unicode contents of this message.
     timestamp : datetime
@@ -436,7 +433,6 @@ class Message(SlottedModel):
     channel_id = Field(snowflake)
     guild_id = Field(snowflake)
     author = Field(User)
-    member = Field(GuildMember)
     content = Field(text)
     timestamp = Field(datetime)
     edited_timestamp = Field(datetime)
