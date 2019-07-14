@@ -123,7 +123,7 @@ class Channel(SlottedModel, Permissible):
     type = Field(enum(ChannelType))
     guild_id = Field(snowflake)
     position = Field(int)
-    permission_overwrites = AutoDictField(PermissionOverwrite, 'id', alias='permission_overwrites')
+    overwrites = AutoDictField(PermissionOverwrite, 'id', alias='permission_overwrites')
     name = Field(text)
     topic = Field(text)
     nsfw = Field(bool)
@@ -144,7 +144,7 @@ class Channel(SlottedModel, Permissible):
 
     def after_load(self):
         # TODO: hackfix
-        self.attach(six.itervalues(self.permission_overwrites), {'channel_id': self.id, 'channel': self})
+        self.attach(six.itervalues(self.overwrites), {'channel_id': self.id, 'channel': self})
 
     def __str__(self):
         return u'#{}'.format(self.name) if self.name else six.text_type(self.id)
@@ -168,18 +168,18 @@ class Channel(SlottedModel, Permissible):
         base = self.guild.get_permissions(member)
 
         # First grab and apply the everyone overwrite
-        everyone = self.permission_overwrites.get(self.guild_id)
+        everyone = self.overwrites.get(self.guild_id)
         if everyone:
             base -= everyone.deny
             base += everyone.allow
 
         for role_id in member.roles:
-            overwrite = self.permission_overwrites.get(role_id)
+            overwrite = self.overwrites.get(role_id)
             if overwrite:
                 base -= overwrite.deny
                 base += overwrite.allow
 
-        ow_member = self.permission_overwrites.get(member.user.id)
+        ow_member = self.overwrites.get(member.user.id)
         if ow_member:
             base -= ow_member.deny
             base += ow_member.allow

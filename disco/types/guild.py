@@ -387,7 +387,6 @@ class Guild(SlottedModel, Permissible):
     voice_states = AutoDictField(VoiceState, 'session_id')
     members = AutoDictField(GuildMember, 'id')
     channels = AutoDictField(Channel, 'id')
-    presences = Field(enum(Presence))
     max_presences = Field(int, default=5000)
     max_members = Field(int)
     vanity_url_code = Field(text)
