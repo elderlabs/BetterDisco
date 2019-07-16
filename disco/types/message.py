@@ -392,8 +392,6 @@ class Message(SlottedModel):
         The ID of this message.
     channel_id : snowflake
         The channel ID this message was sent in.
-    guild_id : snowflake
-        The server ID this message was sent in.
     author : :class:`disco.types.user.User`
         The author of this message.
     content : str
@@ -431,7 +429,6 @@ class Message(SlottedModel):
     """
     id = Field(snowflake)
     channel_id = Field(snowflake)
-    guild_id = Field(snowflake)
     author = Field(User)
     content = Field(text)
     timestamp = Field(datetime)
