@@ -15,17 +15,6 @@ from disco.types.message import Emoji
 from disco.types.permissions import PermissionValue, Permissions, Permissible
 
 
-class DefaultMessageNotificationsLevel(object):
-    ALL_MESSAGES = 0
-    ONLY_MENTIONS = 1
-
-
-class ExplicitContentFilterLevel(object):
-    NONE = 0
-    WITHOUT_ROLES = 1
-    ALL = 2
-
-
 class MFALevel(object):
     NONE = 0
     ELEVATED = 1
@@ -37,6 +26,17 @@ class VerificationLevel(object):
     MEDIUM = 2
     HIGH = 3
     EXTREME = 4
+
+
+class ExplicitContentFilterLevel(object):
+    NONE = 0
+    WITHOUT_ROLES = 1
+    ALL = 2
+
+
+class DefaultMessageNotificationsLevel(object):
+    ALL_MESSAGES = 0
+    ONLY_MENTIONS = 1
 
 
 class PremiumTier(object):
@@ -62,25 +62,25 @@ class GuildEmoji(Emoji):
         The ID of this emoji.
     name : str
         The name of this emoji.
-    roles : list(snowflake)
-        Roles this emoji is attached to.
     user : User
         The User that created this emoji.
     require_colons : bool
         Whether this emoji requires colons to use.
     managed : bool
         Whether this emoji is managed by an integration.
+    roles : list(snowflake)
+        Roles this emoji is attached to.
     animated : bool
         Whether this emoji is animated.
     """
     id = Field(snowflake)
+    guild_id = Field(snowflake)
     name = Field(text)
-    roles = ListField(snowflake)
     user = Field(User)
     require_colons = Field(bool)
     managed = Field(bool)
+    roles = ListField(snowflake)
     animated = Field(bool)
-    guild_id = Field(snowflake)
 
     def __str__(self):
         return u'<{}:{}:{}>'.format('a' if self.animated else '', self.name, self.id)
@@ -100,6 +100,10 @@ class GuildEmoji(Emoji):
         return self.client.state.guilds.get(self.guild_id)
 
 
+class PruneCount(SlottedModel):
+    pruned = Field(int, default=None)
+
+
 class Role(SlottedModel):
     """
     A role object.
@@ -110,30 +114,30 @@ class Role(SlottedModel):
         The role ID.
     name : string
         The role name.
-    color : int
-        The RGB color of this role.
     hoist : bool
         Whether this role is hoisted (displayed separately in the sidebar).
-    position : int
-        The position of this role in the hierarchy.
-    permissions : :class:`disco.types.permissions.PermissionsValue`
-        The permissions this role grants.
     managed : bool
         Whether this role is managed by an integration.
+    color : int
+        The RGB color of this role.
+    permissions : :class:`disco.types.permissions.PermissionsValue`
+        The permissions this role grants.
+    position : int
+        The position of this role in the hierarchy.
     mentionable : bool
         Wherther this role is taggable in chat.
     guild_id : snowflake
         The id of the server the role is in.
     """
     id = Field(snowflake)
-    name = Field(text)
-    color = Field(int)
-    hoist = Field(bool)
-    position = Field(int)
-    permissions = Field(PermissionValue)
-    managed = Field(bool)
-    mentionable = Field(bool)
     guild_id = Field(snowflake)
+    name = Field(text)
+    hoist = Field(bool)
+    managed = Field(bool)
+    color = Field(int)
+    permissions = Field(PermissionValue)
+    position = Field(int)
+    mentionable = Field(bool)
 
     def __str__(self):
         return self.name
@@ -158,6 +162,11 @@ class GuildBan(SlottedModel):
     reason = Field(text)
 
 
+class GuildEmbed(SlottedModel):
+    enabled = Field(bool)
+    channel_id = Field(snowflake)
+
+
 class GuildMember(SlottedModel):
     """
     A GuildMember object.
@@ -166,29 +175,29 @@ class GuildMember(SlottedModel):
     ----------
     user : :class:`disco.types.user.User`
         The user object of this member.
-    nick : str
-        The nickname of the member.
-    roles : list(snowflake)
-        Roles this member is part of.
-    joined_at : datetime
-        When this user joined the guild.
-    premium_since : datetime
-        When this user set their nitro boost to this server.
-    deaf : bool
-        Whether this member is server voice-deafened.
-    mute : bool
-        Whether this member is server voice-muted.
     guild_id : snowflake
         The guild this member is part of.
+    nick : str
+        The nickname of the member.
+    mute : bool
+        Whether this member is server voice-muted.
+    deaf : bool
+        Whether this member is server voice-deafened.
+    joined_at : datetime
+        When this user joined the guild.
+    roles : list(snowflake)
+        Roles this member is part of.
+    premium_since : datetime
+        When this user set their Nitro boost to this server.
     """
     user = Field(User)
-    nick = Field(text)
-    roles = ListField(snowflake)
-    joined_at = Field(datetime)
-    premium_since = Field(datetime)
-    deaf = Field(bool)
-    mute = Field(bool)
     guild_id = Field(snowflake)
+    nick = Field(text)
+    mute = Field(bool)
+    deaf = Field(bool)
+    joined_at = Field(datetime)
+    roles = ListField(snowflake)
+    premium_since = Field(datetime)
 
     def __str__(self):
         return self.user.__str__()
@@ -220,8 +229,8 @@ class GuildMember(SlottedModel):
         """
         Bans the member from the guild.
 
-        Args
-        ----
+        Parameters
+        ----------
         delete_message_days : int
             The number of days to retroactively delete messages for.
         """
@@ -237,8 +246,8 @@ class GuildMember(SlottedModel):
         """
         Sets the member's nickname (or clears it if None).
 
-        Args
-        ----
+        Parameters
+        ----------
         nickname : Optional[str]
             The nickname (or none to reset) to set.
         """
@@ -312,6 +321,12 @@ class Guild(SlottedModel, Permissible):
         The id of the embed channel.
     system_channel_id : snowflake
         The id of the system channel.
+    name : str
+        Guild's name.
+    icon : str
+        Guild's icon image hash
+    splash : str
+        Guild's splash image hash
     widget_channel_id : snowflake
         The id of the server widget channel
     banner : str
@@ -355,47 +370,47 @@ class Guild(SlottedModel, Permissible):
     premium_tier : int
         Guild's premium tier.
     premium_subscription_count : int
-        The amount of users using their nitro boost on this guild.
+        The amount of users using their Nitro boost on this guild.
     """
     id = Field(snowflake)
-    name = Field(text)
-    icon = Field(text)
-    splash = Field(text)
     owner = Field(bool)
     owner_id = Field(snowflake)
     permissions = Field(int)
-    region = Field(text)
     afk_channel_id = Field(snowflake)
+    embed_channel_id = Field(snowflake)
+    system_channel_id = Field(snowflake)
+    name = Field(text)
+    icon = Field(text)
+    splash = Field(text)
+    banner = Field(text)
+    region = Field(text)
     afk_timeout = Field(int)
     embed_enabled = Field(bool)
-    embed_channel_id = Field(snowflake)
     verification_level = Field(enum(VerificationLevel))
-    default_message_notifications = Field(enum(DefaultMessageNotificationsLevel))
     explicit_content_filter = Field(enum(ExplicitContentFilterLevel))
-    roles = AutoDictField(Role, 'id')
-    emojis = AutoDictField(GuildEmoji, 'id')
-    features = ListField(str)
+    default_message_notifications = Field(enum(DefaultMessageNotificationsLevel))
     mfa_level = Field(int)
     application_id = Field(snowflake)
     widget_enabled = Field(bool)
     widget_channel_id = Field(snowflake)
-    system_channel_id = Field(snowflake)
     joined_at = Field(datetime)
     large = Field(bool)
     unavailable = Field(bool)
     member_count = Field(int)
     voice_states = AutoDictField(VoiceState, 'session_id')
+    features = ListField(str)
     members = AutoDictField(GuildMember, 'id')
     channels = AutoDictField(Channel, 'id')
-    max_presences = Field(int, default=5000)
-    max_members = Field(int)
-    vanity_url_code = Field(text)
-    description = Field(text)
-    banner = Field(text)
+    roles = AutoDictField(Role, 'id')
+    emojis = AutoDictField(GuildEmoji, 'id')
     premium_tier = Field(int, default=0)
     premium_subscription_count = Field(int, default=0)
     system_channel_flags = Field(int)
     preferred_locale = Field(str)
+    vanity_url_code = Field(text)
+    max_presences = Field(int, default=5000)
+    max_members = Field(int)
+    description = Field(text)
 
     def __init__(self, *args, **kwargs):
         super(Guild, self).__init__(*args, **kwargs)
@@ -469,6 +484,12 @@ class Guild(SlottedModel, Permissible):
                 return
 
         return self.members.get(user)
+
+    def get_prune_count(self, days=None):
+        return self.client.api.guilds_prune_count_get(self.id, days=days)
+
+    def prune(self, days=None, compute_prune_count=None):
+        return self.client.api.guilds_prune_create(self.id, days=days, compute_prune_count=compute_prune_count)
 
     def create_role(self, **kwargs):
         """
@@ -545,7 +566,8 @@ class Guild(SlottedModel, Permissible):
         """
         return self.client.api.guilds_channels_create(
             self.id, ChannelType.GUILD_TEXT, name=name, permission_overwrites=permission_overwrites,
-            parent_id=parent_id, nsfw=nsfw, position=position, reason=reason)
+            parent_id=parent_id, nsfw=nsfw, position=position, reason=reason,
+        )
 
     def create_voice_channel(
             self,
@@ -569,14 +591,14 @@ class Guild(SlottedModel, Permissible):
     def get_invites(self):
         return self.client.api.guilds_invites_list(self.id)
 
-    def get_vanity_url(self):
-        return self.client.api.guilds_vanity_url_get(self.id)
-
     def get_emojis(self):
         return self.client.api.guilds_emojis_list(self.id)
 
     def get_emoji(self, emoji):
         return self.client.api.guilds_emojis_get(self.id, emoji)
+
+    def get_voice_regions(self):
+        return self.client.api.guilds_voice_regions_list(self.id)
 
     def get_icon_url(self, still_format='webp', animated_format='gif', size=1024):
         if not self.icon:
@@ -590,6 +612,12 @@ class Guild(SlottedModel, Permissible):
             return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}'.format(
                 self.id, self.icon, still_format, size
             )
+
+    def get_vanity_url(self):
+        if not self.vanity_url_code:
+            return ''
+
+        return 'https://discord.gg/' + self.vanity_url_code
 
     def get_splash_url(self, fmt='webp', size=1024):
         if not self.splash:
@@ -606,6 +634,10 @@ class Guild(SlottedModel, Permissible):
     @property
     def icon_url(self):
         return self.get_icon_url()
+
+    @property
+    def vanity_url(self):
+        return self.get_vanity_url()
 
     @property
     def splash_url(self):
@@ -633,6 +665,25 @@ class Guild(SlottedModel, Permissible):
 
     def get_audit_log_entries(self, *args, **kwargs):
         return self.client.api.guilds_auditlogs_list(self.id, *args, **kwargs)
+
+
+class IntegrationAccount(SlottedModel):
+    id = Field(text)
+    name = Field(text)
+
+
+class Integration(SlottedModel):
+    id = Field(snowflake)
+    name = Field(text)
+    type = Field(text)
+    enabled = Field(bool)
+    syncing = Field(bool)
+    role_id = Field(snowflake)
+    expire_behavior = Field(int)
+    expire_grace_period = Field(int)
+    user = Field(User)
+    account = Field(IntegrationAccount)
+    synced_at = Field(datetime)
 
 
 class AuditLogActionTypes(object):

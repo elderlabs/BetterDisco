@@ -25,14 +25,16 @@ class ClientConfig(Config):
         The shard ID for the current client instance.
     shard_count : int
         The total count of shards running.
+    guild_subscriptions : bool
+        Whether to enable subscription events (e.g. presence and typing).
     max_reconnects : int
         The maximum number of connection retries to make before giving up (0 = never give up).
-    log_level: str
+    log_level : str
         The logging level to use.
     manhole_enable : bool
         Whether to enable the manhole (e.g. console backdoor server) utility.
     manhole_bind : tuple(str, int)
-        A (host, port) combination which the manhole server will bind to (if its
+        A (host, port) combination which the manhole server will bind to (if it's
         enabled using :attr:`manhole_enable`).
     encoder : str
         The type of encoding to use for encoding/decoding data from websockets,
@@ -42,6 +44,7 @@ class ClientConfig(Config):
     token = ''
     shard_id = 0
     shard_count = 1
+    guild_subscriptions = True
     max_reconnects = 5
     log_level = 'info'
 
@@ -111,12 +114,12 @@ class Client(LoggingClass):
         """
         Updates the current clients presence.
 
-        Params
-        ------
+        Parameters
+        ----------
         status : `user.Status`
             The clients current status.
         game : `user.Activity`
-            If passed, the game object to set for the users presence.
+            If passed, the game object to set for the user's presence.
         afk : bool
             Whether the client is currently afk.
         since : float

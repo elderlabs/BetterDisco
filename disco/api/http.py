@@ -34,6 +34,12 @@ class Routes(object):
     GATEWAY_GET = (HTTPMethod.GET, '/gateway')
     GATEWAY_BOT_GET = (HTTPMethod.GET, '/gateway/bot')
 
+    # OAUTH2
+    OAUTH2 = '/oauth2'
+    OAUTH2_TOKEN = (HTTPMethod.POST, OAUTH2 + '/token')
+    OAUTH2_TOKEN_REVOKE = (HTTPMethod.POST, OAUTH2 + '/token/revoke')
+    OAUTH2_APPLICATIONS_ME = (HTTPMethod.GET, OAUTH2 + '/applications/@me')
+
     # Channels
     CHANNELS = '/channels/{channel}'
     CHANNELS_GET = (HTTPMethod.GET, CHANNELS)
@@ -89,7 +95,7 @@ class Routes(object):
     GUILDS_ROLES_MODIFY = (HTTPMethod.PATCH, GUILDS + '/roles/{role}')
     GUILDS_ROLES_DELETE = (HTTPMethod.DELETE, GUILDS + '/roles/{role}')
     GUILDS_PRUNE_COUNT = (HTTPMethod.GET, GUILDS + '/prune')
-    GUILDS_PRUNE_BEGIN = (HTTPMethod.POST, GUILDS + '/prune')
+    GUILDS_PRUNE_CREATE = (HTTPMethod.POST, GUILDS + '/prune')
     GUILDS_VOICE_REGIONS_LIST = (HTTPMethod.GET, GUILDS + '/regions')
     GUILDS_VANITY_URL_GET = (HTTPMethod.GET, GUILDS + '/vanity-url')
     GUILDS_INVITES_LIST = (HTTPMethod.GET, GUILDS + '/invites')
@@ -123,6 +129,10 @@ class Routes(object):
     INVITES = '/invites'
     INVITES_GET = (HTTPMethod.GET, INVITES + '/{invite}')
     INVITES_DELETE = (HTTPMethod.DELETE, INVITES + '/{invite}')
+
+    # Voice
+    VOICE = '/voice'
+    VOICE_REGIONS_LIST = (HTTPMethod.GET, VOICE + '/regions')
 
     # Webhooks
     WEBHOOKS = '/webhooks/{webhook}'
@@ -174,7 +184,9 @@ class APIException(Exception):
                 self.msg = '{} ({} - {})'.format(data['message'], self.code, self.errors)
             elif len(data) == 1:
                 key, value = list(data.items())[0]
-                self.msg = 'Request Failed: {}: {}'.format(key, ', '.join(value))
+                if not isinstance(value, str):
+                    value = ', '.join(value)
+                self.msg = 'Request Failed: {}: {}'.format(key, value)
         except ValueError:
             pass
 
@@ -202,18 +214,18 @@ class HTTPClient(LoggingClass):
             sys.version_info.micro)
 
         self.limiter = RateLimiter()
-        self.headers = {
+        self.after_request = after_request
+
+        self.session = requests.Session()
+        self.session.headers.update({
             'User-Agent': 'DiscordBot (https://github.com/b1naryth1ef/disco {}) Python/{} requests/{}'.format(
                 disco_version,
                 py_version,
                 requests_version),
-        }
+        })
 
         if token:
-            self.headers['Authorization'] = 'Bot ' + token
-
-        self.after_request = after_request
-        self.session = requests.Session()
+            self.session.headers['Authorization'] = 'Bot ' + token
 
     def __call__(self, route, args=None, **kwargs):
         return self.call(route, args, **kwargs)
@@ -235,7 +247,7 @@ class HTTPClient(LoggingClass):
             to create the requestable route. The HTTPClient uses this to track
             rate limits as well.
         kwargs : dict
-            Keyword arguments that will be passed along to the requests library
+            Keyword arguments that will be passed along to the requests library.
 
         Raises
         ------
@@ -246,16 +258,10 @@ class HTTPClient(LoggingClass):
         Returns
         -------
         :class:`requests.Response`
-            The response object for the request
+            The response object for the request.
         """
         args = args or {}
         retry = kwargs.pop('retry_number', 0)
-
-        # Merge or set headers
-        if 'headers' in kwargs:
-            kwargs['headers'].update(self.headers)
-        else:
-            kwargs['headers'] = self.headers
 
         # Build the bucket URL
         args = {k: to_bytes(v) for k, v in six.iteritems(args)}
@@ -315,7 +321,7 @@ class HTTPClient(LoggingClass):
         client suspects is transient. Will always return a value between 500 and
         5000 milliseconds.
 
-        :returns: a random backoff in milliseconds
+        :returns: a random backoff in milliseconds.
         :rtype: float
         """
         return random.randint(500, 5000) / 1000.0

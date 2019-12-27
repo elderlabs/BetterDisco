@@ -507,8 +507,8 @@ class Message(SlottedModel):
         """
         Edit this message.
 
-        Args
-        ----
+        Parameters
+        ----------
         content : str
             The new edited contents of the message.
 
@@ -646,8 +646,8 @@ class Message(SlottedModel):
         """
         Replaces user and role mentions with the result of a given lambda/function.
 
-        Args
-        ----
+        Parameters
+        ----------
         user_replace : function
             A function taking a single argument, the user object mentioned, and
             returning a valid string.
