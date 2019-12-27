@@ -726,3 +726,10 @@ class UserUpdate(GatewayEvent):
     user : :class:`disco.types.user.User`
         The updated user object.
     """
+
+
+class PresencesReplace(GatewayEvent):
+    """
+    Sent after a Gateway outage.
+    """
+    pass
