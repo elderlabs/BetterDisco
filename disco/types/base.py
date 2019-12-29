@@ -3,6 +3,7 @@ import gevent
 import inspect
 import functools
 
+from holster.enum import BaseEnumMeta, EnumAttr
 from datetime import datetime as real_datetime
 
 from disco.util.chains import Chainable
@@ -109,10 +110,10 @@ class Field(object):
     def type_to_deserializer(typ):
         if isinstance(typ, Field) or inspect.isclass(typ) and issubclass(typ, Model):
             return typ
-        # elif isinstance(typ, BaseEnumMeta):
-        #    def _f(raw, client, **kwargs):
-        #        return typ.get(raw)
-        #    return _f
+        elif isinstance(typ, BaseEnumMeta):
+            def _f(raw, client, **kwargs):
+                return typ.get(raw)
+            return _f
         elif typ is None:
             def _f(*args, **kwargs):
                 return None
@@ -123,7 +124,9 @@ class Field(object):
 
     @staticmethod
     def serialize(value, inst=None):
-        if isinstance(value, Model):
+        if isinstance(value, EnumAttr):
+            return value.value
+        elif isinstance(value, Model):
             return value.to_dict(ignore=(inst.ignore_dump if inst else []))
         else:
             if inst and inst.cast:
@@ -265,7 +268,7 @@ def _get_cached_property(name, func):
             return value
 
     def _setattr(self, value):
-        setattr(self, '_' + name)
+        setattr(self, '_' + name, value)
 
     def _delattr(self):
         delattr(self, '_' + name)

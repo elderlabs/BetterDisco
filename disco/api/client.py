@@ -516,7 +516,7 @@ class APIClient(LoggingClass):
 
     def guilds_integrations_create(self, guild, type, id):
         r = self.http(Routes.GUILDS_INTEGRATIONS_CREATE, dict(guild=guild), json={"type": type, "id": id})
-        return Integration.create(r.json())
+        return Integration.create(self.client, r.json())
 
     def guilds_integrations_modify(
             self,

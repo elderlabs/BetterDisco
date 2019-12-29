@@ -262,7 +262,7 @@ class GatewayClient(LoggingClass):
         if code and 4000 <= code <= 4010:
             self.session_id = None
 
-        wait_time = self.reconnects * 5
+        wait_time = self.reconnects * 5 if self.reconnects < 6 else 30
         self.log.info('Will attempt to %s after %s seconds', 'resume' if self.session_id else 'reconnect', wait_time)
         gevent.sleep(wait_time)
 
