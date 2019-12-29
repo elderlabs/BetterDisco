@@ -93,6 +93,7 @@ class ActivityTypes(object):
     STREAMING = 1
     LISTENING = 2
     WATCHING = 3
+    CUSTOM = 4
 
 
 class Status(object):
