@@ -6,7 +6,7 @@ from six.moves import map
 from disco.util.snowflake import to_snowflake
 from disco.util.functional import one_or_many, chunks
 from disco.types.user import User
-from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, text, cached_property
+from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, text, cached_property
 from disco.types.permissions import Permissions, Permissible, PermissionValue
 
 
@@ -120,19 +120,23 @@ class Channel(SlottedModel, Permissible):
         Channel permissions overwrites.
     """
     id = Field(snowflake)
+    type = Field(enum(ChannelType))
     guild_id = Field(snowflake)
+    position = Field(int)
+    overwrites = AutoDictField(PermissionOverwrite, 'id', alias='permission_overwrites')
     name = Field(text)
     topic = Field(text)
+    nsfw = Field(bool)
     last_message_id = Field(snowflake)
-    position = Field(int)
     bitrate = Field(int)
     user_limit = Field(int)
-    recipients = AutoDictField(User, 'id')
-    nsfw = Field(bool)
-    type = Field(enum(ChannelType))
-    overwrites = AutoDictField(PermissionOverwrite, 'id', alias='permission_overwrites')
-    parent_id = Field(snowflake)
     rate_limit_per_user = Field(int)
+    recipients = AutoDictField(User, 'id')
+    icon = Field(text)
+    owner_id = Field(snowflake)
+    application_id = Field(snowflake)
+    parent_id = Field(snowflake)
+    last_pin_timestamp = Field(datetime)
 
     def __init__(self, *args, **kwargs):
         super(Channel, self).__init__(*args, **kwargs)

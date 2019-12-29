@@ -9,13 +9,14 @@ class TestEmbeds(TestCase):
         self.assertDictEqual(
             embed.to_dict(),
             {
-                'image': {},
                 'author': {},
-                'video': {},
-                'thumbnail': {},
-                'footer': {},
                 'fields': [],
+                'footer': {},
+                'image': {},
+                'provider': {},
+                'thumbnail': {},
                 'type': 'rich',
+                'video': {},
             })
 
     def test_embed(self):
