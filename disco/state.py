@@ -229,6 +229,11 @@ class State(object):
         elif event.channel.is_dm:
             self.dms[event.channel.id] = event.channel
             self.channels[event.channel.id] = event.channel
+            for user in six.itervalues(event.channel.recipients):
+                if user.id not in self.users:
+                    self.users[user.id] = user
+                else:
+                    event.channel.recipients[user.id] = self.users[user.id]
 
     def on_channel_update(self, event):
         if event.channel.id in self.channels:
@@ -285,6 +290,10 @@ class State(object):
         if event.member.guild_id not in self.guilds:
             return
 
+        # Avoid adding duplicate events to member_count.
+        if event.member.id not in self.guilds[event.member.guild_id].members:
+            self.guilds[event.member.guild_id].member_count += 1
+
         self.guilds[event.member.guild_id].members[event.member.id] = event.member
 
     def on_guild_member_update(self, event):
@@ -303,6 +312,8 @@ class State(object):
         if event.user.id not in self.guilds[event.guild_id].members:
             return
 
+        self.guilds[event.guild_id].member_count -= 1
+
         del self.guilds[event.guild_id].members[event.user.id]
 
     def on_guild_members_chunk(self, event):
@@ -318,6 +329,15 @@ class State(object):
                 self.users[member.id] = member.user
             else:
                 member.user = self.users[member.id]
+
+        if not event.presences:
+            return
+
+        for presence in event.presences:
+            # TODO: this matches the recursive, hackfix method found in on_presence_update
+            user = presence.user
+            user.presence = presence
+            self.users[user.id].inplace_update(user)
 
     def on_guild_role_create(self, event):
         if event.guild_id not in self.guilds:
