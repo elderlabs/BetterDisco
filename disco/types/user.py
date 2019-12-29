@@ -45,7 +45,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     verified = Field(bool)
     email = Field(text)
     flags = Field(int)
-    premium_type = Field(int)
+    premium_type = Field(enum(PremiumType))
 
     presence = Field(None)
 
@@ -103,10 +103,10 @@ class Status(object):
     OFFLINE = 'OFFLINE'
 
 
-class ClientStatus(object):
-    DESKTOP = 'DESKTOP'
-    MOBILE = 'MOBILE'
-    WEB = 'WEB'
+class ClientStatus(SlottedModel):
+    desktop = Field(str)
+    mobile = Field(str)
+    web = Field(str)
 
 
 class ActivityParty(SlottedModel):
@@ -170,5 +170,4 @@ class Presence(SlottedModel):
     game = Field(Activity)
     guild_id = Field(snowflake)
     status = Field(enum(Status))
-    activity = Field(Activity, 'application_id')
-    client_status = Field(enum(ClientStatus))
+    client_status = Field(ClientStatus)
