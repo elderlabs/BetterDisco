@@ -373,6 +373,45 @@ class Channel(SlottedModel, Permissible):
         """
         return PermissionOverwrite.create_for_channel(self, *args, **kwargs)
 
+    def create_reaction(self, message, emoji):
+        """
+        Adds a reaction to a message in this channel.
+
+        Parameters
+        ----------
+        message : snowflake|`Message`
+            The message to add a reaction to.
+        emoji : str
+            The reaction to add to the message.
+        """
+        self.client.api.channels_messages_reactions_create(self.id, to_snowflake(message), emoji)
+
+    def delete_reaction(self, message, emoji, user=None):
+        """
+        Removes reactions from a message in this channel.
+
+        Parameters
+        ----------
+        message : snowflake|`Message`
+            The message to add a reaction to.
+        emoji : str
+            The reaction to remove from the message.
+        user : User
+            The user that added the reaction to the message.
+        """
+        self.client.api.channels_messages_reactions_delete(self.id, to_snowflake(message), emoji, user)
+
+    def delete_reactions_message(self, message):
+        """
+        Removes all reactions from a message in this channel.
+
+        Parameters
+        ----------
+        message : snowflake|`Message`
+            The message to add a reaction to.
+        """
+        self.client.api.channels_messages_reactions_delete_all(self.id, to_snowflake(message))
+
     def delete_message(self, message):
         """
         Deletes a single message from this channel.
