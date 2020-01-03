@@ -19,8 +19,7 @@ class ClientConfig(Config):
     Attributes
     ----------
     token : str
-        Discord authentication token, can be validated using the
-        `disco.util.token.is_valid_token` function.
+        Discord authentication token.
     shard_id : int
         The shard ID for the current client instance.
     shard_count : int
