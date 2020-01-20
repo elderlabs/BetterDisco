@@ -228,6 +228,9 @@ class APIClient(LoggingClass):
 
         self.http(route, obj)
 
+    def channels_messages_reactions_delete_emoji(self, channel, message, emoji):
+        self.http(Routes.CHANNELS_MESSAGES_REACTIONS_DELETE_EMOJI, dict(channel=channel, message=message, emoji=emoji))
+
     def channels_messages_reactions_delete_all(self, channel, message):
         self.http(Routes.CHANNELS_MESSAGES_REACTIONS_DELETE_ALL, dict(channel=channel, message=message))
 
