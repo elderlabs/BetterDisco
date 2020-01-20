@@ -7,6 +7,7 @@ from disco.types.channel import Channel, PermissionOverwrite
 from disco.types.message import Message, MessageReactionEmoji
 from disco.types.voice import VoiceState
 from disco.types.guild import Guild, GuildMember, Role, GuildEmoji
+from disco.types.invite import Invite
 from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime
 from disco.util.string import underscore
 
@@ -739,3 +740,26 @@ class PresencesReplace(GatewayEvent):
     Sent after a Gateway outage.
     """
     pass
+
+
+@wraps_model(Invite)
+class InviteCreate(GatewayEvent):
+    """
+    Sent when a guild invite is created.
+
+    Attributes
+    -----
+    invite : :class:`disco.types.invite.Invite`
+        The invite object.
+    """
+
+
+class InviteDelete(GatewayEvent):
+    """
+    Sent when a guild invite is deleted.
+
+    Attributes
+    -----
+    invite : :class:`disco.types.invite.Invite`
+        The invite object.
+    """
