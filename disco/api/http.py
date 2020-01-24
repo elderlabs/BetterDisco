@@ -294,10 +294,8 @@ class HTTPClient(LoggingClass):
             self.log.warning('Request failed with code %s: %s', r.status_code, r.content)
             response.exception = APIException(r)
             raise response.exception
-        else:
-            if r.status_code == 429:
-                self.log.warning(
-                    'Request responded w/ 429, retrying (but this should not happen, check your clock sync')
+        elif r.status_code == 429:
+            self.log.warning('Request responded w/ 429, retrying (but this should not happen, check your clock sync')
 
             # If we hit the max retries, throw an error
             retry += 1
@@ -306,9 +304,14 @@ class HTTPClient(LoggingClass):
                 raise APIException(r, retries=self.MAX_RETRIES)
 
             backoff = self.random_backoff()
-            self.log.warning('Request to `{}` failed with code {}, retrying after {}s ({})'.format(
-                url, r.status_code, backoff, r.content,
-            ))
+            if r.status_code == 502:
+                self.log.warning('Request to `{}` failed with code {}, retrying after {}s'.format(
+                    url, r.status_code, backoff,
+                ))
+            else:
+                self.log.warning('Request to `{}` failed with code {}, retrying after {}s ({})'.format(
+                    url, r.status_code, backoff, r.content,
+                ))
             gevent.sleep(backoff)
 
             # Otherwise just recurse and try again
