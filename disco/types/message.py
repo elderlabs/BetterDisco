@@ -5,11 +5,12 @@ import functools
 import unicodedata
 
 from disco.types.base import (
-    SlottedModel, Field, ListField, AutoDictField, snowflake, text,
-    datetime, enum, cached_property,
+    BitsetMap, BitsetValue, SlottedModel, Field, ListField, AutoDictField,
+    snowflake, text, datetime, enum, cached_property,
 )
 from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
+from disco.types.channel import ChannelType
 from disco.types.user import User
 
 
@@ -26,6 +27,7 @@ class MessageType(object):
     USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_1 = 9
     USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_2 = 10
     USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_3 = 11
+    CHANNEL_FOLLOW_ADD = 12
 
 
 class MessageActivityType(object):
@@ -95,16 +97,16 @@ class MessageReaction(SlottedModel):
 
     Attributes
     ----------
+    emoji : `MessageReactionEmoji`
+        The emoji which was reacted.
     count : int
         The number of users who reacted with this emoji.
     me : bool
         Whether the current user reacted with this emoji.
-    emoji : `MessageReactionEmoji`
-        The emoji which was reacted.
     """
+    emoji = Field(MessageReactionEmoji)
     count = Field(int)
     me = Field(bool)
-    emoji = Field(MessageReactionEmoji)
 
 
 class MessageApplication(SlottedModel):
@@ -129,6 +131,12 @@ class MessageApplication(SlottedModel):
     description = Field(text)
     icon = Field(text)
     name = Field(text)
+
+
+class MessageReference(SlottedModel):
+    message_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    guild_id = Field(snowflake)
 
 
 class MessageActivity(SlottedModel):
@@ -174,15 +182,15 @@ class MessageEmbedImage(SlottedModel):
         The URL for the image.
     proxy_url : str
         A proxy URL for the image, set by Discord.
-    height : int
-        The height of the image, set by Discord.
     width : int
         The width of the image, set by Discord.
+    height : int
+        The height of the image, set by Discord.
     """
     url = Field(text)
     proxy_url = Field(text)
-    height = Field(int)
     width = Field(int)
+    height = Field(int)
 
 
 class MessageEmbedThumbnail(SlottedModel):
@@ -195,15 +203,15 @@ class MessageEmbedThumbnail(SlottedModel):
         The thumbnail URL.
     proxy_url : str
         A proxy URL for the thumbnail, set by Discord.
-    height : int
-        The height of the thumbnail, set by Discord.
     width : int
         The width of the thumbnail, set by Discord.
+    height : int
+        The height of the thumbnail, set by Discord.
     """
     url = Field(text)
     proxy_url = Field(text)
-    height = Field(int)
     width = Field(int)
+    height = Field(int)
 
 
 class MessageEmbedVideo(SlottedModel):
@@ -214,10 +222,10 @@ class MessageEmbedVideo(SlottedModel):
     ----------
     url : str
         The URL for the video.
-    height : int
-        The height of the video, set by Discord.
     width : int
         The width of the video, set by Discord.
+    height : int
+        The height of the video, set by Discord.
     """
     url = Field(text)
     height = Field(int)
@@ -362,12 +370,12 @@ class MessageAttachment(SlottedModel):
         The id of this attachment.
     filename : str
         The filename of this attachment.
-    size : int
-        Size of the attachment.
     url : str
         The URL of this attachment.
     proxy_url : str
         The URL to proxy through when downloading the attachment.
+    size : int
+        Size of the attachment.
     height : int
         Height of the attachment.
     width : int
@@ -375,11 +383,30 @@ class MessageAttachment(SlottedModel):
     """
     id = Field(str)
     filename = Field(text)
-    size = Field(int)
     url = Field(text)
     proxy_url = Field(text)
+    size = Field(int)
     height = Field(int)
     width = Field(int)
+
+
+class ChannelMention(SlottedModel):
+    id = Field(snowflake)
+    guild_id = Field(snowflake)
+    type = Field(enum(ChannelType))
+    name = Field(text)
+
+
+class MessageFlags(BitsetMap):
+    CROSSPOSTED = 1 << 0
+    IS_CROSSPOST = 1 << 1
+    SUPPRESS_EMBEDS = 1 << 2
+    SOURCE_MESSAGE_DELETED = 1 << 3
+    URGENT = 1 << 4
+
+
+class MessageFlagValue(BitsetValue):
+    map = MessageFlags
 
 
 class Message(SlottedModel):
@@ -392,10 +419,14 @@ class Message(SlottedModel):
         The ID of this message.
     channel_id : snowflake
         The channel ID this message was sent in.
+    type : `MessageType`
+        Type of the message.
     author : :class:`disco.types.user.User`
         The author of this message.
     content : str
         The unicode contents of this message.
+    nonce : str
+        The nonce of this message.
     timestamp : datetime
         When this message was created.
     edited_timestamp : datetime?
@@ -404,48 +435,51 @@ class Message(SlottedModel):
         Whether this is a TTS (text-to-speech) message.
     mention_everyone : bool
         Whether this message has an @everyone which mentions everyone.
+    pinned : bool
+        Whether this message is pinned in the channel.
     mentions : dict[snowflake, `User`]
         Users mentioned within this message.
     mention_roles : list[snowflake]
         IDs for roles mentioned within this message.
-    attachments : dict[`MessageAttachment`]
-        Attachments for this message.
     embeds : list[`MessageEmbed`]
         Embeds for this message.
+    mention_channels : list[`ChannelMention`]
+        The channels mentioned in this message if it is cross-posted.
+    attachments : dict[`MessageAttachment`]
+        Attachments for this message.
     reactions : list[`MessageReaction`]
         Reactions for this message.
-    nonce : str
-        The nonce of this message.
-    pinned : bool
-        Whether this message is pinned in the channel.
-    webhook_id : snowflake
-        The id if the message is a webhook.
-    type : `MessageType`
-        Type of the message.
     activity : `MessageActivity`
         The activity of a Rich Presence-related chat embed.
     application : `MessageApplication`
         The application of a Rich Presence-related chat embed.
+    message_reference: `MessageReference`
+        The reference of a cross-posted message.
+    flags: `MessageFlagValue`
+        The flags attached to a message.
     """
     id = Field(snowflake)
     channel_id = Field(snowflake)
+    webhook_id = Field(snowflake)
+    type = Field(enum(MessageType))
     author = Field(User)
     content = Field(text)
+    nonce = Field(snowflake)
     timestamp = Field(datetime)
     edited_timestamp = Field(datetime)
     tts = Field(bool)
     mention_everyone = Field(bool)
+    pinned = Field(bool)
     mentions = AutoDictField(User, 'id')
     mention_roles = ListField(snowflake)
-    attachments = AutoDictField(MessageAttachment, 'id')
     embeds = ListField(MessageEmbed)
+    mention_channels = ListField(ChannelMention)
+    attachments = AutoDictField(MessageAttachment, 'id')
     reactions = ListField(MessageReaction)
-    nonce = Field(snowflake)
-    pinned = Field(bool)
-    webhook_id = Field(snowflake)
-    type = Field(enum(MessageType))
     activity = Field(MessageActivity)
     application = Field(MessageApplication)
+    message_reference = Field(MessageReference)
+    flags = Field(MessageFlagValue)
 
     def __str__(self):
         return '<Message {} ({})>'.format(self.id, self.channel_id)
@@ -529,6 +563,24 @@ class Message(SlottedModel):
             The deleted message object.
         """
         return self.client.api.channels_messages_delete(self.channel_id, self.id)
+
+    def set_embeds_suppressed(self, state):
+        """
+        Toggle this message's embed suppression.
+
+        Parameters
+        ----------
+        `state`
+            Whether this message's embeds should be suppressed.
+        """
+        flags = int(self.flags or 0)
+
+        if state:
+            flags |= MessageFlags.SUPPRESS_EMBEDS
+        else:
+            flags &= ~MessageFlags.SUPPRESS_EMBEDS
+
+        self.edit(flags=flags)
 
     def get_reactors(self, emoji, *args, **kwargs):
         """
