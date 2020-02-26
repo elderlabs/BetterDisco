@@ -1,5 +1,5 @@
 gevent==1.4.0
--e git+https://github.com/elderlabs/holster.git@master#egg=holster
+-e git+https://github.com/elderlabs/holster#egg=holster
 requests==2.23.0
 six==1.14.0
 websocket-client==0.56.0
