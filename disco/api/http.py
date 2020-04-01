@@ -296,7 +296,7 @@ class HTTPClient(LoggingClass):
             raise response.exception
         elif r.status_code == 104 or r.status_code == 429 or r.status_code == 502:
             if r.status_code == 429:
-                self.log.warning('Request responded w/ 429, retrying (but this should not happen, check your clock sync')
+                self.log.warning('Request responded w/ 429, retrying (but this should not happen, check your clock sync)')
 
             # If we hit the max retries, throw an error
             retry += 1
