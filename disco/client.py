@@ -26,6 +26,8 @@ class ClientConfig(Config):
         The total count of shards running.
     guild_subscriptions : bool
         Whether to enable subscription events (e.g. presence and typing).
+    intents : int
+        Defines which events the bot will receive from the API.
     max_reconnects : int
         The maximum number of connection retries to make before giving up (0 = never give up).
     log_level : str
@@ -44,6 +46,7 @@ class ClientConfig(Config):
     shard_id = 0
     shard_count = 1
     guild_subscriptions = True
+    intents = 513
     max_reconnects = 5
     log_level = 'info'
 
