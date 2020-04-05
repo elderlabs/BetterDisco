@@ -1,4 +1,3 @@
-from disco.types.guild import GuildMember
 from disco.types.base import SlottedModel, text, Field, snowflake, cached_property
 
 
@@ -6,7 +5,6 @@ class VoiceState(SlottedModel):
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
     user_id = Field(snowflake)
-    member = Field(GuildMember)
     session_id = Field(str)
     deaf = Field(bool)
     mute = Field(bool)
