@@ -1,4 +1,4 @@
-from disco.types import GuildMember
+from disco.types.guild import GuildMember
 from disco.types.base import SlottedModel, text, Field, snowflake, cached_property
 
 
