@@ -167,6 +167,19 @@ class GuildEmbed(SlottedModel):
     channel_id = Field(snowflake)
 
 
+class GuildPreview(SlottedModel):
+    id = Field(int)
+    name = Field(str)
+    icon = Field(str)
+    splash = Field(str)
+    discovery_splash = Field(str)
+    emojis = AutoDictField(GuildEmoji, 'id')
+    features = ListField(str)
+    approximate_member_count = Field(int)
+    approximate_presence_count = Field(int)
+    description = Field(str)
+
+
 class GuildMember(SlottedModel):
     """
     A GuildMember object.
@@ -327,8 +340,6 @@ class Guild(SlottedModel, Permissible):
         Guild's icon image hash
     splash : str
         Guild's splash image hash
-    discovery_splash : str
-        Guild's discovery splash image hash
     widget_channel_id : snowflake
         The id of the server widget channel
     banner : str
@@ -373,10 +384,6 @@ class Guild(SlottedModel, Permissible):
         Guild's premium tier.
     premium_subscription_count : int
         The amount of users using their Nitro boost on this guild.
-    approximate_member_count : int
-        The approximate number of guild members.
-    approximate_presence_count : int
-        The approximate amount of online guild members.
     """
     id = Field(snowflake)
     owner = Field(bool)
@@ -388,7 +395,6 @@ class Guild(SlottedModel, Permissible):
     name = Field(text)
     icon = Field(text)
     splash = Field(text)
-    discovery_splash = Field(text)
     banner = Field(text)
     region = Field(text)
     afk_timeout = Field(int)
@@ -417,8 +423,6 @@ class Guild(SlottedModel, Permissible):
     vanity_url_code = Field(text)
     max_presences = Field(int, default=5000)
     max_members = Field(int)
-    approximate_member_count = Field(int)
-    approximate_presence_count = Field(int)
     description = Field(text)
 
     def __init__(self, *args, **kwargs):
