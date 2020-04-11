@@ -695,6 +695,7 @@ class Integration(SlottedModel):
     enabled = Field(bool)
     syncing = Field(bool)
     role_id = Field(snowflake)
+    enable_emoticons = Field(bool)
     expire_behavior = Field(int)
     expire_grace_period = Field(int)
     user = Field(User)

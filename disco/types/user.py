@@ -21,12 +21,14 @@ class UserFlags(object):
     DISCORD_EMPLOYEE = 1 << 0
     DISCORD_PARTNER = 1 << 1
     HS_EVENTS = 1 << 2
-    BUG_HUNTER = 1 << 3
+    BUG_HUNTER_LVL1 = 1 << 3
     HS_BRAVERY = 1 << 6
     HS_BRILLIANCE = 1 << 7
     HS_BALANCE = 1 << 8
     EARLY_SUPPORTER = 1 << 9
     TEAM_USER = 1 << 10
+    SYSTEM = 1 << 12
+    BUG_HUNTER_LVL2 = 1 << 14
 
 
 class PremiumType(object):
@@ -34,17 +36,33 @@ class PremiumType(object):
     NITRO = 2
 
 
+class UserConnection(object):
+    id = Field(str)
+    name = Field(str)
+    type = Field(str)
+    revoked = Field(bool)
+    verified = Field(bool)
+    friend_sync = Field(bool)
+    show_activity = Field(bool)
+    visibility = Field(int)
+
+class VisibilityType(object):
+    NONE = 0
+    EVERYONE = 1
+
 class User(SlottedModel, with_equality('id'), with_hash('id')):
     id = Field(snowflake)
     username = Field(text)
     discriminator = Field(text)
     avatar = Field(text)
     bot = Field(bool, default=False)
+    system = Field(bool)
     mfa_enabled = Field(bool)
     locale = Field(text)
     verified = Field(bool)
     email = Field(text)
-    flags = Field(int)
+    public_flags = Field(enum(UserFlags))
+    flags = Field(enum(UserFlags))
     premium_type = Field(enum(PremiumType))
 
     presence = Field(None)
