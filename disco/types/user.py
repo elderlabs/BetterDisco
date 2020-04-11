@@ -46,9 +46,11 @@ class UserConnection(object):
     show_activity = Field(bool)
     visibility = Field(int)
 
+
 class VisibilityType(object):
     NONE = 0
     EVERYONE = 1
+
 
 class User(SlottedModel, with_equality('id'), with_hash('id')):
     id = Field(snowflake)
@@ -56,15 +58,14 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     discriminator = Field(text)
     avatar = Field(text)
     bot = Field(bool, default=False)
+    public_flags = Field(enum(UserFlags))
     system = Field(bool)
     mfa_enabled = Field(bool)
     locale = Field(text)
     verified = Field(bool)
     email = Field(text)
-    public_flags = Field(enum(UserFlags))
     flags = Field(enum(UserFlags))
     premium_type = Field(enum(PremiumType))
-
     presence = Field(None)
 
     def get_avatar_url(self, still_format='webp', animated_format='gif', size=1024):
