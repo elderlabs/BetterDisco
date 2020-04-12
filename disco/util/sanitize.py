@@ -22,11 +22,14 @@ def _re_sub_mention(mention):
         return mention
 
 
-def S(text, escape_mentions=True, escape_codeblocks=False):
+def S(text, escape_mentions=True, escape_codeblocks=False, escape_rtl=True):
     if escape_mentions:
         text = MENTION_RE.sub(_re_sub_mention, text)
 
     if escape_codeblocks:
         text = text.replace('`', MODIFIER_GRAVE_ACCENT)
+
+    if escape_rtl:
+        text = u'\u202B' + text + u'\u202B'
 
     return text
