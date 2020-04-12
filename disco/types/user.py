@@ -22,13 +22,19 @@ class UserFlags(object):
     DISCORD_PARTNER = 1 << 1
     HS_EVENTS = 1 << 2
     BUG_HUNTER_LVL1 = 1 << 3
+    MFA_SMS = 1 << 4
+    PREMIUM_PROMO_DISMISSED = 1 << 5
     HS_BRAVERY = 1 << 6
     HS_BRILLIANCE = 1 << 7
     HS_BALANCE = 1 << 8
     EARLY_SUPPORTER = 1 << 9
     TEAM_USER = 1 << 10
     SYSTEM = 1 << 12
+    UNREAD_SYS_MSG = 1 << 13
     BUG_HUNTER_LVL2 = 1 << 14
+    UNDERAGE_DELETED = 1 << 15
+    VERIFIED_BOT = 1 << 16
+    VERIFIED_DEV = 1 << 17
 
 
 class PremiumType(object):
@@ -58,13 +64,13 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     discriminator = Field(text)
     avatar = Field(text)
     bot = Field(bool, default=False)
-    public_flags = Field(enum(UserFlags))
-    system = Field(bool)
+    system = Field(bool, default=False)
     mfa_enabled = Field(bool)
     locale = Field(text)
     verified = Field(bool)
     email = Field(text)
-    flags = Field(enum(UserFlags))
+    flags = Field(int)
+    public_flags = Field(int)
     premium_type = Field(enum(PremiumType))
     presence = Field(None)
 

@@ -119,12 +119,12 @@ class GatewayClient(LoggingClass):
     def handle_reconnect(self, _):
         self.log.warning('Received RECONNECT request, forcing a fresh reconnect')
         self.session_id = None
-        self.ws.close()
+        self.ws.close(status=4000)
 
     def handle_invalid_session(self, _):
         self.log.warning('Received INVALID_SESSION, forcing a fresh reconnect')
         self.session_id = None
-        self.ws.close()
+        self.ws.close(status=4000)
 
     def handle_hello(self, packet):
         self.log.info('Received HELLO, starting heartbeater...')
