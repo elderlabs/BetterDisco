@@ -22,7 +22,7 @@ def _re_sub_mention(mention):
         return mention
 
 
-def S(text, escape_mentions=True, escape_codeblocks=False, escape_rtl=True):
+def S(text, escape_mentions=True, escape_codeblocks=False, escape_rtl=False):
     if escape_mentions:
         text = MENTION_RE.sub(_re_sub_mention, text)
 
