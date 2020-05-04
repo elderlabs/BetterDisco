@@ -617,6 +617,9 @@ class Guild(SlottedModel, Permissible):
     def get_emoji(self, emoji):
         return self.client.api.guilds_emojis_get(self.id, emoji)
 
+    def get_preview(self):
+        return self.client.api.guilds_preview_get(self.id)
+
     def get_voice_regions(self):
         return self.client.api.guilds_voice_regions_list(self.id)
 

@@ -14,7 +14,7 @@ from disco.types.message import Message
 from disco.types.oauth import Application, Connection
 from disco.types.guild import (
     Guild, GuildMember, GuildBan, GuildEmbed, PruneCount, Role, GuildEmoji,
-    AuditLogEntry, Integration, DiscoveryChecklist
+    AuditLogEntry, Integration, DiscoveryChecklist, GuildPreview
 )
 from disco.types.channel import Channel
 from disco.types.invite import Invite
@@ -593,6 +593,10 @@ class APIClient(LoggingClass):
             Routes.GUILDS_EMOJIS_DELETE,
             dict(guild=guild, emoji=emoji),
             headers=_reason_header(reason))
+
+    def guilds_preview_get(self, guild):
+        r = self.http(Routes.GUILDS_PREVIEW_GET, dict(guild=guild))
+        return GuildPreview.create(self.client, r.json())
 
     def guilds_auditlogs_list(self, guild, before=None, user_id=None, action_type=None, limit=50):
         r = self.http(Routes.GUILDS_AUDITLOGS_LIST, dict(guild=guild), params=optional(
