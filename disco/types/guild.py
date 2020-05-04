@@ -843,7 +843,7 @@ class AuditLogEntry(SlottedModel):
             return self.guild.emojis.get(self.target_id)
 
 
-class DiscoveryChecklistHealthScore(object):
+class DiscoveryChecklistHealthScore(SlottedModel):
     inactive_users_raw = Field(int)
     participator_retention_30 = Field(int)
     participator_retention_raw = Field(int)
