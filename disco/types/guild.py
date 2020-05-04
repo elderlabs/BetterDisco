@@ -420,7 +420,7 @@ class Guild(SlottedModel, Permissible):
     premium_subscription_count = Field(int, default=0)
     system_channel_flags = Field(int)
     preferred_locale = Field(str)
-    vanity_url_code = Field(text)
+    vanity_url_code = Field(text, default=None)
     max_presences = Field(int, default=25000)
     max_members = Field(int)
     description = Field(text)
@@ -847,13 +847,13 @@ class AuditLogEntry(SlottedModel):
 
 
 class DiscoveryChecklistHealthScore(SlottedModel):
-    inactive_users_raw = Field(int)
-    participator_retention_30 = Field(int)
-    participator_retention_raw = Field(int)
-    participators_raw = Field(int)
-    pct_participators_30 = Field(int)
-    pct_participators_raw = Field(int)
-    retained_users_raw = Field(int)
+    inactive_users_raw = Field(text, default=None)
+    participator_retention_30 = Field(text, default=None)
+    participator_retention_raw = Field(text, default=None)
+    participators_raw = Field(text, default=None)
+    pct_participators_30 = Field(text, default=None)
+    pct_participators_raw = Field(text, default=None)
+    retained_users_raw = Field(text, default=None)
 
 
 class DiscoveryChecklist(SlottedModel):
