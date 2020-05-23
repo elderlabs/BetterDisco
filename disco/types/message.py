@@ -28,6 +28,8 @@ class MessageType(object):
     USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_2 = 10
     USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_3 = 11
     CHANNEL_FOLLOW_ADD = 12
+    GUILD_DISCOVERY_DISQUALIFIED = 14
+    GUILD_DISCOVERY_REQUALIFIED = 15
 
 
 class MessageActivityType(object):
@@ -395,6 +397,18 @@ class ChannelMention(SlottedModel):
     guild_id = Field(snowflake)
     type = Field(enum(ChannelType))
     name = Field(text)
+
+
+class AllowedMentionsTypes(object):
+    ROLE = 'role'
+    USER = 'user'
+    EVERYONE = 'everyone'
+
+
+class AllowedMentions(SlottedModel):
+    parse = ListField(AllowedMentionsTypes)
+    roles = ListField(snowflake)
+    users = ListField(snowflake)
 
 
 class MessageFlags(BitsetMap):
