@@ -93,7 +93,7 @@ class GatewayClient(LoggingClass):
             if not self._heartbeat_acknowledged:
                 self.log.warning('Received HEARTBEAT without HEARTBEAT_ACK, forcing a fresh reconnect')
                 self._heartbeat_acknowledged = True
-                self.ws.close(status=4000)
+                self.ws.close()
                 return
             self._last_heartbeat = time.time()
 
@@ -119,12 +119,12 @@ class GatewayClient(LoggingClass):
     def handle_reconnect(self, _):
         self.log.warning('Received RECONNECT request, forcing a fresh reconnect')
         self.session_id = None
-        self.ws.close(status=4000)
+        self.ws.close()
 
     def handle_invalid_session(self, _):
         self.log.warning('Received INVALID_SESSION, forcing a fresh reconnect')
         self.session_id = None
-        self.ws.close(status=4000)
+        self.ws.close()
 
     def handle_hello(self, packet):
         self.log.info('Received HELLO, starting heartbeater...')
