@@ -144,6 +144,7 @@ class APIClient(LoggingClass):
             attachment=None,
             attachments=[],
             embed=None,
+            allowed_mentions=None,
             sanitize=False):
 
         payload = {
@@ -164,6 +165,9 @@ class APIClient(LoggingClass):
 
         if embed:
             payload['embed'] = embed.to_dict()
+
+        if allowed_mentions:
+            payload['allowed_mentions'] = allowed_mentions.to_dict()
 
         if attachments:
             if len(attachments) > 1:
