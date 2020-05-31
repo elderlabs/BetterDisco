@@ -75,7 +75,7 @@ class GatewayEvent(six.with_metaclass(GatewayEventMeta, Model)):
         except AttributeError:
             return object.__getattribute__(self, name)
 
-        return getattr(getattr(self, _proxy), name)
+        return getattr(getattr(self, _proxy), str(name))
 
 
 def debug(func=None, match=None):
