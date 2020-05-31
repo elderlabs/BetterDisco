@@ -447,6 +447,9 @@ class Channel(SlottedModel, Permissible):
             for msg in messages:
                 self.delete_message(msg)
 
+    def publish_message(self, message):
+        return self.client.api.channels_messages_publish(self.id, message.id)
+
     def delete(self, **kwargs):
         assert (self.is_dm or self.guild.can(self.client.state.me, Permissions.MANAGE_CHANNELS)), 'Invalid Permissions'
         self.client.api.channels_delete(self.id, **kwargs)

@@ -60,6 +60,7 @@ class Routes(object):
                                                CHANNELS + '/messages/{message}/reactions/{emoji}/{user}')
     CHANNELS_MESSAGES_REACTIONS_DELETE_EMOJI = (HTTPMethod.DELETE,
                                                 CHANNELS + '/messages/{message}/reactions/{emoji}')
+    CHANNELS_MESSAGES_PUBLISH = (HTTPMethod.POST, CHANNELS + '/messages/{message}/crosspost')
     CHANNELS_PERMISSIONS_MODIFY = (HTTPMethod.PUT, CHANNELS + '/permissions/{permission}')
     CHANNELS_PERMISSIONS_DELETE = (HTTPMethod.DELETE, CHANNELS + '/permissions/{permission}')
     CHANNELS_INVITES_LIST = (HTTPMethod.GET, CHANNELS + '/invites')
