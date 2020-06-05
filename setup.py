@@ -11,12 +11,12 @@ with open('README.md') as f:
 
 extras_require = {
     'voice': ['telecom-py==0.0.4'],
-    'http': ['flask==0.12.2'],
-    'yaml': ['pyyaml==3.12'],
+    'http': ['flask==1.1.2'],
+    'yaml': ['pyyaml==5.3.1'],
     'music': ['youtube_dl>=2018.1.21'],
     'performance': [
         'erlpack==0.3.2' if sys.version_info.major == 2 else 'earl-etf==2.1.2',
-        'ujson==1.35',
+        'ujson==3.0.0',
         'wsaccel==0.6.2',
     ],
     'sharding': ['gipc==0.6.0'],

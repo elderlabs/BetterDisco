@@ -69,19 +69,17 @@ class GatewayEvent(six.with_metaclass(GatewayEventMeta, Model)):
 
         return obj
 
+    # TODO: FIX THIS
     def __getattr__(self, name):
         try:
             _proxy = object.__getattribute__(self, '_proxy')
         except AttributeError:
             return object.__getattribute__(self, name)
 
-        # TODO: This is a dirty 'fix' to silence a bug I don't fully understand in GuildBanAdd/GuildBanRemove\'s
-        #  wrapper, which returns an empty User class object, thus cannot return a _proxy or name value.
-        #  May someone that has the time to understand this please find a fix. - Dooley_labs
         try:
             return getattr(getattr(self, _proxy), name)
         except TypeError:
-            pass
+            return object.__getattribute__(self, name)
 
 
 def debug(func=None, match=None):
