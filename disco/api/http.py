@@ -39,6 +39,7 @@ class Routes(object):
     OAUTH2_TOKEN = (HTTPMethod.POST, OAUTH2 + '/token')
     OAUTH2_TOKEN_REVOKE = (HTTPMethod.POST, OAUTH2 + '/token/revoke')
     OAUTH2_APPLICATIONS_ME = (HTTPMethod.GET, OAUTH2 + '/applications/@me')
+    OAUTH2_AUTHORIZE = (HTTPMethod.GET, OAUTH2 + '/authorize')
 
     # Channels
     CHANNELS = '/channels/{channel}'
