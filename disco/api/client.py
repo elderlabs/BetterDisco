@@ -144,12 +144,19 @@ class APIClient(LoggingClass):
             attachment=None,
             attachments=[],
             embed=None,
-            allowed_mentions=None,
+            allowed_mention_types=[],
+            allowed_mention_users=[],
+            allowed_mention_roles=[],
             sanitize=False):
 
         payload = {
             'nonce': nonce,
             'tts': tts,
+            'allowed_mentions': {
+                'parse': [],
+                'users': [],
+                'roles': [],
+            },
         }
 
         if attachment:
@@ -166,8 +173,12 @@ class APIClient(LoggingClass):
         if embed:
             payload['embed'] = embed.to_dict()
 
-        if allowed_mentions:
-            payload['allowed_mentions'] = allowed_mentions.to_dict()
+        if allowed_mention_types:
+            payload['allowed_mentions']['parse'] = allowed_mention_types
+        if allowed_mention_users:
+            payload['allowed_mentions']['users'] = allowed_mention_users
+        if allowed_mention_roles:
+            payload['allowed_mentions']['roles'] = allowed_mention_roles
 
         if attachments:
             if len(attachments) > 1:

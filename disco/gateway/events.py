@@ -777,21 +777,22 @@ class PresencesReplace(GatewayEvent):
 @wraps_model(Invite)
 class InviteCreate(GatewayEvent):
     """
-    Sent when a guild invite is created.
-
-    Attributes
-    -----
-    invite : :class:`disco.types.invite.Invite`
-        The invite object.
+    Sent when an invite has been created
     """
+    guild_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
 
 
+@wraps_model(Invite)
 class InviteDelete(GatewayEvent):
     """
-    Sent when a guild invite is deleted.
-
-    Attributes
-    -----
-    invite : :class:`disco.types.invite.Invite`
-        The invite object.
+    Sent when an invite has been deleted
     """
+    guild_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
