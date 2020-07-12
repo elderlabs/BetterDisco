@@ -14,7 +14,7 @@ from disco.types.message import Message
 from disco.types.oauth import Application, Connection
 from disco.types.guild import (
     Guild, GuildMember, GuildBan, GuildEmbed, PruneCount, Role, GuildEmoji,
-    AuditLogEntry, Integration, DiscoveryChecklist, GuildPreview
+    AuditLogEntry, Integration, DiscoveryRequirements, GuildPreview
 )
 from disco.types.channel import Channel
 from disco.types.invite import Invite
@@ -628,9 +628,9 @@ class APIClient(LoggingClass):
         webhooks = Webhook.create_hash(self.client, 'id', data['webhooks'])
         return AuditLogEntry.create_map(self.client, r.json()['audit_log_entries'], users, webhooks, guild_id=guild)
 
-    def guilds_discovery_checklist(self, guild):
-        r = self.http(Routes.GUILDS_DISCOVERY_CHECKLIST, dict(guild=guild))
-        return DiscoveryChecklist.create(self.client, r.json())
+    def guilds_discovery_requirements(self, guild):
+        r = self.http(Routes.GUILDS_DISCOVERY_REQUIREMENTS, dict(guild=guild))
+        return DiscoveryRequirements.create(self.client, r.json())
 
     def users_get(self, user):
         r = self.http(Routes.USERS_GET, dict(user=user))

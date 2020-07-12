@@ -118,7 +118,7 @@ class Routes(object):
     GUILDS_EMOJIS_DELETE = (HTTPMethod.DELETE, GUILDS + '/emojis/{emoji}')
     GUILDS_PREVIEW_GET = (HTTPMethod.GET, GUILDS + '/preview')
     GUILDS_AUDITLOGS_LIST = (HTTPMethod.GET, GUILDS + '/audit-logs')
-    GUILDS_DISCOVERY_CHECKLIST = (HTTPMethod.GET, GUILDS + '/discovery-checklist')
+    GUILDS_DISCOVERY_REQUIREMENTS = (HTTPMethod.GET, GUILDS + '/discovery-requirements')
 
     # Users
     USERS = '/users'

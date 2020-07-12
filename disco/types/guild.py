@@ -689,8 +689,8 @@ class Guild(SlottedModel, Permissible):
     def get_audit_log_entries(self, *args, **kwargs):
         return self.client.api.guilds_auditlogs_list(self.id, *args, **kwargs)
 
-    def get_discovery_checklist(self):
-        return self.client.api.guilds_discovery_checklist(self.id)
+    def get_discovery_requirements(self):
+        return self.client.api.guilds_discovery_requirements(self.id)
 
 
 class IntegrationAccount(SlottedModel):
@@ -846,7 +846,7 @@ class AuditLogEntry(SlottedModel):
             return self.guild.emojis.get(self.target_id)
 
 
-class DiscoveryChecklistHealthScore(SlottedModel):
+class DiscoveryRequirementsHealthScore(SlottedModel):
     inactive_users_raw = Field(text, default=None)
     participator_retention_30 = Field(text, default=None)
     participator_retention_raw = Field(text, default=None)
@@ -856,10 +856,10 @@ class DiscoveryChecklistHealthScore(SlottedModel):
     retained_users_raw = Field(text, default=None)
 
 
-class DiscoveryChecklist(SlottedModel):
+class DiscoveryRequirements(SlottedModel):
     age = Field(bool)
     guild_id = Field(int)
-    health_score = Field(DiscoveryChecklistHealthScore)
+    health_score = Field(DiscoveryRequirementsHealthScore)
     health_score_pending = Field(bool)
     healthy = Field(bool)
     minimum_age = Field(int)
