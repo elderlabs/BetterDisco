@@ -107,10 +107,10 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
         return self.client.api.users_me_dms_create(self.id)
 
     def __str__(self):
-        return u'{}#{}'.format(self.username, str(self.discriminator).zfill(4))
+        return '{}#{}'.format(self.username, str(self.discriminator).zfill(4))
 
     def __repr__(self):
-        return u'<User {} ({})>'.format(self.id, self)
+        return '<User {} ({})>'.format(self.id, self)
 
 
 class ActivityTypes(object):

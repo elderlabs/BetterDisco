@@ -1,11 +1,9 @@
 import re
 import os
-import six
 import gevent
 import inspect
 import importlib
 
-from six.moves import reload_module
 from gevent.pywsgi import WSGIServer
 
 from disco.types.guild import GuildMember
@@ -181,7 +179,7 @@ class Bot(LoggingClass):
                 self.client.events.on('MessageUpdate', self.on_message_update)
 
         # If we have a level getter and its a string, try to load it
-        if isinstance(self.config.commands_level_getter, six.string_types):
+        if isinstance(self.config.commands_level_getter, str):
             mod, func = self.config.commands_level_getter.rsplit('.', 1)
             mod = importlib.import_module(mod)
             self.config.commands_level_getter = getattr(mod, func)
@@ -199,7 +197,7 @@ class Bot(LoggingClass):
         # Convert our configured mapping of entities to levels into something
         #  we can actually use. This ensures IDs are converted properly, and maps
         #  any level names (e.g. `role_id: admin`) map to their numerical values.
-        for entity_id, level in list(six.iteritems(self.config.levels)):
+        for entity_id, level in list(self.config.levels.items()):
             del self.config.levels[entity_id]
             entity_id = int(entity_id) if str(entity_id).isdigit() else entity_id
             level = int(level) if str(level).isdigit() else get_enum_value_by_name(CommandLevels, level)
@@ -230,7 +228,7 @@ class Bot(LoggingClass):
         """
         Generator of all commands this bots plugins have defined.
         """
-        for plugin in six.itervalues(self.plugins):
+        for plugin in self.plugins.values():
             for command in plugin.commands:
                 yield command
 
@@ -262,7 +260,7 @@ class Bot(LoggingClass):
         # Now, we want to compute the actual shortest abbreviation out of the
         #  possible ones
         result = {}
-        for abbrev, group in six.iteritems(possible):
+        for abbrev, group in possible.items():
             if not group:
                 continue
 
@@ -516,7 +514,7 @@ class Bot(LoggingClass):
         config = self.plugins[cls.__name__].config
 
         ctx = self.rmv_plugin(cls)
-        module = reload_module(inspect.getmodule(cls))
+        module = importlib.reload(inspect.getmodule(cls))
         self.add_plugin(getattr(module, cls.__name__), config, ctx)
 
     def run_forever(self):

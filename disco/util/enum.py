@@ -1,9 +1,6 @@
-import six
-
-
 def get_enum_members(enum):
-    for k, v in six.iteritems(enum.__dict__):
-        if not isinstance(k, six.string_types):
+    for k, v in enum.__dict__.items():
+        if not isinstance(k, str):
             continue
 
         if k.startswith('_') or not k.isupper():

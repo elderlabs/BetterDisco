@@ -1,7 +1,6 @@
 import requests
 import random
 import gevent
-import six
 import sys
 
 from disco import VERSION as disco_version
@@ -19,9 +18,6 @@ class HTTPMethod(object):
 
 
 def to_bytes(obj):
-    if six.PY2:
-        if isinstance(obj, six.text_type):
-            return obj.encode('utf-8')
     return obj
 
 
@@ -270,8 +266,8 @@ class HTTPClient(LoggingClass):
         retry = kwargs.pop('retry_number', 0)
 
         # Build the bucket URL
-        args = {k: to_bytes(v) for k, v in six.iteritems(args)}
-        filtered = {k: (v if k in ('guild', 'channel') else '') for k, v in six.iteritems(args)}
+        args = {k: to_bytes(v) for k, v in args.items()}
+        filtered = {k: (v if k in ('guild', 'channel') else '') for k, v in args.items()}
         bucket = (route[0], route[1].format(**filtered))
 
         response = APIResponse()

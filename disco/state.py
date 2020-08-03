@@ -1,4 +1,3 @@
-import six
 import weakref
 
 from collections import deque, namedtuple
@@ -192,7 +191,7 @@ class State(object):
         self.guilds[event.guild.id] = event.guild
         self.channels.update(event.guild.channels)
 
-        for member in six.itervalues(event.guild.members):
+        for member in event.guild.members.values():
             if member.user.id not in self.users:
                 self.users[member.user.id] = member.user
 
@@ -200,7 +199,7 @@ class State(object):
             if presence.user.id in self.users:
                 self.users[presence.user.id].presence = presence
 
-        for voice_state in six.itervalues(event.guild.voice_states):
+        for voice_state in event.guild.voice_states.values():
             self.voice_states[voice_state.session_id] = voice_state
 
         if self.config.sync_guild_members:
@@ -229,7 +228,7 @@ class State(object):
         elif event.channel.is_dm:
             self.dms[event.channel.id] = event.channel
             self.channels[event.channel.id] = event.channel
-            for user in six.itervalues(event.channel.recipients):
+            for user in event.channel.recipients.values():
                 if user.id not in self.users:
                     self.users[user.id] = user
                 else:

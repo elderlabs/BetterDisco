@@ -1,4 +1,3 @@
-import six
 import types
 
 
@@ -45,27 +44,16 @@ def dump_cell(cell):
 
 
 def load_cell(cell):
-    if six.PY3:
-        return (lambda y: cell).__closure__[0]
-    else:
-        return (lambda y: cell).func_closure[0]
+    return (lambda y: cell).__closure__[0]
 
 
 def dump_function(func):
-    if six.PY3:
-        return (
-            func.__code__,
-            func.__name__,
-            func.__defaults__,
-            list(map(dump_cell, func.__closure__)) if func.__closure__ else [],
-        )
-    else:
-        return (
-            func.func_code,
-            func.func_name,
-            func.func_defaults,
-            list(map(dump_cell, func.func_closure)) if func.func_closure else [],
-        )
+    return (
+        func.__code__,
+        func.__name__,
+        func.__defaults__,
+        list(map(dump_cell, func.__closure__)) if func.__closure__ else [],
+    )
 
 
 def load_function(args):

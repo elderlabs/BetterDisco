@@ -1,6 +1,3 @@
-import six
-
-from six.moves import filter, map
 from collections import defaultdict
 
 
@@ -11,10 +8,7 @@ class HashMap(dict):
         return iter(self)
 
     def items(self):
-        if six.PY3:
-            return super(HashMap, self).items()
-        else:
-            return super(HashMap, self).iteritems()
+        return super(HashMap, self).items()
 
     def find(self, predicate):
         if not callable(predicate):
@@ -29,7 +23,7 @@ class HashMap(dict):
 
     def select(self, **kwargs):
         for obj in self.values():
-            for k, v in six.iteritems(kwargs):
+            for k, v in kwargs.items():
                 if getattr(obj, k) != v:
                     break
                 yield obj

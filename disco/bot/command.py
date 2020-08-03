@@ -1,8 +1,6 @@
 import re
 import argparse
 
-from six import integer_types
-
 from disco.bot.parser import ArgumentSet, ArgumentError
 from disco.util.functional import simple_cached_property
 
@@ -187,7 +185,7 @@ class Command(object):
                 return ctx.msg.client.state.users.select_one(username=uid[0], discriminator=uid[1])
 
         def resolve_channel(ctx, cid):
-            if isinstance(cid, integer_types):
+            if isinstance(cid, int):
                 return ctx.msg.guild.channels.get(cid)
             else:
                 return ctx.msg.guild.channels.select_one(name=cid)
@@ -260,7 +258,7 @@ class Command(object):
             if self.group:
                 if self.group in self.plugin.bot.group_abbrev:
                     rest = self.plugin.bot.group_abbrev[self.group]
-                    group = '{}(?:{}) '.format(rest, ''.join(c + u'?' for c in self.group[len(rest):]))
+                    group = '{}(?:{}) '.format(rest, ''.join(c + '?' for c in self.group[len(rest):]))
                 else:
                     group = self.group + ' '
             return ('^{}({})' if grouped else '^{}(?:{})').format(
@@ -282,7 +280,7 @@ class Command(object):
 
         if self.args:
             if len(event.args) < self.args.required_length:
-                raise CommandError(u'Command {} requires {} argument(s) (`{}`) passed {}'.format(
+                raise CommandError('Command {} requires {} argument(s) (`{}`) passed {}'.format(
                     event.name,
                     self.args.required_length,
                     self.raw_args,

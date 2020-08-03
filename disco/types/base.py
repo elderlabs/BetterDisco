@@ -51,8 +51,7 @@ class ConversionError(Exception):
             'Failed to convert `{}` (`{}`) to {}: {}'.format(
                 str(raw)[:144], field.src_name, field.true_type, e))
 
-        if six.PY3:
-            self.__cause__ = e
+        self.__cause__ = e
 
 
 class Field(object):
@@ -104,7 +103,7 @@ class Field(object):
         try:
             return self.deserializer(raw, client, **kwargs)
         except Exception as e:
-            six.reraise(ConversionError, ConversionError(self, raw, e))
+            raise ConversionError(self, raw, e)
 
     @staticmethod
     def type_to_deserializer(typ):
@@ -150,13 +149,13 @@ class DictField(Field):
     @staticmethod
     def serialize(value, inst=None):
         return {
-            Field.serialize(k): Field.serialize(v) for k, v in six.iteritems(value)
+            Field.serialize(k): Field.serialize(v) for k, v in value.items()
             if k not in (inst.ignore_dump if inst else [])
         }
 
     def try_convert(self, raw, client, **kwargs):
         return HashMap({
-            self.key_de(k, client): self.value_de(v, client) for k, v in six.iteritems(raw)
+            self.key_de(k, client): self.value_de(v, client) for k, v in raw.items()
         })
 
 
@@ -201,7 +200,7 @@ def enum(typ):
             return None
 
         for k, v in get_enum_members(typ):
-            if isinstance(data, six.string_types) and k == data.upper():
+            if isinstance(data, str) and k == data.upper():
                 return v
             elif k == data or v == data:
                 return v
@@ -230,10 +229,7 @@ def text(obj):
     if obj is None:
         return None
 
-    if six.PY2:
-        if isinstance(obj, str):
-            return obj.decode('utf-8')
-    return six.text_type(obj)
+    return str(obj)
 
 
 def with_equality(field):
@@ -286,7 +282,7 @@ class ModelMeta(type):
             if Model and issubclass(parent, Model) and parent != Model:
                 fields.update(parent._fields)
 
-        for k, v in six.iteritems(dct):
+        for k, v in dct.items():
             if hasattr(v, '_cached_property'):
                 dct[k] = _get_cached_property(k, v)
                 slots.add('_' + k)
@@ -303,9 +299,9 @@ class ModelMeta(type):
             dct['__slots__'] = tuple(set(dct.get('__slots__', [])) | slots)
 
             # Remove all fields from the dict
-            dct = {k: v for k, v in six.iteritems(dct) if k not in dct['__slots__']}
+            dct = {k: v for k, v in dct.items() if k not in dct['__slots__']}
         else:
-            dct = {k: v for k, v in six.iteritems(dct) if k not in fields}
+            dct = {k: v for k, v in dct.items() if k not in fields}
 
         dct['_fields'] = fields
         return super(ModelMeta, mcs).__new__(mcs, name, parents, dct)
@@ -344,7 +340,7 @@ class Model(six.with_metaclass(ModelMeta, Chainable)):
 
     @classmethod
     def load_into(cls, inst, obj, consume=False):
-        for name, field in six.iteritems(cls._fields):
+        for name, field in cls._fields.items():
             try:
                 raw = obj[field.src_name]
 
@@ -368,7 +364,7 @@ class Model(six.with_metaclass(ModelMeta, Chainable)):
             setattr(inst, field.dst_name, value)
 
     def inplace_update(self, other, ignored=None):
-        for name in six.iterkeys(self._fields):
+        for name in self._fields.keys():
             if ignored and name in ignored:
                 continue
 
@@ -385,7 +381,7 @@ class Model(six.with_metaclass(ModelMeta, Chainable)):
 
     def to_dict(self, ignore=None):
         obj = {}
-        for name, field in six.iteritems(self.__class__._fields):
+        for name, field in self.__class__._fields.items():
             if ignore and name in ignore:
                 continue
 
@@ -415,7 +411,7 @@ class Model(six.with_metaclass(ModelMeta, Chainable)):
     @classmethod
     def attach(cls, it, data):
         for item in it:
-            for k, v in six.iteritems(data):
+            for k, v in data.items():
                 try:
                     setattr(item, k, v)
                 except Exception:
@@ -429,7 +425,7 @@ class SlottedModel(Model):
 class BitsetMap(object):
     @classmethod
     def keys(cls):
-        for k, v in six.iteritems(cls.__dict__):
+        for k, v in cls.__dict__.items():
             if k.isupper():
                 yield k
 

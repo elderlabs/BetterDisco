@@ -1,5 +1,3 @@
-from __future__ import absolute_import, print_function
-
 try:
     import ujson as json
 except ImportError:

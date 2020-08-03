@@ -1,5 +1,4 @@
 import re
-import six
 import warnings
 import functools
 import unicodedata
@@ -714,13 +713,13 @@ class Message(SlottedModel):
             The message with mentions replaced w/ their proper form.
         """
         def replace_user(u):
-            return u'@' + six.text_type(u)
+            return '@' + str(u)
 
         def replace_role(r):
-            return u'@' + six.text_type(r)
+            return '@' + str(r)
 
         def replace_channel(c):
-            return six.text_type(c)
+            return str(c)
 
         return self.replace_mentions(replace_user, replace_role, replace_channel)
 
@@ -785,12 +784,12 @@ class MessageTable(object):
                 self.size_index[idx] = size
 
     def set_header(self, *args):
-        args = list(map(six.text_type, args))
+        args = list(map(str, args))
         self.header = args
         self.recalculate_size_index(args)
 
     def add(self, *args):
-        args = list(map(six.text_type, args))
+        args = list(map(str, args))
         self.entries.append(args)
         self.recalculate_size_index(args)
 

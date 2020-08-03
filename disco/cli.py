@@ -2,16 +2,12 @@
 The CLI module is a small utility that can be used as an easy entry point for
 creating and running bots/clients.
 """
-from __future__ import print_function
+from gevent import monkey; monkey.patch_all()
 
 import os
-import six
 import logging
 import argparse
 
-from gevent import monkey
-
-monkey.patch_all()
 
 parser = argparse.ArgumentParser()
 
@@ -73,7 +69,7 @@ def disco_main(run=False):
         else:
             config = ClientConfig()
 
-    for arg_key, config_key in six.iteritems(CONFIG_OVERRIDE_MAPPING):
+    for arg_key, config_key in CONFIG_OVERRIDE_MAPPING.items():
         if getattr(args, arg_key) is not None:
             setattr(config, config_key, getattr(args, arg_key))
 
@@ -103,7 +99,7 @@ def disco_main(run=False):
     if run:
         (bot or client).run_forever()
 
-    return (bot or client)
+    return bot or client
 
 
 if __name__ == '__main__':

@@ -1,7 +1,4 @@
-from __future__ import print_function
-
 from disco.bot import Plugin
-from disco.util.sanitize import S
 
 
 class BasicPlugin(Plugin):
@@ -34,7 +31,7 @@ class BasicPlugin(Plugin):
 
     @Plugin.command('ban', '<user:snowflake> <reason:str...>')
     def on_ban(self, event, user, reason):
-        event.guild.create_ban(user, reason=reason + u'\U0001F4BF')
+        event.guild.create_ban(user, reason=reason + '\U0001F4BF')
 
     @Plugin.command('ping')
     def on_ping_command(self, event):
@@ -45,7 +42,7 @@ class BasicPlugin(Plugin):
     @Plugin.listen('MessageCreate')
     def on_message_create(self, event):
         # All of Discord's events can be listened too and handled easily
-        self.log.info(u'{}: {}'.format(event.author, event.content))
+        self.log.info('{}: {}'.format(event.author, event.content))
 
     @Plugin.command('test')
     @Plugin.command('echo', '<content:str...>')

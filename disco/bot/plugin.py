@@ -1,4 +1,3 @@
-import six
 import types
 import gevent
 import inspect
@@ -481,7 +480,7 @@ class Plugin(LoggingClass, PluginDeco):
         for listener in self.listeners:
             listener.remove()
 
-        for schedule in six.itervalues(self.schedules):
+        for schedule in self.schedules.values():
             schedule.kill()
 
     def reload(self):

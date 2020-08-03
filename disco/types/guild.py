@@ -1,4 +1,3 @@
-import six
 import warnings
 
 from disco.api.http import APIException
@@ -83,7 +82,7 @@ class GuildEmoji(Emoji):
     animated = Field(bool)
 
     def __str__(self):
-        return u'<{}:{}:{}>'.format('a' if self.animated else '', self.name, self.id)
+        return '<{}:{}:{}>'.format('a' if self.animated else '', self.name, self.id)
 
     def update(self, **kwargs):
         return self.client.api.guilds_emojis_modify(self.guild_id, self.id, **kwargs)
@@ -432,11 +431,11 @@ class Guild(SlottedModel, Permissible):
     def __init__(self, *args, **kwargs):
         super(Guild, self).__init__(*args, **kwargs)
 
-        self.attach(six.itervalues(self.channels), {'guild_id': self.id})
-        self.attach(six.itervalues(self.members), {'guild_id': self.id})
-        self.attach(six.itervalues(self.roles), {'guild_id': self.id})
-        self.attach(six.itervalues(self.emojis), {'guild_id': self.id})
-        self.attach(six.itervalues(self.voice_states), {'guild_id': self.id})
+        self.attach(self.channels.values(), {'guild_id': self.id})
+        self.attach(self.members.values(), {'guild_id': self.id})
+        self.attach(self.roles.values(), {'guild_id': self.id})
+        self.attach(self.emojis.values(), {'guild_id': self.id})
+        self.attach(self.voice_states.values(), {'guild_id': self.id})
 
     @cached_property
     def owner(self):
@@ -479,7 +478,7 @@ class Guild(SlottedModel, Permissible):
         """
         user = to_snowflake(user)
 
-        for state in six.itervalues(self.voice_states):
+        for state in self.voice_states.values():
             if state.user_id == user:
                 return state
 

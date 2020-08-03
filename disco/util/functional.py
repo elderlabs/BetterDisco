@@ -1,5 +1,3 @@
-import six
-
 NO_MORE_SENTINEL = object()
 
 
@@ -14,7 +12,7 @@ def take(seq, count):
     count : int
         The number of elements to take.
     """
-    for _ in six.moves.range(count):
+    for _ in range(count):
         i = next(seq, NO_MORE_SENTINEL)
         if i is NO_MORE_SENTINEL:
             return
@@ -32,7 +30,7 @@ def chunks(obj, size):
     size : int
         Size of chunks to split list into.
     """
-    for i in six.moves.range(0, len(obj), size):
+    for i in range(0, len(obj), size):
         yield obj[i:i + size]
 
 
@@ -74,4 +72,4 @@ def optional(**kwargs):
     null values.
     :returns: dict
     """
-    return {k: v for k, v in six.iteritems(kwargs) if v is not None}
+    return {k: v for k, v in kwargs.items() if v is not None}

@@ -1,5 +1,4 @@
 import os
-import six
 
 from .serializer import Serializer
 
@@ -42,7 +41,7 @@ class Config(object):
         prefix += '_'
         obj = {}
 
-        for k, v in six.iteritems(self.__dict__):
+        for k, v in self.__dict__.items():
             if k.startswith(prefix):
                 obj[k[len(prefix):]] = v
 

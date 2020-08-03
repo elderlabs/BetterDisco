@@ -19,7 +19,7 @@ extras_require = {
         'ujson==3.0.0',
         'wsaccel==0.6.2',
     ],
-    'sharding': ['gipc==0.6.0'],
+    'sharding': ['gipc==1.0.0'],
     'docs': ['biblio==0.0.4'],
 }
 
@@ -35,7 +35,7 @@ setup(
     long_description_content_type="text/markdown",
     include_package_data=True,
     install_requires=requirements,
-    dependency_links=['https://github.com/elderlabs/holster#egg=holster'],
+    dependency_links=['https://github.com/elderlabs/holster/tarball/master#egg=holster'],
     extras_require=extras_require,
     test_suite='tests',
     setup_requires=['pytest-runner==2.11.1'],

@@ -1,6 +1,5 @@
 import gevent
 import zlib
-import six
 import ssl
 import time
 
@@ -174,14 +173,14 @@ class GatewayClient(LoggingClass):
             if msg[-4:] != ZLIB_SUFFIX:
                 return
 
-            msg = self._zlib.decompress(self._buffer if six.PY3 else str(self._buffer))
+            msg = self._zlib.decompress(self._buffer)
             # If this encoder is text based, we want to decode the data as utf8
             if self.encoder.OPCODE == ABNF.OPCODE_TEXT:
                 msg = msg.decode('utf-8')
             self._buffer = None
         else:
             # Detect zlib and decompress
-            is_erlpack = ((six.PY2 and ord(msg[0]) == 131) or (six.PY3 and msg[0] == 131))
+            is_erlpack = (msg[0] == 131)
             if msg[0] != '{' and not is_erlpack:
                 msg = zlib.decompress(msg, 15, TEN_MEGABYTES).decode('utf-8')
 

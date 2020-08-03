@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import six
 
 from disco.types.user import User, Presence
@@ -56,7 +54,7 @@ class GatewayEvent(six.with_metaclass(GatewayEventMeta, Model)):
             alias, model = cls._wraps_model
 
             data = {
-                k: obj.pop(k) for k in six.iterkeys(model._fields) if k in obj
+                k: obj.pop(k) for k in model._fields.keys() if k in obj
             }
 
             obj[alias] = data

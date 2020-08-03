@@ -1,6 +1,6 @@
 import os
 
-from six.moves import UserDict
+from collections import UserDict
 
 from disco.util.hashmap import HashMap
 from disco.util.serializer import Serializer

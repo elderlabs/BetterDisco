@@ -39,4 +39,4 @@ class VoiceRegion(SlottedModel):
         return self.id
 
     def __repr__(self):
-        return u'<VoiceRegion {}>'.format(self.name)
+        return '<VoiceRegion {}>'.format(self.name)

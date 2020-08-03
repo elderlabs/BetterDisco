@@ -1,7 +1,4 @@
 import re
-import six
-
-from six.moves import map
 
 from disco.util.snowflake import to_snowflake
 from disco.util.functional import one_or_many, chunks
@@ -144,13 +141,13 @@ class Channel(SlottedModel, Permissible):
 
     def after_load(self):
         # TODO: hackfix
-        self.attach(six.itervalues(self.overwrites), {'channel_id': self.id, 'channel': self})
+        self.attach(self.overwrites.values(), {'channel_id': self.id, 'channel': self})
 
     def __str__(self):
-        return u'#{}'.format(self.name) if self.name else six.text_type(self.id)
+        return '#{}'.format(self.name) if self.name else str(self.id)
 
     def __repr__(self):
-        return u'<Channel {} ({})>'.format(self.id, self)
+        return '<Channel {} ({})>'.format(self.id, self)
 
     def get_permissions(self, user):
         """

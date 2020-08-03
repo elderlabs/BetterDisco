@@ -1,5 +1,3 @@
-import six
-
 from datetime import datetime
 
 UNIX_EPOCH = datetime(1970, 1, 1)
@@ -34,7 +32,7 @@ def from_timestamp_ms(ts):
 
 
 def to_snowflake(i):
-    if isinstance(i, six.integer_types):
+    if isinstance(i, int):
         return i
     elif isinstance(i, str):
         return int(i)

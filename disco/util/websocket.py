@@ -1,7 +1,4 @@
-from __future__ import absolute_import
-
 import websocket
-import six
 
 from disco.util.emitter import Emitter
 from disco.util.logging import LoggingClass
@@ -22,7 +19,7 @@ class Websocket(LoggingClass, websocket.WebSocketApp):
         self.emitter = Emitter()
 
         # Hack to get events to emit
-        for var in six.iterkeys(self.__dict__):
+        for var in self.__dict__.keys():
             if not var.startswith('on_'):
                 continue
 
@@ -30,7 +27,7 @@ class Websocket(LoggingClass, websocket.WebSocketApp):
 
     def _get_close_args(self, data):
         if data and len(data) >= 2:
-            code = 256 * six.byte2int(data[0:1]) + six.byte2int(data[1:2])
+            code = 256 * data[0:1][0] + data[1:2][0]
             reason = data[2:].decode('utf-8')
             return [code, reason]
         return [None, None]

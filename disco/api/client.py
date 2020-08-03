@@ -3,7 +3,7 @@ import warnings
 
 from contextlib import contextmanager
 from gevent.local import local
-from six.moves.urllib.parse import quote
+from urllib.parse import quote
 
 from disco.api.http import Routes, HTTPClient, to_bytes
 from disco.util.functional import optional
