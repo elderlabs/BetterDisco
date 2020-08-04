@@ -14,13 +14,14 @@ class Permissions(BitsetMap):
     STREAM = 1 << 9
     VIEW_CHANNEL = 1 << 10
     SEND_MESSAGES = 1 << 11
-    SEND_TSS_MESSAGES = 1 << 12
+    SEND_TTS_MESSAGES = 1 << 12
     MANAGE_MESSAGES = 1 << 13
     EMBED_LINKS = 1 << 14
     ATTACH_FILES = 1 << 15
     READ_MESSAGE_HISTORY = 1 << 16
     MENTION_EVERYONE = 1 << 17
     USE_EXTERNAL_EMOJIS = 1 << 18
+    VIEW_GUILD_INSIGHTS = 1 << 19
     CONNECT = 1 << 20
     SPEAK = 1 << 21
     MUTE_MEMBERS = 1 << 22

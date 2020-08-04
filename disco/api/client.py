@@ -439,8 +439,8 @@ class APIClient(LoggingClass):
         return GuildBan.create(self.client, r.json())
 
     def guilds_bans_create(self, guild, user, delete_message_days=0, reason=None):
-        self.http(Routes.GUILDS_BANS_CREATE, dict(guild=guild, user=user), params={
-            'delete-message-days': delete_message_days,
+        self.http(Routes.GUILDS_BANS_CREATE, dict(guild=guild, user=user), json={
+            'delete_message_days': delete_message_days,
             'reason': reason,
         }, headers=_reason_header(reason))
 

@@ -123,8 +123,10 @@ class Role(SlottedModel):
         The permissions this role grants.
     position : int
         The position of this role in the hierarchy.
+    tags : dict(str, snowflake)
+        The tags of this role.
     mentionable : bool
-        Wherther this role is taggable in chat.
+        Whether this role is taggable in chat.
     guild_id : snowflake
         The id of the server the role is in.
     """
@@ -135,8 +137,10 @@ class Role(SlottedModel):
     managed = Field(bool)
     color = Field(int)
     permissions = Field(PermissionValue)
+    permissions_new = Field(text)
     position = Field(int)
     mentionable = Field(bool)
+    tags = DictField(text, snowflake)
 
     def __str__(self):
         return self.name
@@ -846,13 +850,10 @@ class AuditLogEntry(SlottedModel):
 
 
 class DiscoveryRequirementsHealthScore(SlottedModel):
-    inactive_users_raw = Field(text, default=None)
-    participator_retention_30 = Field(text, default=None)
-    participator_retention_raw = Field(text, default=None)
-    participators_raw = Field(text, default=None)
-    pct_participators_30 = Field(text, default=None)
-    pct_participators_raw = Field(text, default=None)
-    retained_users_raw = Field(text, default=None)
+    avg_nonnew_participators = Field(text, default=None)
+    avg_nonnew_communicators = Field(text, default=None)
+    num_intentful_joiners = Field(text, default=None)
+    perc_ret_w1_intentful = Field(text, default=None)
 
 
 class DiscoveryRequirements(SlottedModel):
@@ -864,10 +865,11 @@ class DiscoveryRequirements(SlottedModel):
     minimum_age = Field(int)
     minimum_size = Field(int)
     nsfw_properties = Field(dict)
-    percent_participator_healthy = Field(bool)
     protected = Field(bool)
     retention_healthy = Field(bool)
+    engagement_healthy = Field(bool)
     safe_environment = Field(bool)
     size = Field(bool)
     sufficient = Field(bool)
+    sufficient_without_grace_period = Field(bool)
     valid_rules_channel = Field(bool)
