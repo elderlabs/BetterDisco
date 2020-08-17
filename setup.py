@@ -35,7 +35,6 @@ setup(
     long_description_content_type="text/markdown",
     include_package_data=True,
     install_requires=requirements,
-    dependency_links=['https://github.com/elderlabs/holster/tarball/master#egg=holster'],
     extras_require=extras_require,
     test_suite='tests',
     setup_requires=['pytest-runner==2.11.1'],

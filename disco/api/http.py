@@ -280,7 +280,10 @@ class HTTPClient(LoggingClass):
         # Make the actual request
         url = self.BASE_URL + route[1].format(**args)
         self.log.info('%s %s (%s)', route[0], url, kwargs.get('params'))
-        r = self.session.request(route[0], url, **kwargs)
+        try:
+            r = self.session.request(route[0], url, **kwargs)
+        except ConnectionError:
+            r.status_code = 104
 
         if self.after_request:
             response.response = r
