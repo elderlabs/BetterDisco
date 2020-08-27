@@ -208,7 +208,7 @@ class GuildMember(SlottedModel):
     """
     user = Field(User)
     guild_id = Field(snowflake)
-    nick = Field(text)
+    nick = Field(text, default=None)
     mute = Field(bool)
     deaf = Field(bool)
     joined_at = Field(datetime)

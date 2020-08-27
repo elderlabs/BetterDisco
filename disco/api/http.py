@@ -280,10 +280,11 @@ class HTTPClient(LoggingClass):
         # Make the actual request
         url = self.BASE_URL + route[1].format(**args)
         self.log.info('%s %s (%s)', route[0], url, kwargs.get('params'))
+        error = False
         try:
             r = self.session.request(route[0], url, **kwargs)
         except ConnectionError:
-            r.status_code = 104
+            error = True
 
         if self.after_request:
             response.response = r
@@ -293,13 +294,13 @@ class HTTPClient(LoggingClass):
         self.limiter.update(bucket, r)
 
         # If we got a success status code, just return the data
-        if r.status_code != 104 and r.status_code < 400:
+        if not error and r.status_code < 400:
             return r
         elif r.status_code != 429 and 400 <= r.status_code < 500:
             self.log.warning('Request failed with code %s: %s', r.status_code, r.content)
             response.exception = APIException(r)
             raise response.exception
-        elif r.status_code == 104 or r.status_code == 429 or r.status_code == 502:
+        elif error or r.status_code == 429 or r.status_code == 502:
             if r.status_code == 429:
                 self.log.warning('Request responded w/ 429, retrying (but this should not happen, check your clock sync)')
 
