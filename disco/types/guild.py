@@ -73,7 +73,6 @@ class GuildEmoji(Emoji):
         Whether this emoji is animated.
     """
     id = Field(snowflake)
-    guild_id = Field(snowflake)
     name = Field(text)
     user = Field(User)
     require_colons = Field(bool)
@@ -84,9 +83,11 @@ class GuildEmoji(Emoji):
     def __str__(self):
         return '<{}:{}:{}>'.format('a' if self.animated else '', self.name, self.id)
 
+    # TODO: fix this
     def update(self, **kwargs):
         return self.client.api.guilds_emojis_modify(self.guild_id, self.id, **kwargs)
 
+    # TODO: fix this
     def delete(self, **kwargs):
         return self.client.api.guilds_emojis_delete(self.guild_id, self.id, **kwargs)
 
@@ -94,6 +95,7 @@ class GuildEmoji(Emoji):
     def url(self):
         return 'https://cdn.discordapp.com/emojis/{}.{}'.format(self.id, 'gif' if self.animated else 'png')
 
+    # TODO: fix this
     @cached_property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
@@ -368,7 +370,7 @@ class Guild(SlottedModel, Permissible):
     description : str
         Guild's description
     max_presences : int
-        Guild's maximum amount of presences
+        [DEPRECATED] Guild's maximum amount of presences
     max_members : int
         Guild's maximum amount of members
     preferred_locale : str
@@ -424,7 +426,7 @@ class Guild(SlottedModel, Permissible):
     system_channel_flags = Field(int)
     preferred_locale = Field(str)
     vanity_url_code = Field(text, default=None)
-    max_presences = Field(int, default=25000)
+    max_presences = Field(int, default=None)
     max_members = Field(int)
     description = Field(text)
     rules_channel_id = Field(snowflake)
