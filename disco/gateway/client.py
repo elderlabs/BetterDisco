@@ -113,7 +113,7 @@ class GatewayClient(LoggingClass):
     def handle_heartbeat_acknowledge(self, _):
         self.log.debug('Received HEARTBEAT_ACK')
         self._heartbeat_acknowledged = True
-        self.latency = (time.perf_counter() - self._last_heartbeat)
+        self.latency = '{:.2f}'.format((time.perf_counter() - self._last_heartbeat) * 1000)
 
     def handle_reconnect(self, _):
         self.log.warning('Received RECONNECT request, forcing a fresh reconnect')
