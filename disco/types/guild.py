@@ -139,7 +139,6 @@ class Role(SlottedModel):
     managed = Field(bool)
     color = Field(int)
     permissions = Field(PermissionValue)
-    permissions_new = Field(text)
     position = Field(int)
     mentionable = Field(bool)
     tags = DictField(text, snowflake)
@@ -335,8 +334,6 @@ class Guild(SlottedModel, Permissible):
         The id of the owner.
     afk_channel_id : snowflake
         The id of the afk channel.
-    embed_channel_id : snowflake
-        The id of the embed channel.
     system_channel_id : snowflake
         The id of the system channel.
     name : str
@@ -353,8 +350,6 @@ class Guild(SlottedModel, Permissible):
         Voice region.
     afk_timeout : int
         Delay after which users are automatically moved to the afk channel.
-    embed_enabled : bool
-        Whether the guild's embed is enabled.
     widget_enabled : bool
         Whether the guild's server widget is enabled.
     verification_level : int
@@ -395,7 +390,6 @@ class Guild(SlottedModel, Permissible):
     owner_id = Field(snowflake)
     permissions = Field(int)
     afk_channel_id = Field(snowflake)
-    embed_channel_id = Field(snowflake)
     system_channel_id = Field(snowflake)
     name = Field(text)
     icon = Field(text)
@@ -403,7 +397,6 @@ class Guild(SlottedModel, Permissible):
     banner = Field(text)
     region = Field(text)
     afk_timeout = Field(int)
-    embed_enabled = Field(bool)
     widget_enabled = Field(bool)
     verification_level = Field(enum(VerificationLevel))
     explicit_content_filter = Field(enum(ExplicitContentFilterLevel))
