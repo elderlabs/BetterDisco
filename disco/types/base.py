@@ -437,7 +437,7 @@ class BitsetValue(object):
         if isinstance(value, self.__class__):
             value = value.value
 
-        self.value = value
+        self.value = int(value)
 
     def check(self, *args):
         for arg in args:
