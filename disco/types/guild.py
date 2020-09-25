@@ -388,7 +388,7 @@ class Guild(SlottedModel, Permissible):
     id = Field(snowflake)
     owner = Field(bool)
     owner_id = Field(snowflake)
-    permissions = Field(int)
+    permissions = Field(PermissionValue)
     afk_channel_id = Field(snowflake)
     system_channel_id = Field(snowflake)
     name = Field(text)
