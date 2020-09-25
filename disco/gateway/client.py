@@ -221,7 +221,6 @@ class GatewayClient(LoggingClass):
                 'token': self.client.config.token,
                 'compress': True,
                 'large_threshold': 250,
-                'guild_subscriptions': self.client.config.guild_subscriptions,
                 'intents': self.client.config.intents,
                 'shard': [
                     int(self.client.config.shard_id),
