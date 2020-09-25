@@ -204,7 +204,7 @@ class GuildDelete(GatewayEvent):
         guild leave event.
     """
     id = Field(snowflake)
-    unavailable = Field(bool)
+    unavailable = Field(bool, default=False)
 
     @property
     def deleted(self):
