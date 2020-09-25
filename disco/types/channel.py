@@ -118,7 +118,7 @@ class Channel(SlottedModel, Permissible):
     """
     id = Field(snowflake)
     type = Field(enum(ChannelType))
-    guild_id = Field(snowflake, default=None)
+    guild_id = Field(snowflake)
     position = Field(int)
     overwrites = AutoDictField(PermissionOverwrite, 'id', alias='permission_overwrites')
     name = Field(text)
