@@ -15,11 +15,11 @@ extras_require = {
     'yaml': ['pyyaml==5.3.1'],
     'music': ['youtube_dl>=2018.1.21'],
     'performance': [
-        'erlpack==0.3.2' if sys.version_info.major == 2 else 'earl-etf==2.1.2',
-        'ujson==3.0.0',
+        'earl-etf==2.1.2',
+        'ujson==3.2.0',
         'wsaccel==0.6.2',
     ],
-    'sharding': ['gipc==1.0.0'],
+    'sharding': ['gipc==1.1.0'],
     'docs': ['biblio==0.0.4'],
 }
 

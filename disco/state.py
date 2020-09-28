@@ -53,7 +53,7 @@ class StateConfig(Config):
         to batch requests using the underlying `GatewayClient.request_guild_members`
         interface.
     """
-    track_messages = True
+    track_messages = False
     track_messages_size = 100
 
     sync_guild_members = True
@@ -75,8 +75,6 @@ class State(object):
         The configuration for this state instance.
     me : `User`
         The currently logged in user.
-    dms : dict(snowflake, `Channel`)
-        Mapping of all known DM Channels.
     guilds : dict(snowflake, `Guild`)
         Mapping of all known/loaded Guilds.
     channels : dict(snowflake, `Channel`)
@@ -105,7 +103,6 @@ class State(object):
         self.guilds_waiting_sync = 0
 
         self.me = None
-        self.dms = HashMap()
         self.guilds = HashMap()
         self.channels = HashMap(weakref.WeakValueDictionary())
         self.users = HashMap(weakref.WeakValueDictionary())
@@ -148,10 +145,6 @@ class State(object):
         self.me = event.user
         self.guilds_waiting_sync = len(event.guilds)
 
-        for dm in event.private_channels:
-            self.dms[dm.id] = dm
-            self.channels[dm.id] = dm
-
     def on_user_update(self, event):
         self.me.inplace_update(event.user)
 
@@ -183,7 +176,7 @@ class State(object):
                 self.messages[event.channel_id].remove(sm)
 
     def on_guild_create(self, event):
-        if event.unavailable is False:
+        if not event.unavailable:
             self.guilds_waiting_sync -= 1
             if self.guilds_waiting_sync <= 0:
                 self.ready.set()
@@ -225,14 +218,6 @@ class State(object):
         if event.channel.is_guild and event.channel.guild_id in self.guilds:
             self.guilds[event.channel.guild_id].channels[event.channel.id] = event.channel
             self.channels[event.channel.id] = event.channel
-        elif event.channel.is_dm:
-            self.dms[event.channel.id] = event.channel
-            self.channels[event.channel.id] = event.channel
-            for user in event.channel.recipients.values():
-                if user.id not in self.users:
-                    self.users[user.id] = user
-                else:
-                    event.channel.recipients[user.id] = self.users[user.id]
 
     def on_channel_update(self, event):
         if event.channel.id in self.channels:
@@ -245,8 +230,6 @@ class State(object):
     def on_channel_delete(self, event):
         if event.channel.is_guild and event.channel.guild and event.channel.id in event.channel.guild.channels:
             del event.channel.guild.channels[event.channel.id]
-        elif event.channel.is_dm and event.channel.id in self.dms:
-            del self.dms[event.channel.id]
 
     def on_voice_server_update(self, event):
         if event.guild_id not in self.voice_clients:
@@ -303,6 +286,14 @@ class State(object):
             return
 
         self.guilds[event.member.guild_id].members[event.member.id].inplace_update(event.member)
+
+        if not event.user.id in self.users:
+            self.users[event.user.id] = event.user
+
+        if event.roles and event.guild_id in self.guilds:
+            self.guilds[event.guild_id].members[event.user.id].roles = event.roles
+
+        self.users[event.user.id].inplace_update(event.user)
 
     def on_guild_member_remove(self, event):
         if event.guild_id not in self.guilds:
@@ -369,7 +360,7 @@ class State(object):
         self.guilds[event.guild_id].emojis = HashMap({i.id: i for i in event.emojis})
 
     def on_presence_update(self, event):
-        # TODO: this is recursive, we hackfix in model, but its still lame ATM
+        # TODO: this is recursive, we hackfix in model
         user = event.presence.user
         user.presence = event.presence
 
@@ -382,14 +373,3 @@ class State(object):
             #  use this opportunity to add them. They will quickly fall out of
             #  scope and be deleted if they aren't used below
             self.users[user.id] = user
-
-        # Some updates come with a guild_id and roles the user is in, we should
-        #  use this to update the guild member, but only if we have the guild
-        #  cached.
-        if event.roles is UNSET or event.guild_id not in self.guilds:
-            return
-
-        if user.id not in self.guilds[event.guild_id].members:
-            return
-
-        self.guilds[event.guild_id].members[user.id].roles = event.roles

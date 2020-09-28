@@ -139,8 +139,9 @@ class Ready(GatewayEvent):
         The user object for the authenticated account.
     guilds : list[:class:`disco.types.guild.Guild`
         All guilds this account is a member of. These are shallow guild objects.
+        These are marked unavailable until the corresponding GuildCreate event is recieved.
     private_channels list[:class:`disco.types.channel.Channel`]
-        All private channels (DMs) open for this account.
+        An empty array.
     """
     version = Field(int, alias='v')
     session_id = Field(str)
