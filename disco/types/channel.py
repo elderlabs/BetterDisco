@@ -52,7 +52,6 @@ class PermissionOverwrite(ChannelSubType):
     type = Field(enum(PermissionOverwriteType))
     allow = Field(PermissionValue, cast=int)
     deny = Field(PermissionValue, cast=int)
-
     channel_id = Field(snowflake)
 
     @classmethod

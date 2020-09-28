@@ -192,7 +192,7 @@ class Activity(SlottedModel):
 
 class Presence(SlottedModel):
     user = Field(User, alias='user', ignore_dump=['presence'])
-    game = Field(Activity)
+    activty = Field(Activity)
     guild_id = Field(snowflake)
     status = Field(enum(Status))
     activities = ListField(Activity)
