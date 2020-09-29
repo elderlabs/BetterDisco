@@ -1,7 +1,9 @@
-try:
-    import ujson as json
-except ImportError:
-    import json
+### Memory leak
+# try:
+#     import ujson as json
+# except ImportError:
+###
+import json
 
 from disco.gateway.encoding.base import BaseEncoder
 
