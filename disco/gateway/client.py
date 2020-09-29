@@ -63,6 +63,7 @@ class GatewayClient(LoggingClass):
         self.shutting_down = False
         self.replaying = False
         self.replayed_events = 0
+        self.last_conn_state = None
 
         # Cached gateway URL
         self._cached_gateway_url = None
@@ -91,6 +92,7 @@ class GatewayClient(LoggingClass):
         while True:
             if not self._heartbeat_acknowledged:
                 self.log.warning('Received HEARTBEAT without HEARTBEAT_ACK, forcing a fresh reconnect')
+                self.last_conn_state = 'HEARTBEAT'
                 self._heartbeat_acknowledged = True
                 self.ws.close()
                 return
@@ -117,11 +119,13 @@ class GatewayClient(LoggingClass):
 
     def handle_reconnect(self, _):
         self.log.warning('Received RECONNECT request, forcing a fresh reconnect')
+        self.last_conn_state = 'RECONNECT'
         self.session_id = None
         self.ws.close()
 
     def handle_invalid_session(self, _):
         self.log.warning('Received INVALID_SESSION, forcing a fresh reconnect')
+        self.last_conn_state = 'INVALID_SESSION'
         self.session_id = None
         self.ws.close()
 
@@ -176,13 +180,13 @@ class GatewayClient(LoggingClass):
             msg = self._zlib.decompress(self._buffer)
             # If this encoder is text based, we want to decode the data as utf8
             if self.encoder.OPCODE == ABNF.OPCODE_TEXT:
-                msg = msg.decode('utf-8')
+                msg = str(msg, 'utf=8')
             self._buffer = None
         else:
             # Detect zlib and decompress
             is_erlpack = (msg[0] == 131)
             if msg[0] != '{' and not is_erlpack:
-                msg = zlib.decompress(msg, 15, TEN_MEGABYTES).decode('utf-8')
+                msg = str(zlib.decompress(msg, 15, TEN_MEGABYTES), 'utf=8')
 
         try:
             data = self.encoder.decode(msg)

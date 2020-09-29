@@ -28,7 +28,7 @@ class Websocket(LoggingClass, websocket.WebSocketApp):
     def _get_close_args(self, data):
         if data and len(data) >= 2:
             code = 256 * data[0:1][0] + data[1:2][0]
-            reason = data[2:].decode('utf-8')
+            reason = str(data[2:], 'utf=8')
             return [code, reason]
         return [None, None]
 

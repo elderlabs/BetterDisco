@@ -163,7 +163,7 @@ class VoiceConnection(object):
 
         buff = ""
         while True:
-            buff += nb_read(fd, 2048).decode('utf-8')
+            buff += str(nb_read(fd, 2048), 'utf-8')
 
             parts = buff.split('\n')
             for message in parts[:-1]:
