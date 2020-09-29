@@ -71,7 +71,7 @@ class RouteState(LoggingClass):
             return
 
         self.remaining = int(response.headers.get('X-RateLimit-Remaining'))
-        self.reset_time = int(math.ceil((response.headers.get('X-RateLimit-Reset'))))
+        self.reset_time = math.ceil(float((response.headers.get('X-RateLimit-Reset'))))
 
     def wait(self, timeout=None):
         """
