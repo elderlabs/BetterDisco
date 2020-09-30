@@ -204,6 +204,8 @@ class GuildMember(SlottedModel):
         Roles this member is part of.
     premium_since : datetime
         When this user set their Nitro boost to this server.
+    is_pending : bool
+        Whether the user has passed Discord's role gate.
     """
     user = Field(User)
     guild_id = Field(snowflake)
@@ -213,6 +215,7 @@ class GuildMember(SlottedModel):
     joined_at = Field(datetime)
     roles = ListField(snowflake)
     premium_since = Field(datetime)
+    is_pending = Field(bool, default=False)
 
     def __str__(self):
         return self.user.__str__()
