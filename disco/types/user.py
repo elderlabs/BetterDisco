@@ -119,6 +119,7 @@ class ActivityTypes(object):
     LISTENING = 2
     WATCHING = 3
     CUSTOM = 4
+    COMPETING = 5
 
 
 class Status(object):
@@ -192,7 +193,7 @@ class Activity(SlottedModel):
 
 class Presence(SlottedModel):
     user = Field(User, alias='user', ignore_dump=['presence'])
-    activty = Field(Activity)
+    activity = Field(Activity)
     guild_id = Field(snowflake)
     status = Field(enum(Status))
     activities = ListField(Activity)
