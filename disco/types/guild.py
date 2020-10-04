@@ -442,7 +442,7 @@ class Guild(SlottedModel, Permissible):
     max_video_channel_users = Field(int)
     approximate_member_count = Field(int)
     approximate_presence_count = Field(int)
-    welcome_screen = Field(WelcomeScreen)
+    #welcome_screen = Field(WelcomeScreen)
 
     def __init__(self, *args, **kwargs):
         super(Guild, self).__init__(*args, **kwargs)
