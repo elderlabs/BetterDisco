@@ -742,6 +742,9 @@ class AuditLogActionTypes(object):
     MEMBER_BAN_REMOVE = 23
     MEMBER_UPDATE = 24
     MEMBER_ROLE_UPDATE = 25
+    MEMBER_MOVE = 26
+    MEMBER_DISCONNECT = 27
+    BOT_ADD = 28
     ROLE_CREATE = 30
     ROLE_UPDATE = 31
     ROLE_DELETE = 32
@@ -755,10 +758,17 @@ class AuditLogActionTypes(object):
     EMOJI_UPDATE = 61
     EMOJI_DELETE = 62
     MESSAGE_DELETE = 72
+    MESSAGE_BULK_DELETE = 73
+    MESSAGE_PIN = 74
+    MESSAGE_UNPIN = 75
+    INTEGRATION_CREATE = 80
+    INTEGRATION_UPDATE = 81
+    INTEGRATION_DELETE = 82
 
 
 GUILD_ACTIONS = (
     AuditLogActionTypes.GUILD_UPDATE,
+    AuditLogActionTypes.BOT_ADD,
 )
 
 CHANNEL_ACTIONS = (
@@ -777,6 +787,8 @@ MEMBER_ACTIONS = (
     AuditLogActionTypes.MEMBER_BAN_REMOVE,
     AuditLogActionTypes.MEMBER_UPDATE,
     AuditLogActionTypes.MEMBER_ROLE_UPDATE,
+    AuditLogActionTypes.MEMBER_MOVE,
+    AuditLogActionTypes.MEMBER_DISCONNECT,
 )
 
 ROLE_ACTIONS = (
@@ -805,6 +817,15 @@ EMOJI_ACTIONS = (
 
 MESSAGE_ACTIONS = (
     AuditLogActionTypes.MESSAGE_DELETE,
+    AuditLogActionTypes.MESSAGE_BULK_DELETE,
+    AuditLogActionTypes.MESSAGE_PIN,
+    AuditLogActionTypes.MESSAGE_UNPIN,
+)
+
+INTEGRATIONS_ACTIONS = (
+    AuditLogActionTypes.INTEGRATION_CREATE,
+    AuditLogActionTypes.INTEGRATION_UPDATE,
+    AuditLogActionTypes.INTEGRATION_DELETE,
 )
 
 
