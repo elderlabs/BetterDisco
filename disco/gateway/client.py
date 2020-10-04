@@ -115,7 +115,7 @@ class GatewayClient(LoggingClass):
     def handle_heartbeat_acknowledge(self, _):
         self.log.debug('Received HEARTBEAT_ACK')
         self._heartbeat_acknowledged = True
-        self.latency = '{:.2f}'.format((time.perf_counter() - self._last_heartbeat) * 1000)
+        self.latency = float('{:.2f}'.format((time.perf_counter() - self._last_heartbeat) * 1000))
 
     def handle_reconnect(self, _):
         self.log.warning('Received RECONNECT request, forcing a fresh reconnect')
@@ -255,15 +255,14 @@ class GatewayClient(LoggingClass):
 
         # Track reconnect attempts
         self.reconnects += 1
-        self.log.info('WS Closed: [%s] %s (%s)', code, reason, self.reconnects)
+        self.log.info('WS Closed: [%s] %s (%s)', code, reason if reason else '', self.reconnects)
 
         if self.max_reconnects and self.reconnects > self.max_reconnects:
             raise Exception('Failed to reconnect after {} attempts, giving up'.format(self.max_reconnects))
 
         # Don't resume for these error codes
-        if code and 4000 < code <= 4010:
-            if code != 1000:
-                self.session_id = None
+        if code and 4000 < code <= 4010 or code == 1001:
+            self.session_id = None
 
         wait_time = (self.reconnects if self.reconnects > 1 else 0) * 5 if self.reconnects < 6 else 30
         self.log.info('Will attempt to %s after %s seconds', 'resume' if self.session_id else 'reconnect', wait_time)

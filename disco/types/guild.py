@@ -51,6 +51,18 @@ class SystemChannelFlag(object):
     SUPPRESS_PREMIUM_SUBSCRIPTIONS = 1 << 1
 
 
+class WelcomeScreenChannel(object):
+    channel_id = Field(snowflake)
+    description = Field(str)
+    emoji_id = Field(snowflake)
+    emoji_name = Field(str)
+
+
+class WelcomeScreen(object):
+    description = Field(str)
+    welcome_channels = AutoDictField(WelcomeScreenChannel, 'channel_id')
+
+
 class GuildEmoji(Emoji):
     """
     An emoji object.
@@ -387,46 +399,50 @@ class Guild(SlottedModel, Permissible):
         The amount of users using their Nitro boost on this guild.
     """
     id = Field(snowflake)
-    owner = Field(bool)
-    owner_id = Field(snowflake)
-    permissions = Field(PermissionValue, cast=int)
-    afk_channel_id = Field(snowflake)
-    system_channel_id = Field(snowflake)
     name = Field(text)
     icon = Field(text)
     splash = Field(text)
-    banner = Field(text)
+    discovery_splash = Field(text)
+    owner = Field(bool)
+    owner_id = Field(snowflake)
+    permissions = Field(PermissionValue, cast=int)
     region = Field(text)
+    afk_channel_id = Field(snowflake)
     afk_timeout = Field(int)
-    widget_enabled = Field(bool)
     verification_level = Field(enum(VerificationLevel))
-    explicit_content_filter = Field(enum(ExplicitContentFilterLevel))
     default_message_notifications = Field(enum(DefaultMessageNotificationsLevel))
+    explicit_content_filter = Field(enum(ExplicitContentFilterLevel))
+    roles = AutoDictField(Role, 'id')
+    emojis = AutoDictField(GuildEmoji, 'id')
+    features = ListField(str)
     mfa_level = Field(enum(MFALevel))
     application_id = Field(snowflake)
+    widget_enabled = Field(bool)
     widget_channel_id = Field(snowflake)
+    system_channel_id = Field(snowflake)
+    system_channel_flags = Field(int)
+    rules_channel_id = Field(snowflake)
     joined_at = Field(datetime)
     large = Field(bool)
     unavailable = Field(bool)
     member_count = Field(int)
     voice_states = AutoDictField(VoiceState, 'session_id')
-    features = ListField(str)
     members = AutoDictField(GuildMember, 'id')
     channels = AutoDictField(Channel, 'id')
-    roles = AutoDictField(Role, 'id')
-    emojis = AutoDictField(GuildEmoji, 'id')
-    premium_tier = Field(enum(PremiumTier))
-    premium_subscription_count = Field(int, default=0)
-    system_channel_flags = Field(int)
-    preferred_locale = Field(str)
-    vanity_url_code = Field(text, default=None)
+    # presences = AutoDictField(Presence)
     max_presences = Field(int, default=None)
     max_members = Field(int)
+    vanity_url_code = Field(text, default=None)
     description = Field(text)
-    rules_channel_id = Field(snowflake)
+    banner = Field(text)
+    premium_tier = Field(enum(PremiumTier))
+    premium_subscription_count = Field(int, default=0)
+    preferred_locale = Field(str)
     public_updates_channel_id = Field(snowflake)
     max_video_channel_users = Field(int)
-    discovery_splash = Field(text)
+    approximate_member_count = Field(int)
+    approximate_presence_count = Field(int)
+    welcome_screen = Field(WelcomeScreen)
 
     def __init__(self, *args, **kwargs):
         super(Guild, self).__init__(*args, **kwargs)
@@ -869,3 +885,22 @@ class DiscoveryRequirements(SlottedModel):
     sufficient = Field(bool)
     sufficient_without_grace_period = Field(bool)
     valid_rules_channel = Field(bool)
+
+
+class DiscoveryCategoryName(SlottedModel):
+    default = Field(str)
+    # localizations = Field
+
+
+class DiscoveryCategory(SlottedModel):
+    id = Field(int)
+    name = Field(DiscoveryCategoryName)
+    is_primary = Field(bool)
+
+
+class DiscoveryGuild(SlottedModel):
+    guild_id = Field(snowflake)
+    primary_category_id = Field(str)
+    keywords = ListField(str)
+    emoji_discoverability_enabled = Field(bool)
+    category_ids = ListField(str)

@@ -1,4 +1,4 @@
-from disco.types.base import SlottedModel, Field, datetime, enum
+from disco.types.base import SlottedModel, Field, datetime, enum, snowflake
 from disco.types.user import User
 from disco.types.guild import Guild
 from disco.types.channel import Channel
@@ -20,8 +20,8 @@ class Invite(SlottedModel):
         The guild this invite is for.
     channel : :class:`disco.types.channel.Channel`
         The channel this invite is for.
-    target_user : :class:`disco.types.user.User`
-        The user this invite targets.
+    target_user_id : snowflake
+        The user ID this invite targets.
     target_user_type : int
         The type of user target for this invite.
     approximate_presence_count : int
@@ -44,7 +44,7 @@ class Invite(SlottedModel):
     code = Field(str)
     guild = Field(Guild)
     channel = Field(Channel)
-    target_user = Field(User)
+    target_user_id = Field(snowflake)
     target_user_type = Field(enum(InviteTargetUserType))
     approximate_presence_count = Field(int)
     approximate_member_count = Field(int)

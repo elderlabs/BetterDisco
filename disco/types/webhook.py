@@ -1,10 +1,12 @@
 import re
 
 from disco.types.base import SlottedModel, Field, snowflake, cached_property
+from disco.types.channel import Channel
+from disco.types.guild import Guild
 from disco.types.user import User
 
 
-WEBHOOK_URL_RE = re.compile(r'\/api\/webhooks\/(\d+)\/(.[^/]+)')
+WEBHOOK_URL_RE = re.compile(r'/api/webhooks/(\d+)/(.[^/]+)')
 
 
 class Webhook(SlottedModel):
@@ -15,6 +17,8 @@ class Webhook(SlottedModel):
     name = Field(str)
     avatar = Field(str)
     token = Field(str)
+    source_guild = Field(Guild)
+    source_channel = Field(Channel)
 
     @classmethod
     def execute_url(cls, url, **kwargs):
