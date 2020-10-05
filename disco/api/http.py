@@ -1,6 +1,7 @@
 import requests
 import random
 import gevent
+import platform
 import sys
 
 from disco import VERSION as disco_version
