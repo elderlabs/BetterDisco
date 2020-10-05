@@ -131,6 +131,7 @@ class Channel(SlottedModel, Permissible):
     icon = Field(text)
     owner_id = Field(snowflake)
     application_id = Field(snowflake)
+    lock_permissions = Field(bool)
     parent_id = Field(snowflake)
     last_pin_timestamp = Field(datetime)
 

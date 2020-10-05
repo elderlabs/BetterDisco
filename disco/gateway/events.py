@@ -4,7 +4,7 @@ from disco.types.user import User, Presence
 from disco.types.channel import Channel, PermissionOverwrite
 from disco.types.message import Message, MessageReactionEmoji
 from disco.types.voice import VoiceState
-from disco.types.guild import Guild, GuildMember, Role, GuildEmoji
+from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration
 from disco.types.invite import Invite
 from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime
 from disco.util.string import underscore
@@ -558,11 +558,8 @@ class PresenceUpdate(GatewayEvent):
         The updated presence object.
     guild_id : snowflake
         The guild this presence update is for.
-    roles : list[snowflake]
-        List of roles the user from the presence is part of.
     """
     guild_id = Field(snowflake)
-    roles = ListField(snowflake)
 
     @property
     def guild(self):
@@ -796,6 +793,18 @@ class InviteCreate(GatewayEvent):
 class InviteDelete(GatewayEvent):
     """
     Sent when an invite has been deleted
+    """
+    guild_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+
+@wraps_model(Integration)
+class IntegrationUpdate(GatewayEvent):
+    """
+    Sent when a guild integration is updated
     """
     guild_id = Field(snowflake)
 

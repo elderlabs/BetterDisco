@@ -1,15 +1,13 @@
-# disco
+# BetterDisco
 
 [![PyPI](https://img.shields.io/pypi/l/disco-py.svg)](https://pypi.python.org/pypi/disco-py/)
-[![PyPI](https://img.shields.io/pypi/v/disco-py.svg)](https://pypi.python.org/pypi/disco-py/)
-[![TravisCI](https://img.shields.io/travis/b1naryth1ef/disco.svg)](https://travis-ci.org/b1naryth1ef/disco/)
 
-Disco is an extensive and extendable Python 2.x/3.x library for the [Discord API](https://discordapp.com/developers/docs/intro). Disco boasts the following major features:
+Disco is an extensive and extendable Python 3.x library for the [Discord API](https://discordapp.com/developers/docs/intro). Disco boasts the following major features:
 
 - Expressive, functional interface that gets out of the way
 - Built for high-performance and efficiency
 - Configurable and modular, take the bits you need
-- Full support for Python 2.x/3.x
+- Full support for Python 3.x
 - Evented networking and IO using Gevent
 
 ## Installation
@@ -19,8 +17,7 @@ Disco was built to run both as a generic-use library, and a standalone bot toolk
 |Name|Reason|
 |----|------|
 |requests[security]|adds packages for a proper SSL implementation|
-|ujson|faster json parser, improves performance|
-|erlpack (2.x), earl-etf (3.x)|ETF parser run with the --encoder=etf flag|
+|earl-etf (3.x)|ETF parser run with the --encoder=etf flag|
 |gipc|Gevent IPC, required for autosharding|
 
 ## Examples
