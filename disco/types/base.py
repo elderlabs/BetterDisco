@@ -385,6 +385,9 @@ class Model(six.with_metaclass(ModelMeta, Chainable)):
             if ignore and name in ignore:
                 continue
 
+            if field.metadata.get('private'):
+                continue
+
             if getattr(self, name) is UNSET:
                 continue
             obj[name] = field.serialize(getattr(self, name), field)

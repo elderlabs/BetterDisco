@@ -8,6 +8,7 @@ storage.json
 .eggs/
 .cache/
 .benchmarks/
+venv/
 __pycache__
 .venv
 
