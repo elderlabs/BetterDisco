@@ -558,11 +558,8 @@ class PresenceUpdate(GatewayEvent):
         The updated presence object.
     guild_id : snowflake
         The guild this presence update is for.
-    roles : list[snowflake]
-        List of roles the user from the presence is part of.
     """
     guild_id = Field(snowflake)
-    roles = ListField(snowflake)
 
     @property
     def guild(self):

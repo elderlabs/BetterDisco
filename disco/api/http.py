@@ -104,7 +104,7 @@ class Routes(object):
     GUILDS_INTEGRATIONS_MODIFY = (HTTPMethod.PATCH, GUILDS + '/integrations/{integration}')
     GUILDS_INTEGRATIONS_DELETE = (HTTPMethod.DELETE, GUILDS + '/integrations/{integration}')
     GUILDS_INTEGRATIONS_SYNC = (HTTPMethod.POST, GUILDS + '/integrations/{integration}/sync')
-    GUILDS_EMBED_GET = (HTTPMethod.GET, GUILDS + '/embed')
+    GUILDS_EMBED_GET = (HTTPMethod.GET, GUILDS + '/widget')
     GUILDS_EMBED_MODIFY = (HTTPMethod.PATCH, GUILDS + '/embed')
     GUILDS_WEBHOOKS_LIST = (HTTPMethod.GET, GUILDS + '/webhooks')
     GUILDS_EMOJIS_LIST = (HTTPMethod.GET, GUILDS + '/emojis')
@@ -210,17 +210,14 @@ class HTTPClient(LoggingClass):
     def __init__(self, token, after_request=None):
         super(HTTPClient, self).__init__()
 
-        py_version = '{}.{}.{}'.format(
-            sys.version_info.major,
-            sys.version_info.minor,
-            sys.version_info.micro)
+        py_version = platform.python_version()
 
         self.limiter = RateLimiter()
         self.after_request = after_request
 
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'DiscordBot (https://github.com/b1naryth1ef/disco {}) Python/{} requests/{}'.format(
+            'User-Agent': 'DiscordBot (https://github.com/elderlabs/betterdisco {}) Python/{} requests/{}'.format(
                 disco_version,
                 py_version,
                 requests_version),
