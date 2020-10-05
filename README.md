@@ -1,8 +1,6 @@
 # BetterDisco
 
 [![PyPI](https://img.shields.io/pypi/l/disco-py.svg)](https://pypi.python.org/pypi/disco-py/)
-[![PyPI](https://img.shields.io/pypi/v/disco-py.svg)](https://pypi.python.org/pypi/disco-py/)
-[![TravisCI](https://img.shields.io/travis/b1naryth1ef/disco.svg)](https://travis-ci.org/b1naryth1ef/disco/)
 
 Disco is an extensive and extendable Python 3.x library for the [Discord API](https://discordapp.com/developers/docs/intro). Disco boasts the following major features:
 
