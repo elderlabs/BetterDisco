@@ -204,7 +204,8 @@ class GatewayClient(LoggingClass):
         if isinstance(error, KeyboardInterrupt):
             self.shutting_down = True
             self.ws_event.set()
-        raise Exception('WS received error: {}'.format(error))
+        if not error == 'Connection is already closed.':
+            raise Exception('WS received error: {}'.format(error))
 
     def on_open(self):
         if self.zlib_stream_enabled:
