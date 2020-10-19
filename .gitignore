@@ -8,9 +8,7 @@ storage.json
 .eggs/
 .cache/
 .benchmarks/
-venv/
 __pycache__
-.venv
 
 # Documentation stuff
 docs/api/
@@ -20,6 +18,8 @@ node_modules/
 
 # JetBrains IDE
 .idea/
+venv/
+.venv/
 
 # Visual Studio IDE
 /.vs

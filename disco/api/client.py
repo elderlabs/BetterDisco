@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from gevent.local import local
 from urllib.parse import quote
 
-from disco.api.http import Routes, HTTPClient, to_bytes
+from disco.api.http import Routes, HTTPClient
 from disco.util.functional import optional
 from disco.util.logging import LoggingClass
 from disco.util.sanitize import S
@@ -23,7 +23,7 @@ from disco.types.webhook import Webhook
 
 
 def _reason_header(value):
-    return optional(**{'X-Audit-Log-Reason': quote(to_bytes(value)) if value else None})
+    return optional(**{'X-Audit-Log-Reason': quote(value) if value else None})
 
 
 class Responses(list):
