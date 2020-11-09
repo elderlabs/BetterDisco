@@ -1,11 +1,14 @@
-import requests
-import random
 import gevent
+import random
+import requests
 import platform
-import sys
+
+from requests import __version__ as requests_version
+from requests.adapters import HTTPAdapter
+from requests.exceptions import ConnectionError
+from urllib3.util.retry import Retry
 
 from disco import VERSION as disco_version
-from requests import __version__ as requests_version
 from disco.util.logging import LoggingClass
 from disco.api.ratelimit import RateLimiter
 
@@ -18,8 +21,16 @@ class HTTPMethod(object):
     DELETE = 'DELETE'
 
 
-def to_bytes(obj):
-    return obj
+def random_backoff():
+    """
+    Returns a random backoff (in milliseconds) to be used for any error the
+    client suspects is transient. Will always return a value between 500 and
+    5000 milliseconds.
+
+    :returns: a random backoff in milliseconds.
+    :rtype: float
+    """
+    return random.randint(500, 5000) / 1000.0
 
 
 class Routes(object):
@@ -217,6 +228,7 @@ class HTTPClient(LoggingClass):
         self.after_request = after_request
 
         self.session = requests.Session()
+        self.session.mount(self.BASE_URL, HTTPAdapter(max_retries=Retry(total=self.MAX_RETRIES, backoff_factor=random_backoff(), status_forcelist=[104])))
         self.session.headers.update({
             'User-Agent': 'DiscordBot (https://github.com/elderlabs/betterdisco {}) Python/{} requests/{}'.format(
                 disco_version,
@@ -264,7 +276,7 @@ class HTTPClient(LoggingClass):
         retry = kwargs.pop('retry_number', 0)
 
         # Build the bucket URL
-        args = {k: to_bytes(v) for k, v in args.items()}
+        args = {k: v for k, v in args.items()}
         filtered = {k: (v if k in ('guild', 'channel') else '') for k, v in args.items()}
         bucket = (route[0], route[1].format(**filtered))
 
@@ -278,58 +290,47 @@ class HTTPClient(LoggingClass):
         # Make the actual request
         url = self.BASE_URL + route[1].format(**args)
         self.log.info('%s %s (%s)', route[0], url, kwargs.get('params'))
-        error = False
         try:
             r = self.session.request(route[0], url, **kwargs)
-        except ConnectionError:
-            error = True
 
-        if self.after_request:
-            response.response = r
-            self.after_request(response)
+            if self.after_request:
+                response.response = r
+                self.after_request(response)
 
-        # Update rate limiter
-        self.limiter.update(bucket, r)
+            # Update rate limiter
+            self.limiter.update(bucket, r)
 
-        # If we got a success status code, just return the data
-        if not error and r.status_code < 400:
-            return r
-        elif r.status_code != 429 and 400 <= r.status_code < 500:
-            self.log.warning('Request failed with code %s: %s', r.status_code, r.content)
-            response.exception = APIException(r)
-            raise response.exception
-        elif error or r.status_code == 429 or r.status_code == 502:
-            if r.status_code == 429:
-                self.log.warning('Request responded w/ 429, retrying (but this should not happen, check your clock sync)')
+            # If we got a success status code, just return the data
+            if r.status_code < 400:
+                return r
+            elif r.status_code != 429 and 400 <= r.status_code < 500:
+                self.log.warning('Request failed with code %s: %s', r.status_code, r.content)
+                response.exception = APIException(r)
+                raise response.exception
+            elif r.status_code == 429 or r.status_code == 502:
+                if r.status_code == 429:
+                    self.log.warning('Request responded w/ 429, retrying (but this should not happen, check your clock sync)')
 
-            # If we hit the max retries, throw an error
-            retry += 1
-            if retry > self.MAX_RETRIES:
-                self.log.error('Failing request, hit max retries')
-                raise APIException(r, retries=self.MAX_RETRIES)
+                # If we hit the max retries, throw an error
+                retry += 1
+                if retry > self.MAX_RETRIES:
+                    self.log.error('Failing request, hit max retries')
+                    raise APIException(r, retries=self.MAX_RETRIES)
 
-            backoff = self.random_backoff()
-            if r.status_code == 502:
-                self.log.warning('Request to `{}` failed with code {}, retrying after {}s'.format(
-                    url, r.status_code, backoff,
-                ))
-            else:
-                self.log.warning('Request to `{}` failed with code {}, retrying after {}s ({})'.format(
-                    url, r.status_code, backoff, r.content,
-                ))
-            gevent.sleep(backoff)
+                backoff = random_backoff()
+                if r.status_code == 502:
+                    self.log.warning('Request to `{}` failed with code {}, retrying after {}s'.format(
+                        url, r.status_code, backoff,
+                    ))
+                else:
+                    self.log.warning('Request to `{}` failed with code {}, retrying after {}s ({})'.format(
+                        url, r.status_code, backoff, r.content,
+                    ))
+                gevent.sleep(backoff)
 
-            # Otherwise just recurse and try again
+                # Otherwise just recurse and try again
+                return self(route, args, retry_number=retry, **kwargs)
+        except ConnectionError as e:
+            # For internal logging and testing; likely harmless and useless
+            self.log.error(e)
             return self(route, args, retry_number=retry, **kwargs)
-
-    @staticmethod
-    def random_backoff():
-        """
-        Returns a random backoff (in milliseconds) to be used for any error the
-        client suspects is transient. Will always return a value between 500 and
-        5000 milliseconds.
-
-        :returns: a random backoff in milliseconds.
-        :rtype: float
-        """
-        return random.randint(500, 5000) / 1000.0
