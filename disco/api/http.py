@@ -289,7 +289,7 @@ class HTTPClient(LoggingClass):
 
         # Make the actual request
         url = self.BASE_URL + route[1].format(**args)
-        self.log.info('%s %s %s', route[0], url, '({})'.format(kwargs.get('params')) if not kwargs.get('params') else '')
+        self.log.info('%s %s %s', route[0], url, '({})'.format(kwargs.get('params')) if kwargs.get('params') else '')
         try:
             r = self.session.request(route[0], url, **kwargs)
 
