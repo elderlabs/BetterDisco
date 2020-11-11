@@ -289,7 +289,7 @@ class HTTPClient(LoggingClass):
 
         # Make the actual request
         url = self.BASE_URL + route[1].format(**args)
-        self.log.info('%s %s (%s)', route[0], url, kwargs.get('params'))
+        self.log.info('%s %s %s', route[0], url, '({})'.format(kwargs.get('params')) if kwargs.get('params') else '')
         try:
             r = self.session.request(route[0], url, **kwargs)
 
@@ -307,7 +307,7 @@ class HTTPClient(LoggingClass):
                 self.log.warning('Request failed with code %s: %s', r.status_code, r.content)
                 response.exception = APIException(r)
                 raise response.exception
-            elif r.status_code == 429 or r.status_code == 502:
+            elif r.status_code in [429, 500, 502, 503]:
                 if r.status_code == 429:
                     self.log.warning('Request responded w/ 429, retrying (but this should not happen, check your clock sync)')
 
@@ -318,7 +318,7 @@ class HTTPClient(LoggingClass):
                     raise APIException(r, retries=self.MAX_RETRIES)
 
                 backoff = random_backoff()
-                if r.status_code == 502:
+                if r.status_code in [500, 502, 503]:
                     self.log.warning('Request to `{}` failed with code {}, retrying after {}s'.format(
                         url, r.status_code, backoff,
                     ))
@@ -330,7 +330,9 @@ class HTTPClient(LoggingClass):
 
                 # Otherwise just recurse and try again
                 return self(route, args, retry_number=retry, **kwargs)
-        except ConnectionError as e:
-            # For internal logging and testing; likely harmless and useless
-            self.log.warning(e)
+        except ConnectionError:
+            # Catch ConnectionResetError
+            backoff = random_backoff()
+            self.log.warning('Request to `{}` failed with ConnectionError, retrying after {}s'.format(url, backoff))
+            gevent.sleep(backoff)
             return self(route, args, retry_number=retry, **kwargs)
