@@ -1,10 +1,10 @@
 import gevent
-import zlib
+import platform
 import ssl
 import time
+import zlib
 
-import platform
-from websocket import ABNF
+from websocket import ABNF, WebSocketConnectionClosedException
 
 from disco.gateway.packets import OPCode, RECV, SEND
 from disco.gateway.events import GatewayEvent
@@ -205,7 +205,7 @@ class GatewayClient(LoggingClass):
         if isinstance(error, KeyboardInterrupt):
             self.shutting_down = True
             self.ws_event.set()
-        if not error == 'Connection is already closed.':
+        if not isinstance(error, WebSocketConnectionClosedException):
             raise Exception('WS received error: {}'.format(error))
 
     def on_open(self):
