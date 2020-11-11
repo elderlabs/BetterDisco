@@ -332,5 +332,5 @@ class HTTPClient(LoggingClass):
                 return self(route, args, retry_number=retry, **kwargs)
         except ConnectionError as e:
             # For internal logging and testing; likely harmless and useless
-            self.log.error(e)
+            self.log.warning(e)
             return self(route, args, retry_number=retry, **kwargs)
