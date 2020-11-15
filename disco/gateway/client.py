@@ -129,6 +129,7 @@ class GatewayClient(LoggingClass):
         self.ws.close(status=4000)
 
     def handle_hello(self, packet):
+        self.replayed_events = 0
         self.log.info('Received HELLO, starting heartbeater...')
         self._heartbeat_task = gevent.spawn(self.heartbeat_task, packet['d']['heartbeat_interval'])
 
@@ -140,7 +141,6 @@ class GatewayClient(LoggingClass):
     def on_resumed(self, _):
         self.log.info('RESUME completed, replayed %s events', self.replayed_events)
         self.reconnects = 0
-        self.replayed_events = 0
         self.replaying = False
 
     def connect_and_run(self, gateway_url=None):
