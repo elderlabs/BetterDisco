@@ -121,7 +121,6 @@ class GatewayClient(LoggingClass):
         self.log.warning('Received RECONNECT request, forcing a fresh reconnect')
         self.last_conn_state = 'RECONNECT'
         self.ws.close(status=4000)
-        self.replayed_events = 0
 
     def handle_invalid_session(self, _):
         self.log.warning('Received INVALID_SESSION, forcing a fresh reconnect')
@@ -141,6 +140,7 @@ class GatewayClient(LoggingClass):
     def on_resumed(self, _):
         self.log.info('RESUME completed, replayed %s events', self.replayed_events)
         self.reconnects = 0
+        self.replayed_events = 0
         self.replaying = False
 
     def connect_and_run(self, gateway_url=None):
