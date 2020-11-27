@@ -413,6 +413,7 @@ class AllowedMentions(SlottedModel):
     parse = ListField(AllowedMentionsTypes)
     roles = ListField(snowflake)
     users = ListField(snowflake)
+    replied_user = Field(bool)
 
 
 class MessageFlags(BitsetMap):
