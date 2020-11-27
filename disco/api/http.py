@@ -67,8 +67,7 @@ class Routes(object):
     CHANNELS_MESSAGES_REACTIONS_DELETE_ME = (HTTPMethod.DELETE, CHANNELS + '/messages/{message}/reactions/{emoji}/@me')
     CHANNELS_MESSAGES_REACTIONS_DELETE_USER = (HTTPMethod.DELETE,
                                                CHANNELS + '/messages/{message}/reactions/{emoji}/{user}')
-    CHANNELS_MESSAGES_REACTIONS_DELETE_EMOJI = (HTTPMethod.DELETE,
-                                                CHANNELS + '/messages/{message}/reactions/{emoji}')
+    CHANNELS_MESSAGES_REACTIONS_DELETE_EMOJI = (HTTPMethod.DELETE, CHANNELS + '/messages/{message}/reactions/{emoji}')
     CHANNELS_MESSAGES_PUBLISH = (HTTPMethod.POST, CHANNELS + '/messages/{message}/crosspost')
     CHANNELS_PERMISSIONS_MODIFY = (HTTPMethod.PUT, CHANNELS + '/permissions/{permission}')
     CHANNELS_PERMISSIONS_DELETE = (HTTPMethod.DELETE, CHANNELS + '/permissions/{permission}')
@@ -228,7 +227,6 @@ class HTTPClient(LoggingClass):
         self.after_request = after_request
 
         self.session = requests.Session()
-        self.session.mount(self.BASE_URL, HTTPAdapter(max_retries=Retry(total=self.MAX_RETRIES, backoff_factor=random_backoff(), status_forcelist=[104])))
         self.session.headers.update({
             'User-Agent': 'DiscordBot (https://github.com/elderlabs/betterdisco {}) Python/{} requests/{}'.format(
                 disco_version,

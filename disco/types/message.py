@@ -413,6 +413,7 @@ class AllowedMentions(SlottedModel):
     parse = ListField(AllowedMentionsTypes)
     roles = ListField(snowflake)
     users = ListField(snowflake)
+    replied_user = Field(bool)
 
 
 class MessageFlags(BitsetMap):
@@ -425,6 +426,23 @@ class MessageFlags(BitsetMap):
 
 class MessageFlagValue(BitsetValue):
     map = MessageFlags
+
+
+class MessageStickerFormatTypes(object):
+    PNG = 1
+    APNG = 2
+    LOTTIE = 3
+
+
+class MessageSticker(SlottedModel):
+    id = Field(snowflake)
+    pack_id = Field(snowflake)
+    name = Field(text)
+    description = Field(text)
+    tags = Field(text)
+    asset = Field(text)
+    preview_asset = Field(text)
+    format_type = Field(enum(MessageStickerFormatTypes))
 
 
 class Message(SlottedModel):
@@ -478,26 +496,27 @@ class Message(SlottedModel):
     """
     id = Field(snowflake)
     channel_id = Field(snowflake)
-    webhook_id = Field(snowflake)
-    type = Field(enum(MessageType))
     author = Field(User)
     content = Field(text)
-    nonce = Field(snowflake)
     timestamp = Field(datetime)
     edited_timestamp = Field(datetime)
     tts = Field(bool)
     mention_everyone = Field(bool)
-    pinned = Field(bool)
     mentions = AutoDictField(User, 'id')
     mention_roles = ListField(snowflake)
-    embeds = ListField(MessageEmbed)
     mention_channels = ListField(ChannelMention)
     attachments = AutoDictField(MessageAttachment, 'id')
+    embeds = ListField(MessageEmbed)
     reactions = ListField(MessageReaction)
+    nonce = Field(snowflake)
+    pinned = Field(bool)
+    webhook_id = Field(snowflake)
+    type = Field(enum(MessageType))
     activity = Field(MessageActivity)
     application = Field(MessageApplication)
     message_reference = Field(MessageReference)
     flags = Field(MessageFlagValue)
+    stickers = ListField(MessageSticker)
 
     def __str__(self):
         return '<Message {} ({})>'.format(self.id, self.channel_id)
