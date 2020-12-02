@@ -200,7 +200,12 @@ class APIClient(LoggingClass):
         else:
             r = self.http(Routes.CHANNELS_MESSAGES_CREATE, dict(channel=channel), json=payload)
 
-        return Message.create(self.client, r.json())
+        # Catch API failures
+        # TODO: long-term solution at higher level
+        if r:
+            return Message.create(self.client, r.json())
+        else:
+            return self.log.error('Request failed with code {}'.format(r.status_code))
 
     def channels_messages_modify(self, channel, message, content=None, embed=None, flags=None, sanitize=False):
         payload = optional(flags=flags)
