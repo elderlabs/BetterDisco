@@ -157,6 +157,17 @@ class Routes(object):
     WEBHOOKS_TOKEN_DELETE = (HTTPMethod.DELETE, WEBHOOKS + '/{token}')
     WEBHOOKS_TOKEN_EXECUTE = (HTTPMethod.POST, WEBHOOKS + '/{token}')
 
+    # Applications
+    APPLICATIONS = '/applications/{application}'
+    APPLICATIONS_GLOBAL_COMMANDS_GET = (HTTPMethod.GET, APPLICATIONS + '/commands')
+    APPLICATIONS_GLOBAL_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/commands')
+    APPLICATIONS_GLOBAL_COMMANDS_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/commands')
+    APPLICATIONS_GLOBAL_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/commands/{id}')
+    APPLICATIONS_GUILD_COMMANDS_GET = (HTTPMethod.GET, APPLICATIONS + '/guild/{guild}/commands')
+    APPLICATIONS_GUILD_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/guild/{guild}/commands')
+    APPLICATIONS_GUILD_COMMANDS_MODIFY = (HTTPMethod.MODIFY, APPLICATIONS + '/guild/{guild}/commands')
+    APPLICATIONS_GUILD_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/guild/{guild}/commands/{id}')
+
 
 class APIResponse(object):
     def __init__(self):
