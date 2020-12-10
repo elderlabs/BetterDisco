@@ -105,6 +105,7 @@ class State(object):
         self.me = None
         self.guilds = HashMap()
         self.channels = HashMap(weakref.WeakValueDictionary())
+        self.emojis = HashMap(weakref.WeakValueDictionary())
         self.users = HashMap(weakref.WeakValueDictionary())
         self.voice_clients = HashMap(weakref.WeakValueDictionary())
         self.voice_states = HashMap(weakref.WeakValueDictionary())
@@ -183,6 +184,7 @@ class State(object):
 
         self.guilds[event.guild.id] = event.guild
         self.channels.update(event.guild.channels)
+        self.emojis.update(event.guild.emojis)
 
         for member in event.guild.members.values():
             if member.user.id not in self.users:
@@ -358,6 +360,10 @@ class State(object):
             emoji.guild_id = event.guild_id
 
         self.guilds[event.guild_id].emojis = HashMap({i.id: i for i in event.emojis})
+
+        self.emojis = {}
+        for guild in self.guilds.values():
+            self.emojis.update(guild.emojis)
 
     def on_presence_update(self, event):
         # TODO: this is recursive, we hackfix in model

@@ -1,4 +1,4 @@
 gevent==20.9.0
-requests[security]==2.24.0
+requests==2.25.0
 six==1.15.0
 websocket_client==0.57.0

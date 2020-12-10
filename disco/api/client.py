@@ -63,6 +63,7 @@ class APIClient(LoggingClass):
 
         self.client = client
         self.http = HTTPClient(token, self._after_requests)
+        self.token = token
 
         self._captures = local()
 
@@ -145,6 +146,7 @@ class APIClient(LoggingClass):
             attachments=[],
             embed=None,
             allowed_mentions={},
+            message_reference={},
             sanitize=False):
 
         payload = {
@@ -164,6 +166,8 @@ class APIClient(LoggingClass):
                 DeprecationWarning)
 
         if content:
+            if self.token in content:
+                content = 'The bot\'s token would have been exposed in this message and has been removed for safety.'
             if sanitize:
                 content = S(content)
             payload['content'] = content
@@ -171,12 +175,11 @@ class APIClient(LoggingClass):
         if embed:
             payload['embed'] = embed.to_dict()
 
-        if 'parse' in allowed_mentions:
-            payload['allowed_mentions']['parse'] = allowed_mentions['parse']
-        if 'users' in allowed_mentions:
-            payload['allowed_mentions']['users'] = allowed_mentions['users']
-        if 'roles' in allowed_mentions:
-            payload['allowed_mentions']['roles'] = allowed_mentions['roles']
+        if allowed_mentions:
+            payload['allowed_mentions'] = allowed_mentions
+
+        if message_reference:
+            payload['message_reference'] = message_reference
 
         if attachments:
             if len(attachments) > 1:
@@ -197,7 +200,12 @@ class APIClient(LoggingClass):
         else:
             r = self.http(Routes.CHANNELS_MESSAGES_CREATE, dict(channel=channel), json=payload)
 
-        return Message.create(self.client, r.json())
+        # Catch API failures
+        # TODO: long-term solution at higher level
+        if r:
+            return Message.create(self.client, r.json())
+        else:
+            return self.log.error('Request failed with code {}'.format(r.status_code))
 
     def channels_messages_modify(self, channel, message, content=None, embed=None, flags=None, sanitize=False):
         payload = optional(flags=flags)

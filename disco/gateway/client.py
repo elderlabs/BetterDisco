@@ -1,10 +1,10 @@
 import gevent
-import zlib
+import platform
 import ssl
 import time
+import zlib
 
-import platform
-from websocket import ABNF
+from websocket import ABNF, WebSocketConnectionClosedException
 
 from disco.gateway.packets import OPCode, RECV, SEND
 from disco.gateway.events import GatewayEvent
@@ -129,6 +129,7 @@ class GatewayClient(LoggingClass):
         self.ws.close(status=4000)
 
     def handle_hello(self, packet):
+        self.replayed_events = 0
         self.log.info('Received HELLO, starting heartbeater...')
         self._heartbeat_task = gevent.spawn(self.heartbeat_task, packet['d']['heartbeat_interval'])
 
@@ -204,7 +205,7 @@ class GatewayClient(LoggingClass):
         if isinstance(error, KeyboardInterrupt):
             self.shutting_down = True
             self.ws_event.set()
-        if not error == 'Connection is already closed.':
+        if not isinstance(error, WebSocketConnectionClosedException):
             raise Exception('WS received error: {}'.format(error))
 
     def on_open(self):
