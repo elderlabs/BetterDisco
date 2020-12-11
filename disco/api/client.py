@@ -9,6 +9,7 @@ from disco.api.http import Routes, HTTPClient
 from disco.util.functional import optional
 from disco.util.logging import LoggingClass
 from disco.util.sanitize import S
+from disco.types.application import InteractionApplicationCommandCallbackData, InteractionResponse, ApplicationCommand
 from disco.types.user import User
 from disco.types.message import Message
 from disco.types.oauth import Application, Connection
@@ -210,7 +211,9 @@ class APIClient(LoggingClass):
     def channels_messages_modify(self, channel, message, content=None, embed=None, flags=None, sanitize=False):
         payload = optional(flags=flags)
 
-        if content is not None:
+        if content:
+            if self.token in content:
+                content = 'The bot\'s token would have been exposed in this message and has been removed for safety.'
             if sanitize:
                 content = S(content)
             payload['content'] = content
@@ -717,3 +720,56 @@ class APIClient(LoggingClass):
 
         if wait:
             return Message.create(self.client, obj.json())
+
+    def applications_global_commands_get(self):
+        r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_GET, dict(application=self.client.state.me.id))
+        return ApplicationCommand.create_map(self.client, r.json())
+
+    def applications_global_commands_create(self, name, data):
+        r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_CREATE, dict(application=self.client.state.me.id), json=optional(name=name, **data))
+        return ApplicationCommand.create(self.client, r.json())
+
+    def applications_global_commands_modify(self, command, data):
+        r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_MODIFY, dict(application=self.client.state.me.id, command=command), json=optional(**data))
+        return ApplicationCommand.create(self.client, r.json())
+
+    def applications_global_commands_delete(self, command):
+        return self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_DELETE, dict(application=self.client.state.me.id, command=command))
+
+    def applications_guild_commands_get(self, guild):
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_GET, dict(application=self.client.state.me.id, guild=guild))
+        return ApplicationCommand.create_map(self.client, r.json())
+
+    def applications_guild_commands_create(self, guild, name, data):
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_CREATE, dict(application=self.client.state.me.id, guild=guild, name=name), json=optional(**data))
+        return ApplicationCommand.create(self.client, r.json())
+
+    def applications_guild_commands_modify(self, guild, command, data):
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_MODIFY, dict(application=self.client.state.me.id, guild=guild, command=command), json=optional(**data))
+        return ApplicationCommand.create(self.client, r.json())
+
+    def applications_guild_commands_delete(self, guild, command):
+        return self.http(Routes.APPLICATIONS_GUILD_COMMANDS_DELETE, dict(application=self.client.state.me.id, guild=guild, command=command))
+
+    def interactions_create(self, interaction, token, type, data=None):
+        return self.http(Routes.INTERACTIONS_CREATE, dict(id=interaction, token=token), json=optional(type=type, data=data))
+
+    def interactions_edit(self, interaction, token, data=None):
+        r = self.http(Routes.INTERACTIONS_EDIT, dict(id=interaction, token=token), json=optional(data=data))
+        return InteractionResponse.create(self.client, r.json())
+
+    def interactions_delete(self, interaction, token):
+        r = self.http(Routes.INTERACTIONS_DELETE, dict(id=interaction, token=token))
+        return InteractionResponse.create(self.client, r.json())
+
+    def interactions_followup_create(self, token, data):
+        r = self.http(Routes.INTERACTIONS_FOLLOWUP_CREATE, dict(id=self.client.state.me.id, token=token), json=optional(**data))
+        return InteractionApplicationCommandCallbackData.create(self.client, r.json())
+
+    def interactions_followup_edit(self, token, data):
+        r = self.http(Routes.INTERACTIONS_FOLLOWUP_EDIT, dict(id=self.client.state.me.id, token=token), json=optional(**data))
+        return InteractionApplicationCommandCallbackData.create(self.client, r.json())
+
+    def interactions_followup_delete(self, token):
+        r = self.http(Routes.INTERACTIONS_FOLLOWUP_DELETE, dict(id=self.client.state.me.id, token=token))
+        return InteractionApplicationCommandCallbackData.create(self.client, r.json())

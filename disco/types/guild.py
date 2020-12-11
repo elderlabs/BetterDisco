@@ -216,7 +216,7 @@ class GuildMember(SlottedModel):
         Roles this member is part of.
     premium_since : datetime
         When this user set their Nitro boost to this server.
-    is_pending : bool
+    pending : bool
         Whether the user has passed Discord's role gate.
     """
     user = Field(User)
@@ -227,7 +227,7 @@ class GuildMember(SlottedModel):
     joined_at = Field(datetime)
     roles = ListField(snowflake)
     premium_since = Field(datetime)
-    is_pending = Field(bool, default=False)
+    pending = Field(bool, default=False)
 
     def __str__(self):
         return self.user.__str__()
@@ -442,7 +442,7 @@ class Guild(SlottedModel, Permissible):
     max_video_channel_users = Field(int)
     approximate_member_count = Field(int)
     approximate_presence_count = Field(int)
-    #welcome_screen = Field(WelcomeScreen)
+    # welcome_screen = Field(WelcomeScreen)
 
     def __init__(self, *args, **kwargs):
         super(Guild, self).__init__(*args, **kwargs)
@@ -588,14 +588,7 @@ class Guild(SlottedModel, Permissible):
             position=position, reason=reason,
         )
 
-    def create_text_channel(
-            self,
-            name,
-            permission_overwrites=[],
-            parent_id=None,
-            nsfw=None,
-            position=None,
-            reason=None):
+    def create_text_channel(self, name, permission_overwrites=[], parent_id=None, nsfw=None, position=None, reason=None):
         """
         Creates a text channel within the guild.
         """
