@@ -1,12 +1,13 @@
 import six
 
-from disco.types.user import User, Presence
-from disco.types.channel import Channel, PermissionOverwrite
-from disco.types.message import Message, MessageReactionEmoji
-from disco.types.voice import VoiceState
-from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration, Interaction
-from disco.types.invite import Invite
+from disco.types.application import Interaction
 from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime
+from disco.types.channel import Channel, PermissionOverwrite
+from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration
+from disco.types.invite import Invite
+from disco.types.message import Message, MessageReactionEmoji
+from disco.types.user import User, Presence
+from disco.types.voice import VoiceState
 from disco.util.string import underscore
 
 # Mapping of discords event name to our event classes
@@ -518,7 +519,7 @@ class MessageDelete(GatewayEvent):
 
     @property
     def guild(self):
-        return self.channel.guild
+        return self.client.state.guilds.get(self.guild_id)
 
 
 class MessageDeleteBulk(GatewayEvent):
@@ -544,7 +545,7 @@ class MessageDeleteBulk(GatewayEvent):
 
     @property
     def guild(self):
-        return self.channel.guild
+        return self.client.state.guilds.get(self.guild_id)
 
 
 @wraps_model(Presence)
@@ -669,7 +670,7 @@ class MessageReactionAdd(GatewayEvent):
 
     @property
     def guild(self):
-        return self.channel.guild
+        return self.client.state.guilds.get(self.guild_id)
 
 
 class MessageReactionRemove(GatewayEvent):
@@ -701,7 +702,7 @@ class MessageReactionRemove(GatewayEvent):
 
     @property
     def guild(self):
-        return self.channel.guild
+        return self.client.state.guilds.get(self.guild_id)
 
 
 class MessageReactionRemoveAll(GatewayEvent):
@@ -727,7 +728,7 @@ class MessageReactionRemoveAll(GatewayEvent):
 
     @property
     def guild(self):
-        return self.channel.guild
+        return self.client.state.guilds.get(self.guild_id)
 
 
 class MessageReactionRemoveEmoji(GatewayEvent):
@@ -755,7 +756,7 @@ class MessageReactionRemoveEmoji(GatewayEvent):
 
     @property
     def guild(self):
-        return self.channel.guild
+        return self.client.state.guilds.get(self.guild_id)
 
 
 @wraps_model(User)
@@ -813,9 +814,47 @@ class IntegrationUpdate(GatewayEvent):
         return self.client.state.guilds.get(self.guild_id)
 
 @wraps_model(Interaction)
-class InteractionCreated(GatewayEvent):
+class InteractionCreate(GatewayEvent):
     """
     Sent whenever a /command is sent to your application.
+    """
+    guild_id = Field(snowflake)
+    channel_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+    @property
+    def channel(self):
+        return self.client.state.channels.get(self.channel_id)
+
+
+class ApplicationCommandCreate(GatewayEvent):
+    """
+    Received when a slash command is created.
+    """
+    guild_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+
+class ApplicationCommandUpdate(GatewayEvent):
+    """
+    Received when a slash command is updated.
+    """
+    guild_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+
+class ApplicationCommandDelete(GatewayEvent):
+    """
+    Received when a slash command is deleted.
     """
     guild_id = Field(snowflake)
 

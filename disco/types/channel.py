@@ -26,7 +26,7 @@ class PermissionOverwriteType(object):
 
 
 class ChannelSubType(SlottedModel):
-    channel_id = Field(None)
+    channel_id = Field(snowflake)
 
     @cached_property
     def channel(self):
@@ -76,12 +76,13 @@ class PermissionOverwrite(ChannelSubType):
         return value
 
     def save(self, **kwargs):
-        self.client.api.channels_permissions_modify(self.channel_id,
-                                                    self.id,
-                                                    self.allow.value or 0,
-                                                    self.deny.value or 0,
-                                                    self.type,
-                                                    **kwargs)
+        self.client.api.channels_permissions_modify(
+            self.channel_id,
+            self.id,
+            self.allow.value or 0,
+            self.deny.value or 0,
+            self.type,
+            **kwargs)
         return self
 
     def delete(self, **kwargs):

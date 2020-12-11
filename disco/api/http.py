@@ -161,12 +161,21 @@ class Routes(object):
     APPLICATIONS = '/applications/{application}'
     APPLICATIONS_GLOBAL_COMMANDS_GET = (HTTPMethod.GET, APPLICATIONS + '/commands')
     APPLICATIONS_GLOBAL_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/commands')
-    APPLICATIONS_GLOBAL_COMMANDS_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/commands')
-    APPLICATIONS_GLOBAL_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/commands/{id}')
-    APPLICATIONS_GUILD_COMMANDS_GET = (HTTPMethod.GET, APPLICATIONS + '/guild/{guild}/commands')
-    APPLICATIONS_GUILD_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/guild/{guild}/commands')
-    APPLICATIONS_GUILD_COMMANDS_MODIFY = (HTTPMethod.MODIFY, APPLICATIONS + '/guild/{guild}/commands')
-    APPLICATIONS_GUILD_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/guild/{guild}/commands/{id}')
+    APPLICATIONS_GLOBAL_COMMANDS_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/commands/{command}')
+    APPLICATIONS_GLOBAL_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/commands/{command}')
+    APPLICATIONS_GUILD_COMMANDS_GET = (HTTPMethod.GET, APPLICATIONS + '/guilds/{guild}/commands')
+    APPLICATIONS_GUILD_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/guilds/{guild}/commands')
+    APPLICATIONS_GUILD_COMMANDS_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/guilds/{guild}/commands/{command}')
+    APPLICATIONS_GUILD_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/guilds/{guild}/commands/{command}')
+
+    # Interactions
+    INTERACTIONS = '/webhooks/{id}/{token}'
+    INTERACTIONS_CREATE = (HTTPMethod.POST, '/interactions/{id}/{token}/callback')
+    INTERACTIONS_EDIT = (HTTPMethod.PATCH, INTERACTIONS + '/messages/@original')
+    INTERACTIONS_DELETE = (HTTPMethod.DELETE, INTERACTIONS + '/messages/@original')
+    INTERACTIONS_FOLLOWUP_CREATE = (HTTPMethod.POST, INTERACTIONS)
+    INTERACTIONS_FOLLOWUP_EDIT = (HTTPMethod.PATCH, INTERACTIONS + '/messages/{message}')
+    INTERACTIONS_FOLLOWUP_DELETE = (HTTPMethod.DELETE, INTERACTIONS + '/messages/{message}')
 
 
 class APIResponse(object):
