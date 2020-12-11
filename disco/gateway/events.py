@@ -4,7 +4,7 @@ from disco.types.user import User, Presence
 from disco.types.channel import Channel, PermissionOverwrite
 from disco.types.message import Message, MessageReactionEmoji
 from disco.types.voice import VoiceState
-from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration
+from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration, Interaction
 from disco.types.invite import Invite
 from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime
 from disco.util.string import underscore
@@ -805,6 +805,17 @@ class InviteDelete(GatewayEvent):
 class IntegrationUpdate(GatewayEvent):
     """
     Sent when a guild integration is updated
+    """
+    guild_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+@wraps_model(Interaction)
+class InteractionCreated(GatewayEvent):
+    """
+    Sent whenever a /command is sent to your application.
     """
     guild_id = Field(snowflake)
 
