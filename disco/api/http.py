@@ -165,8 +165,17 @@ class Routes(object):
     APPLICATIONS_GLOBAL_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/commands/{id}')
     APPLICATIONS_GUILD_COMMANDS_GET = (HTTPMethod.GET, APPLICATIONS + '/guild/{guild}/commands')
     APPLICATIONS_GUILD_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/guild/{guild}/commands')
-    APPLICATIONS_GUILD_COMMANDS_MODIFY = (HTTPMethod.MODIFY, APPLICATIONS + '/guild/{guild}/commands')
+    APPLICATIONS_GUILD_COMMANDS_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/guild/{guild}/commands')
     APPLICATIONS_GUILD_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/guild/{guild}/commands/{id}')
+
+    # Interactions
+    INTERACTIONS = '/webhooks/{id}/{token}'
+    INTERACTIONS_CREATE = (HTTPMethod.POST, '/interactions/{id}/{token}/callback')
+    INTERACTIONS_EDIT = (HTTPMethod.PATCH, INTERACTIONS + '/messages/@original')
+    INTERACTIONS_DELETE = (HTTPMethod.DELETE, INTERACTIONS + '/messages/@original')
+    INTERACTIONS_FOLLOWUP_CREATE = (HTTPMethod.POST, INTERACTIONS)
+    INTERACTIONS_FOLLOWUP_EDIT = (HTTPMethod.PATCH, INTERACTIONS + '/messages/{message}')
+    INTERACTIONS_FOLLOWUP_DELETE = (HTTPMethod.DELETE, INTERACTIONS + '/messages/{message}')
 
 
 class APIResponse(object):
