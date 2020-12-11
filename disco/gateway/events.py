@@ -828,3 +828,36 @@ class InteractionCreate(GatewayEvent):
     @property
     def channel(self):
         return self.client.state.channels.get(self.channel_id)
+
+
+class ApplicationCommandCreate(GatewayEvent):
+    """
+    Received when a slash command is created.
+    """
+    guild_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+
+class ApplicationCommandUpdate(GatewayEvent):
+    """
+    Received when a slash command is updated.
+    """
+    guild_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+
+class ApplicationCommandDelete(GatewayEvent):
+    """
+    Received when a slash command is deleted.
+    """
+    guild_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)

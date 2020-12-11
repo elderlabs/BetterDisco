@@ -1,4 +1,4 @@
-from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property, DictField
+from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField
 from disco.types.guild import GuildMember
 from disco.types.message import MessageEmbed, AllowedMentions
 
@@ -41,6 +41,7 @@ class ApplicationCommandInteractionData(SlottedModel):
 
 class ApplicationCommand(SlottedModel):
     id = Field(snowflake)
+    guild_id = Field(snowflake)
     application_id = Field(snowflake)
     name = Field(text)
     description = Field(text)
@@ -55,11 +56,29 @@ class InteractionType(object):
 class Interaction(SlottedModel):
     id = Field(snowflake)
     type = Field(enum(InteractionType))
-    data = Field(DictField)
+    data = Field(ApplicationCommandInteractionData)
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
     member = Field(GuildMember)
     token = Field(text)
+
+    def send_acknowledgement(self, type, data=None):
+        return self.client.api.interactions_create(self.id, self.token, type, data)
+
+    def edit_acknowledgement(self, data):
+        return self.client.api.interactions_edit(self.id, self.token, data)
+
+    def delete_acknowledgement(self):
+        return self.client.api.interactions_delete(self.id, self.token)
+
+    def reply(self, data):
+        return self.client.api.interactions_followup_create(self.token, data)
+
+    def edit(self, data):
+        return self.client.api.interactions_followup_edit(self.token, data)
+
+    def delete(self):
+        return self.client.api.interactions_followup_delete(self.token)
 
 
 class InteractionResponseType(object):
