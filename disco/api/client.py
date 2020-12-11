@@ -210,7 +210,9 @@ class APIClient(LoggingClass):
     def channels_messages_modify(self, channel, message, content=None, embed=None, flags=None, sanitize=False):
         payload = optional(flags=flags)
 
-        if content is not None:
+        if content:
+            if self.token in content:
+                content = 'The bot\'s token would have been exposed in this message and has been removed for safety.'
             if sanitize:
                 content = S(content)
             payload['content'] = content
