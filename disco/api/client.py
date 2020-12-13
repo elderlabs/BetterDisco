@@ -723,7 +723,7 @@ class APIClient(LoggingClass):
 
     def applications_global_commands_get(self):
         r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_GET, dict(application=self.client.state.me.id))
-        return ApplicationCommand.create(self.client, r.json())
+        return ApplicationCommand.create_map(self.client, r.json())
 
     def applications_global_commands_create(self, name, data):
         r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_CREATE, dict(application=self.client.state.me.id), json=optional(name=name, **data))
@@ -738,7 +738,7 @@ class APIClient(LoggingClass):
 
     def applications_guild_commands_get(self, guild):
         r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_GET, dict(application=self.client.state.me.id, guild=guild))
-        return ApplicationCommand.create(self.client, r.json())
+        return ApplicationCommand.create_map(self.client, r.json())
 
     def applications_guild_commands_create(self, guild, name, data):
         r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_CREATE, dict(application=self.client.state.me.id, guild=guild, name=name), json=optional(**data))
