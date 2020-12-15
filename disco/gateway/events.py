@@ -1,6 +1,6 @@
 import six
 
-from disco.types.application import Interaction
+from disco.types.application import ApplicationCommand, Interaction
 from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime
 from disco.types.channel import Channel, PermissionOverwrite
 from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration
@@ -140,21 +140,29 @@ class Ready(GatewayEvent):
         The user object for the authenticated account.
     guilds : list[:class:`disco.types.guild.Guild`
         All guilds this account is a member of. These are shallow guild objects.
-        These are marked unavailable until the corresponding GuildCreate event is recieved.
+        These are marked unavailable until the corresponding GuildCreate event is received.
     private_channels list[:class:`disco.types.channel.Channel`]
         An empty array.
     """
-    version = Field(int, alias='v')
-    session_id = Field(str)
-    user = Field(User)
+    trace = ListField(str, alias='_trace')
+    application = Field(User)
+    geo_ordered_rtc_regions = ListField(str)
     guilds = ListField(Guild)
+    # presences =
     private_channels = ListField(Channel)
+    relationships = ListField(None)
+    session_id = Field(str)
+    shard = Field(str)
+    user = Field(User)
+    user_settings = Field(None)
+    version = Field(int, alias='v')
 
 
 class Resumed(GatewayEvent):
     """
     Sent after a resume completes.
     """
+    trace = ListField(str, alias='_trace')
 
 
 @wraps_model(Guild)
@@ -829,7 +837,7 @@ class InteractionCreate(GatewayEvent):
     def channel(self):
         return self.client.state.channels.get(self.channel_id)
 
-
+@wraps_model(ApplicationCommand)
 class ApplicationCommandCreate(GatewayEvent):
     """
     Received when a slash command is created.
@@ -840,7 +848,7 @@ class ApplicationCommandCreate(GatewayEvent):
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
 
-
+@wraps_model(ApplicationCommand)
 class ApplicationCommandUpdate(GatewayEvent):
     """
     Received when a slash command is updated.
@@ -851,7 +859,7 @@ class ApplicationCommandUpdate(GatewayEvent):
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
 
-
+@wraps_model(ApplicationCommand)
 class ApplicationCommandDelete(GatewayEvent):
     """
     Received when a slash command is deleted.

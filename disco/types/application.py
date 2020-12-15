@@ -1,6 +1,6 @@
-from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField
+from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property
 from disco.types.guild import GuildMember
-from disco.types.message import MessageEmbed, AllowedMentions
+from disco.types.message import MessageEmbed, AllowedMentions, MessageFlagValue
 
 
 class ApplicationCommandOptionType(object):
@@ -20,7 +20,7 @@ class ApplicationCommandOptionChoice(SlottedModel):
 
 
 class ApplicationCommandOption(SlottedModel):
-    type = Field(int)
+    type = Field(enum(ApplicationCommandOptionType))
     name = Field(text)
     description = Field(text)
     default = Field(bool)
@@ -62,6 +62,14 @@ class Interaction(SlottedModel):
     member = Field(GuildMember)
     token = Field(text)
 
+    @cached_property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+    @cached_property
+    def channel(self):
+        return self.client.state.channels.get(self.channel_id)
+
     def send_acknowledgement(self, type, data=None):
         return self.client.api.interactions_create(self.id, self.token, type, data)
 
@@ -89,12 +97,16 @@ class InteractionResponseType(object):
     ACK_WITH_SOURCE = 5
 
 
+class InteractionResponseFlags:
+    EPHEMERAL = 1 << 6
+
+
 class InteractionApplicationCommandCallbackData(SlottedModel):
     tts = Field(bool)
     content = Field(text)
     embeds = ListField(MessageEmbed)
     allowed_mentions = Field(AllowedMentions)
-    flags = Field(int)
+    flags = Field(MessageFlagValue)
 
 
 class InteractionResponse(SlottedModel):
