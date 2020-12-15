@@ -34,6 +34,7 @@ class MessageType(object):
     GUILD_DISCOVERY_GRACE_PERIOD_FINAL_WARNING = 17
     # UNDOCUMENTED = 18
     INLINE_REPLY = 19
+    APPLICATION_COMMAND = 20
 
 
 class MessageActivityType(object):

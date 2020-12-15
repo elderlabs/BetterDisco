@@ -166,7 +166,7 @@ class APIClient(LoggingClass):
                 'attachment kwarg has been deprecated, switch to using attachments with a list',
                 DeprecationWarning)
 
-        if content:
+        if content is not None:
             if self.token in content:
                 content = 'The bot\'s token would have been exposed in this message and has been removed for safety.'
             if sanitize:
@@ -211,7 +211,7 @@ class APIClient(LoggingClass):
     def channels_messages_modify(self, channel, message, content=None, embed=None, flags=None, sanitize=False):
         payload = optional(flags=flags)
 
-        if content:
+        if content is not None:
             if self.token in content:
                 content = 'The bot\'s token would have been exposed in this message and has been removed for safety.'
             if sanitize:

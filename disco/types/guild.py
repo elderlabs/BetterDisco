@@ -457,6 +457,26 @@ class Guild(SlottedModel, Permissible):
     def owner(self):
         return self.members.get(self.owner_id)
 
+    def get_commands(self):
+        return self.client.api.applications_guild_commands_get(self.id)
+
+    def register_command(self, name, description, options=None):
+        data = {}
+        data['name'] = name
+        data['description'] = description
+        data['options'] = options
+        return self.client.api.applications_guild_commands_create(self.id, name, data)
+
+    def update_command(self, command_id, name, description, options):
+        data = {}
+        data['name'] = name
+        data['description'] = description
+        data['options'] = options
+        return self.client.api.applications_guild_commands_modify(self.id, command_id, data)
+
+    def delete_command(self, command_id):
+        return self.client.api.applications_guild_commands_delete(self.id, command_id)
+
     def get_permissions(self, member):
         """
         Get the permissions a user has in this guild.
