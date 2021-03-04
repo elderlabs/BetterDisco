@@ -870,3 +870,15 @@ class ApplicationCommandDelete(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
+class GuildJoinRequestDelete(GatewayEvent):
+    """
+    Appears to be sent when a user leaves a guild before
+    passing through the membership screening modal
+    """
+    guild_id = Field(snowflake)
+    user_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
