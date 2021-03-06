@@ -34,11 +34,19 @@ class YoutubeDLPlayable(AvConvPlayable):
             results = results['entries']
 
         for result in results:
-            audio_formats = [fmt for fmt in result['formats'] if fmt['vcodec'] == 'none' and fmt['acodec'] == 'opus']
+            if 'youtube' in result['extractor']:
+                audio_formats = [fmt for fmt in result['formats'] if fmt['vcodec'] == 'none' and fmt['acodec'] == 'opus']
+            elif result['extractor'] == 'twitch:stream':
+                audio_formats = [fmt for fmt in result['formats'] if fmt['format_id'] == 'audio_only']
+            else:
+                audio_formats = [fmt for fmt in result['formats'] if fmt['ext'] in ['opus', 'mp3']]
             if not audio_formats:
                 raise Exception("Couldn't find valid audio format for {}".format(url))
 
-            best_audio_format = sorted(audio_formats, key=lambda i: i['abr'], reverse=True)[0]
+            if result['extractor'] == 'twitch:stream':
+                best_audio_format = audio_formats[0]
+            else:
+                best_audio_format = sorted(audio_formats, key=lambda i: i['abr'], reverse=True)[0]
             yield AvConvPlayable(best_audio_format['url'])
 
 
