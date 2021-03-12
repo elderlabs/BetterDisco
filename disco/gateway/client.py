@@ -164,7 +164,7 @@ class GatewayClient(LoggingClass):
 
         self.ws.run_forever(sslopt={'cert_reqs': ssl.CERT_NONE})
 
-    def on_message(self, _, msg):
+    def on_message(self, msg):
         if self.zlib_stream_enabled:
             if not self._buffer:
                 self._buffer = bytearray()
@@ -208,7 +208,7 @@ class GatewayClient(LoggingClass):
         if not isinstance(error, WebSocketConnectionClosedException):
             raise Exception('WS received error: {}'.format(error))
 
-    def on_open(self, _):
+    def on_open(self):
         if self.zlib_stream_enabled:
             self._zlib = zlib.decompressobj()
 
@@ -239,7 +239,7 @@ class GatewayClient(LoggingClass):
                 },
             })
 
-    def on_close(self, _, code, reason):
+    def on_close(self, code, reason):
         # Make sure we cleanup any old data
         self._buffer = None
 
