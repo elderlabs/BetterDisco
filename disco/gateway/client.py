@@ -201,7 +201,7 @@ class GatewayClient(LoggingClass):
         # Emit packet
         self.packets.emit((RECV, data['op']), data)
 
-    def on_error(self, _, error):
+    def on_error(self, error):
         if isinstance(error, KeyboardInterrupt):
             self.shutting_down = True
             self.ws_event.set()
