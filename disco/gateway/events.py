@@ -882,3 +882,12 @@ class GuildJoinRequestDelete(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
+class GiftCodeUpdate(GatewayEvent):
+    """
+    """
+    guild_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    code = Field(str)
+    sku_id = Field(snowflake)
+    uses = Field(int)
