@@ -127,8 +127,10 @@ class VoiceConnection(object):
             r, w = os.pipe()
 
             self._event_reader_greenlet = gevent.spawn(self._event_reader, r)
+            # TODO: doesn't exist
             self._conn.set_event_pipe(w)
 
+    # TODO: kill the ffmpeg session
     def disconnect(self):
         assert self._conn is not None, 'Not connected'
 

@@ -4,9 +4,7 @@ import requests
 import platform
 
 from requests import __version__ as requests_version
-from requests.adapters import HTTPAdapter
 from requests.exceptions import ConnectionError
-from urllib3.util.retry import Retry
 
 from disco import VERSION as disco_version
 from disco.util.logging import LoggingClass

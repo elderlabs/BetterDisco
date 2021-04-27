@@ -1,4 +1,4 @@
-import six
+from six import with_metaclass
 
 from disco.types.application import ApplicationCommand, Interaction
 from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime
@@ -10,6 +10,7 @@ from disco.types.oauth import Application
 from disco.types.user import User, Presence
 from disco.types.voice import VoiceState
 from disco.util.string import underscore
+
 
 # Mapping of discords event name to our event classes
 EVENTS_MAP = {}
@@ -25,7 +26,7 @@ class GatewayEventMeta(ModelMeta):
         return obj
 
 
-class GatewayEvent(six.with_metaclass(GatewayEventMeta, Model)):
+class GatewayEvent(with_metaclass(GatewayEventMeta, Model)):
     """
     The GatewayEvent class wraps various functionality for events passed to us
     over the gateway websocket, and serves as a simple proxy to inner values for
