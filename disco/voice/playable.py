@@ -92,7 +92,7 @@ class OpusFilePlayable(BasePlayable, AbstractOpus):
 
 
 class FFmpegInput(BaseInput, AbstractOpus):
-    def __init__(self, source='-', command='avconv', streaming=False, **kwargs):
+    def __init__(self, source='-', command='ffmpeg', streaming=False, **kwargs):
         super(FFmpegInput, self).__init__(**kwargs)
         if source:
             self.source = source
