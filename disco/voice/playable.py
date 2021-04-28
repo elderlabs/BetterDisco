@@ -11,6 +11,11 @@ from six import add_metaclass
 
 from disco.voice.opus import OpusEncoder
 
+try:
+    import youtube_dl
+    ytdl = youtube_dl.YoutubeDL()
+except ImportError:
+    ytdl = None
 
 OPUS_HEADER_SIZE = struct.calcsize('<h')
 
@@ -128,6 +133,7 @@ class FFmpegInput(BaseInput, AbstractOpus):
                 self.command,
                 '-i', str(self.source),
                 '-f', 's16le',
+                '-bufsize', '4M',
                 '-ar', str(self.sampling_rate),
                 '-ac', str(self.channels),
                 '-loglevel', 'warning',
@@ -149,29 +155,43 @@ class YoutubeDLInput(FFmpegInput):
     def info(self):
         with self._info_lock:
             if not self._info:
-                import youtube_dl
-                ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best'})
-
+                assert ytdl is not None, 'YoutubeDL isn\'t installed'
+                # ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best'})
                 if self._url:
-                    obj = ydl.extract_info(self._url, download=False, process=False)
-                    if 'entries' in obj:
-                        self._ie_info = list(obj['entries'])[0]
+                    # ytdl.extract_info(self._url, download=False, process=False)
+                    results = ytdl.extract_info(self._url, download=False)
+                    if 'entries' not in results:
+                        self._ie_info = [results]
                     else:
-                        self._ie_info = obj
+                        self._ie_info = results['entries']
 
-                self._info = ydl.process_ie_result(self._ie_info, download=False)
+                    for result in self._ie_info:
+                        if 'youtube' in result['extractor']:
+                            audio_formats = [fmt for fmt in result['formats'] if
+                                             fmt['vcodec'] == 'none' and fmt['acodec'] == 'opus']
+                        elif result['extractor'] == 'twitch:stream':
+                            audio_formats = [fmt for fmt in result['formats'] if fmt['format_id'] == 'audio_only']
+                        else:
+                            audio_formats = [fmt for fmt in result['formats'] if fmt['ext'] in ['opus', 'mp3']]
+                        if not audio_formats:
+                            raise Exception("Couldn't find valid audio format for {}".format(self._url))
+
+                        if result['extractor'] == 'twitch:stream':
+                            self._info = audio_formats[0]
+                        else:
+                            self._info = sorted(audio_formats, key=lambda i: i['abr'], reverse=True)[0]
+
             return self._info
 
     @property
     def _metadata(self):
         return self.info
 
+    # TODO: :thinking:
     @classmethod
     def many(cls, url, *args, **kwargs):
-        import youtube_dl
-
-        ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best'})
-        info = ydl.extract_info(url, download=False, process=False)
+        # ytdl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best'})
+        info = ytdl.extract_info(url, download=False, process=False)
 
         if 'entries' not in info:
             yield cls(ie_info=info, *args, **kwargs)
@@ -225,7 +245,7 @@ class DCADOpusEncoderPlayable(BasePlayable, AbstractOpus, OpusEncoder):
         self._done = False
         self._proc = None
 
-# TODO: is this it?
+# TODO: what is this?
     @property
     def proc(self):
         if not self._proc:
