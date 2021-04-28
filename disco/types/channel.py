@@ -1,11 +1,10 @@
 import re
 
-from disco.util.snowflake import to_snowflake
-from disco.util.functional import one_or_many, chunks
-from disco.types.user import User
 from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, text, cached_property
 from disco.types.permissions import Permissions, Permissible, PermissionValue
-
+from disco.types.user import User
+from disco.util.functional import one_or_many, chunks
+from disco.util.snowflake import to_snowflake
 
 NSFW_RE = re.compile('^nsfw(-|$)')
 

@@ -6,7 +6,7 @@ import types
 
 from gevent.lock import Semaphore
 from gevent.queue import Queue
-from io import StringIO as BufferedIO
+from io import BytesIO as BufferedIO
 from six import add_metaclass
 
 from disco.voice.opus import OpusEncoder
