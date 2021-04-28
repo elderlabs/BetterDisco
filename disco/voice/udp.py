@@ -6,7 +6,7 @@ import warnings
 from collections import namedtuple
 
 try:
-    import nacl.secret
+    import nacl
 except ImportError:
     warnings.warn('nacl is not installed, voice support is disabled')
 
