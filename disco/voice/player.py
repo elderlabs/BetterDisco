@@ -3,10 +3,11 @@ import gevent
 
 from holster.enum import Enum
 
-from disco.voice.client import VoiceState
-from disco.voice.queue import PlayableQueue
+from disco.types.channel import Channel
 from disco.util.emitter import Emitter
 from disco.util.logging import LoggingClass
+from disco.voice.client import VoiceState
+from disco.voice.queue import PlayableQueue
 
 
 class Player(LoggingClass):
@@ -124,3 +125,9 @@ class Player(LoggingClass):
 
         self.client.set_speaking(False)
         self.disconnect()
+
+    def set_channel(self, channel_or_id):
+        if channel_or_id and isinstance(channel_or_id, Channel):
+            channel_or_id = channel_or_id.id
+
+        self.client.set_voice_state(channel_or_id)
