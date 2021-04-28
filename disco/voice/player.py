@@ -47,6 +47,9 @@ class Player(LoggingClass):
         # Event emitter for metadata
         self.events = Emitter()
 
+    def client(self):
+        return self.client()
+
     def disconnect(self):
         self.client.disconnect()
         self.events.emit(self.Events.DISCONNECT)
