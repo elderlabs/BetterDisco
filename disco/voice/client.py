@@ -233,7 +233,8 @@ class VoiceClient(LoggingClass):
     def on_voice_codecs(self, data):
         self.audio_codec = data['audio_codec']
         self.video_codec = data['video_codec']
-        self.transport_id = data['media_session_id']
+        if 'media_session_id' in data.keys():
+            self.transport_id = data['media_session_id']
 
         # Set the UDP's RTP Audio Header's Payload Type
         self.udp.set_audio_codec(data['audio_codec'])
