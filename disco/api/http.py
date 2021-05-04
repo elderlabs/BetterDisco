@@ -233,7 +233,7 @@ class HTTPClient(LoggingClass):
     A simple HTTP client which wraps the requests library, adding support for
     Discords rate-limit headers, authorization, and request/response validation.
     """
-    BASE_URL = 'https://discord.com/api/v8'
+    BASE_URL = 'https://discord.com/api/v9'
     MAX_RETRIES = 5
 
     def __init__(self, token, after_request=None):
@@ -350,5 +350,10 @@ class HTTPClient(LoggingClass):
             # Catch ConnectionResetError
             backoff = random_backoff()
             self.log.warning('Request to `{}` failed with ConnectionError, retrying after {}s'.format(url, backoff))
+            gevent.sleep(backoff)
+            return self(route, args, retry_number=retry, **kwargs)
+        except requests.exceptions.Timeout:
+            backoff = random_backoff()
+            self.log.warning('Request to `{}` failed with ConnectionTimeout, retrying after {}s')
             gevent.sleep(backoff)
             return self(route, args, retry_number=retry, **kwargs)
