@@ -259,7 +259,7 @@ class GatewayClient(LoggingClass):
         # Track reconnect attempts
         self.reconnects += 1
         # self.log.info('WS Closed: [%s] %s (%s)', code, reason if reason else '', self.reconnects)
-        self.log.info('WS Closed:{}{} (%s)'.format(' [{}]'.format(code) if code else '', ' {}'.format(reason) if reason else '', self.reconnects))
+        self.log.info('WS Closed:{}{} ({})'.format(' [{}]'.format(code) if code else '', ' {}'.format(reason) if reason else '', self.reconnects))
 
         if self.max_reconnects and self.reconnects > self.max_reconnects:
             raise Exception('Failed to reconnect after {} attempts, giving up'.format(self.max_reconnects))
