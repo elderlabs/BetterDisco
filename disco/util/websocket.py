@@ -14,7 +14,7 @@ class Websocket(LoggingClass, websocket.WebSocketApp):
     """
     def __init__(self, *args, **kwargs):
         LoggingClass.__init__(self)
-        websocket.enableTrace(True)
+        # websocket.enableTrace(True)
         websocket.setdefaulttimeout(5)
         websocket.WebSocketApp.__init__(self, *args, **kwargs)
 
