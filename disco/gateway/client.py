@@ -94,7 +94,7 @@ class GatewayClient(LoggingClass):
                 self.log.warning('Received HEARTBEAT without HEARTBEAT_ACK, forcing a fresh reconnect')
                 self.last_conn_state = 'HEARTBEAT'
                 self._heartbeat_acknowledged = True
-                self.ws.close()
+                self.ws.close(status=1000)
                 return
             self._last_heartbeat = time.perf_counter()
 
@@ -246,6 +246,7 @@ class GatewayClient(LoggingClass):
         # Kill heartbeater, a reconnect/resume will trigger a HELLO which will
         #  respawn it
         if self._heartbeat_task:
+            self.log.info('WS Closed: killing heartbeater')
             self._heartbeat_task.kill()
 
         # If we're quitting, just break out of here
@@ -257,7 +258,8 @@ class GatewayClient(LoggingClass):
 
         # Track reconnect attempts
         self.reconnects += 1
-        self.log.info('WS Closed: [%s] %s (%s)', code, reason if reason else '', self.reconnects)
+        # self.log.info('WS Closed: [%s] %s (%s)', code, reason if reason else '', self.reconnects)
+        self.log.info('WS Closed:{}{} (%s)'.format(' [{}]'.format(code) if code else '', ' {}'.format(reason) if reason else '', self.reconnects))
 
         if self.max_reconnects and self.reconnects > self.max_reconnects:
             raise Exception('Failed to reconnect after {} attempts, giving up'.format(self.max_reconnects))
