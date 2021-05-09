@@ -186,10 +186,6 @@ class State(object):
         self.channels.update(event.guild.channels)
         self.emojis.update(event.guild.emojis)
 
-        for member in event.guild.members.values():
-            if member.user.id not in self.users:
-                self.users[member.user.id] = member.user
-
         for presence in event.presences:
             if presence.user.id in self.users:
                 self.users[presence.user.id].presence = presence

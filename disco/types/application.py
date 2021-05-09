@@ -97,7 +97,7 @@ class InteractionResponseType(object):
     ACK_WITH_SOURCE = 5
 
 
-class InteractionResponseFlags:
+class InteractionResponseFlags(object):
     EPHEMERAL = 1 << 6
 
 

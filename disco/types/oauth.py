@@ -23,6 +23,10 @@ class Team(SlottedModel):
     owner_user_id = Field(snowflake)
 
 
+class ApplicationFlags(object):
+    NONE = 0
+
+
 class Application(SlottedModel):
     id = Field(snowflake)
     name = Field(text)
@@ -39,6 +43,7 @@ class Application(SlottedModel):
     primary_sku_id = Field(snowflake)
     slug = Field(text)
     cover_image = Field(text)
+    flags = Field(int)
 
     def user_is_owner(self, user):
         user_id = to_snowflake(user)

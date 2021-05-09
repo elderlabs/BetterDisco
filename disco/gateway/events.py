@@ -1,4 +1,4 @@
-import six
+from six import with_metaclass
 
 from disco.types.application import ApplicationCommand, Interaction
 from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime
@@ -6,9 +6,11 @@ from disco.types.channel import Channel, PermissionOverwrite
 from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration
 from disco.types.invite import Invite
 from disco.types.message import Message, MessageReactionEmoji
+from disco.types.oauth import Application
 from disco.types.user import User, Presence
 from disco.types.voice import VoiceState
 from disco.util.string import underscore
+
 
 # Mapping of discords event name to our event classes
 EVENTS_MAP = {}
@@ -24,7 +26,7 @@ class GatewayEventMeta(ModelMeta):
         return obj
 
 
-class GatewayEvent(six.with_metaclass(GatewayEventMeta, Model)):
+class GatewayEvent(with_metaclass(GatewayEventMeta, Model)):
     """
     The GatewayEvent class wraps various functionality for events passed to us
     over the gateway websocket, and serves as a simple proxy to inner values for
@@ -145,16 +147,16 @@ class Ready(GatewayEvent):
         An empty array.
     """
     trace = ListField(str, alias='_trace')
-    application = Field(User)
+    application = Field(Application)
     geo_ordered_rtc_regions = ListField(str)
     guilds = ListField(Guild)
-    # presences =
+    # presences = Field(...)
     private_channels = ListField(Channel)
     relationships = ListField(None)
     session_id = Field(str)
     shard = Field(str)
     user = Field(User)
-    user_settings = Field(None)
+    # user_settings = Field(...)
     version = Field(int, alias='v')
 
 
@@ -869,3 +871,24 @@ class ApplicationCommandDelete(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
+class GuildJoinRequestDelete(GatewayEvent):
+    """
+    Appears to be sent when a user leaves a guild before
+    passing through the membership screening modal
+    """
+    guild_id = Field(snowflake)
+    user_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+class GiftCodeUpdate(GatewayEvent):
+    """
+    """
+    guild_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    code = Field(str)
+    sku_id = Field(snowflake)
+    uses = Field(int)

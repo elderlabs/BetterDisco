@@ -1,11 +1,10 @@
 import re
 
-from disco.util.snowflake import to_snowflake
-from disco.util.functional import one_or_many, chunks
-from disco.types.user import User
 from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, text, cached_property
 from disco.types.permissions import Permissions, Permissible, PermissionValue
-
+from disco.types.user import User
+from disco.util.functional import one_or_many, chunks
+from disco.util.snowflake import to_snowflake
 
 NSFW_RE = re.compile('^nsfw(-|$)')
 
@@ -363,6 +362,18 @@ class Channel(SlottedModel, Permissible):
         for more information.
         """
         self.client.api.channels_typing(self.id)
+
+    def connect(self, *args, **kwargs):
+        """
+        Connect to this channel over voice.
+        """
+        from disco.voice.client import VoiceClient
+        assert self.is_voice, 'Channel must support voice to connect'
+
+        server_id = self.guild_id or self.id
+        vc = self.client.state.voice_clients.get(server_id) or VoiceClient(self.client, server_id, is_dm=self.is_dm)
+
+        return vc.connect(self.id, *args, **kwargs)
 
     def create_overwrite(self, *args, **kwargs):
         """

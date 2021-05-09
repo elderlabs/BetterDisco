@@ -296,6 +296,7 @@ class Plugin(LoggingClass, PluginDeco):
             raise Exception('unhandled meta type {}'.format(meta))
 
     def handle_exception(self, greenlet, event):
+        self.log.error('[disco.bot.plugin - handle_exception] - {}\n{}'.format(greenlet, event.__dict__))
         pass
 
     def wait_for_event(self, event_name, conditional=None, **kwargs):

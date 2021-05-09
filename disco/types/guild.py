@@ -227,6 +227,7 @@ class GuildMember(SlottedModel):
     joined_at = Field(datetime)
     roles = ListField(snowflake)
     premium_since = Field(datetime)
+    is_pending = Field(bool, default=False)
     pending = Field(bool, default=False)
 
     def __str__(self):

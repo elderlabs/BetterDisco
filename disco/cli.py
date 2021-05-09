@@ -69,6 +69,7 @@ def disco_main(run=False):
         else:
             config = ClientConfig()
 
+    # TODO: type(int), like shard_id, needs to be int here, but is loaded as str. Fix it.
     for arg_key, config_key in CONFIG_OVERRIDE_MAPPING.items():
         if getattr(args, arg_key) is not None:
             setattr(config, config_key, getattr(args, arg_key))
