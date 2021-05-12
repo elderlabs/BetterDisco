@@ -64,7 +64,6 @@ class BaseInput(BaseUtil):
         raise NotImplementedError
 
 
-
 class FFmpegInput(BaseInput, AbstractOpus):
     def __init__(self, source='-', command='ffmpeg', streaming=False, **kwargs):
         super(FFmpegInput, self).__init__(**kwargs)
@@ -124,7 +123,7 @@ class YoutubeDLInput(FFmpegInput):
         self._ie_info = ie_info
         self._info = None
         self._info_lock = Semaphore()
-        self._streaming = False
+        self.streaming = False
 
     @property
     def info(self):
@@ -153,10 +152,10 @@ class YoutubeDLInput(FFmpegInput):
 
                         if result['extractor'] == 'twitch:stream':
                             self._info = audio_formats[0]
-                            self._streaming = True
+                            self.streaming(True)
                         else:
                             self._info = sorted(audio_formats, key=lambda i: i['abr'], reverse=True)[0]
-                            self._streaming = False
+                            self.streaming(False)
 
             return self._info
 
@@ -183,9 +182,11 @@ class YoutubeDLInput(FFmpegInput):
 
     @property
     def streaming(self):
-        if self._streaming:
-            return True
-        return False
+        return self._streaming
+
+    @streaming.setter
+    def streaming(self, value):
+        self._streaming = value
 
 
 class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
