@@ -105,14 +105,13 @@ class FFmpegInput(BaseInput, AbstractOpus):
             args = [
                 self.command,
                 '-i', str(self.source),
-                '-f', 's16le',
-                '-bufsize', '4M',
+                '-f', 's32le',
                 '-ar', str(self.sampling_rate),
                 '-ac', str(self.channels),
                 '-loglevel', 'warning',
                 'pipe:1',
             ]
-            self._proc = subprocess.Popen(args, stdin=None, stdout=subprocess.PIPE)
+            self._proc = subprocess.Popen(args, stdin=None, stdout=subprocess.PIPE, bufsize=4096)
         return self._proc
 
 
