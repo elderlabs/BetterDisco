@@ -130,7 +130,6 @@ class YoutubeDLInput(FFmpegInput):
         with self._info_lock:
             if not self._info:
                 assert ytdl is not None, 'YoutubeDL isn\'t installed'
-                # ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best'})
                 if self._url:
                     # ytdl.extract_info(self._url, download=False, process=False)
                     results = ytdl.extract_info(self._url, download=False)
@@ -152,10 +151,10 @@ class YoutubeDLInput(FFmpegInput):
 
                         if result['extractor'] == 'twitch:stream':
                             self._info = audio_formats[0]
-                            self.streaming(True)
+                            self.streaming = True
                         else:
                             self._info = sorted(audio_formats, key=lambda i: i['abr'], reverse=True)[0]
-                            self.streaming(False)
+                            self.streaming = False
 
             return self._info
 
