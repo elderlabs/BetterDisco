@@ -64,32 +64,6 @@ class BaseInput(BaseUtil):
         raise NotImplementedError
 
 
-class OpusFilePlayable(BasePlayable, AbstractOpus):
-    """
-    An input which reads opus data from a file or file-like object.
-    """
-    def __init__(self, fobj, *args, **kwargs):
-        super(OpusFilePlayable, self).__init__(*args, **kwargs)
-        self.fobj = fobj
-        self.done = False
-
-    def next_frame(self):
-        if self.done:
-            return None
-
-        header = self.fobj.read(OPUS_HEADER_SIZE)
-        if len(header) < OPUS_HEADER_SIZE:
-            self.done = True
-            return None
-
-        data_size = struct.unpack('<h', header)[0]
-        data = self.fobj.read(data_size)
-        if len(data) < data_size:
-            self.done = True
-            return None
-
-        return data
-
 
 class FFmpegInput(BaseInput, AbstractOpus):
     def __init__(self, source='-', command='ffmpeg', streaming=False, **kwargs):
@@ -150,7 +124,7 @@ class YoutubeDLInput(FFmpegInput):
         self._ie_info = ie_info
         self._info = None
         self._info_lock = Semaphore()
-        self._stream = False
+        self._streaming = False
 
     @property
     def info(self):
@@ -179,10 +153,10 @@ class YoutubeDLInput(FFmpegInput):
 
                         if result['extractor'] == 'twitch:stream':
                             self._info = audio_formats[0]
-                            self._stream = True
+                            self._streaming = True
                         else:
                             self._info = sorted(audio_formats, key=lambda i: i['abr'], reverse=True)[0]
-                            self._stream = False
+                            self._streaming = False
 
             return self._info
 
@@ -209,7 +183,7 @@ class YoutubeDLInput(FFmpegInput):
 
     @property
     def streaming(self):
-        if self._stream:
+        if self._streaming:
             return True
         return False
 
@@ -254,7 +228,6 @@ class DCADOpusEncoderPlayable(BasePlayable, AbstractOpus, OpusEncoder):
         self._done = False
         self._proc = None
 
-# TODO: what is this?
     @property
     def proc(self):
         if not self._proc:
