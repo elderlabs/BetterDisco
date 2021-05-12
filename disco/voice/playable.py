@@ -13,7 +13,7 @@ from disco.voice.opus import OpusEncoder
 
 try:
     import youtube_dl
-    ytdl = youtube_dl.YoutubeDL()
+    ytdl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best'})
 except ImportError:
     ytdl = None
 
@@ -150,6 +150,7 @@ class YoutubeDLInput(FFmpegInput):
         self._ie_info = ie_info
         self._info = None
         self._info_lock = Semaphore()
+        self._stream = False
 
     @property
     def info(self):
@@ -178,8 +179,10 @@ class YoutubeDLInput(FFmpegInput):
 
                         if result['extractor'] == 'twitch:stream':
                             self._info = audio_formats[0]
+                            self._stream = True
                         else:
                             self._info = sorted(audio_formats, key=lambda i: i['abr'], reverse=True)[0]
+                            self._stream = False
 
             return self._info
 
@@ -203,6 +206,12 @@ class YoutubeDLInput(FFmpegInput):
     @property
     def source(self):
         return self.info['url']
+
+    @property
+    def streaming(self):
+        if self._stream:
+            return True
+        return False
 
 
 class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
