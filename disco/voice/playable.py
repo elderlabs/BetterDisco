@@ -105,7 +105,7 @@ class FFmpegInput(BaseInput, AbstractOpus):
             args = [
                 self.command,
                 '-i', str(self.source),
-                '-f', 's32le',
+                '-f', 's16le',
                 '-ar', str(self.sampling_rate),
                 '-ac', str(self.channels),
                 '-loglevel', 'warning',
