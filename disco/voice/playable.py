@@ -1,4 +1,5 @@
 import abc
+import audioop
 import gevent
 import struct
 import subprocess
@@ -115,6 +116,25 @@ class FFmpegInput(BaseInput, AbstractOpus):
         return self._proc
 
 
+class VolumeHandler(FFmpegInput):
+    def __init__(self, ffmpeg, volume=1.0, **kwargs):
+        super(VolumeHandler, self).__init__(**kwargs)
+        self.ffmpeg = ffmpeg
+        self.volume = volume
+
+    @property
+    def volume(self):
+        return self._volume
+
+    @volume.setter
+    def volume(self, value):
+        self._volume = max(value, 0.0)
+
+    def read(self, sz):
+        frag = self.ffmpeg.read(sz)
+        return audioop.mul(frag, 2, min(self._volume, 2.0))
+
+
 class YoutubeDLInput(FFmpegInput):
     def __init__(self, url=None, ie_info=None, *args, **kwargs):
         super(YoutubeDLInput, self).__init__(None, *args, **kwargs)
@@ -215,92 +235,6 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
 
     def next_frame(self):
         return self.frames.get()
-
-
-class DCADOpusEncoderPlayable(BasePlayable, AbstractOpus, OpusEncoder):
-    def __init__(self, source, *args, **kwargs):
-        self.source = source
-        self.command = kwargs.pop('command', 'dcad')
-        self.on_complete = kwargs.pop('on_complete', None)
-        super(DCADOpusEncoderPlayable, self).__init__(*args, **kwargs)
-
-        self._done = False
-        self._proc = None
-
-    @property
-    def proc(self):
-        if not self._proc:
-            source = obj = self.source.fileobj()
-            if not hasattr(obj, 'fileno'):
-                source = subprocess.PIPE
-
-            self._proc = subprocess.Popen([
-                self.command,
-                '--channels', str(self.channels),
-                '--rate', str(self.sampling_rate),
-                '--size', str(self.samples_per_frame),
-                '--bitrate', '128',
-                '--fec',
-                '--packet-loss-percent', '30',
-                '--input', 'pipe:0',
-                '--output', 'pipe:1',
-            ], stdin=source, stdout=subprocess.PIPE)
-
-            def writer():
-                while True:
-                    data = obj.read(2048)
-                    if len(data) > 0:
-                        self._proc.stdin.write(data)
-                    if len(data) < 2048:
-                        break
-
-            if source == subprocess.PIPE:
-                gevent.spawn(writer)
-        return self._proc
-
-    def next_frame(self):
-        if self._done:
-            return None
-
-        header = self.proc.stdout.read(OPUS_HEADER_SIZE)
-        if len(header) < OPUS_HEADER_SIZE:
-            self._done = True
-            self.on_complete()
-            return
-
-        size = struct.unpack('<h', header)[0]
-
-        data = self.proc.stdout.read(size)
-        if len(data) < size:
-            self._done = True
-            self.on_complete()
-            return
-
-        return data
-
-
-class FileProxyPlayable(BasePlayable, AbstractOpus):
-    def __init__(self, other, output, *args, **kwargs):
-        self.flush = kwargs.pop('flush', False)
-        self.on_complete = kwargs.pop('on_complete', None)
-        super(FileProxyPlayable, self).__init__(*args, **kwargs)
-        self.other = other
-        self.output = output
-
-    def next_frame(self):
-        frame = self.other.next_frame()
-
-        if frame:
-            self.output.write(struct.pack('<h', len(frame)))
-            self.output.write(frame)
-
-            if self.flush:
-                self.output.flush()
-        else:
-            self.output.flush()
-            self.on_complete()
-            self.output.close()
-        return frame
 
 
 class PlaylistPlayable(BasePlayable, AbstractOpus):
