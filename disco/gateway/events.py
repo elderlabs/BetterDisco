@@ -2,7 +2,7 @@ from six import with_metaclass
 
 from disco.types.application import ApplicationCommand, Interaction
 from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime
-from disco.types.channel import Channel, PermissionOverwrite
+from disco.types.channel import Channel, PermissionOverwrite, ThreadMember
 from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration
 from disco.types.invite import Invite
 from disco.types.message import Message, MessageReactionEmoji
@@ -892,3 +892,62 @@ class GiftCodeUpdate(GatewayEvent):
     code = Field(str)
     sku_id = Field(snowflake)
     uses = Field(int)
+
+
+@wraps_model(Channel)
+class ThreadCreate(GatewayEvent):
+    """
+    Sent when a thread is created, relevant to the current
+    user, or when the current user is added to a thread.
+    """
+    thread_member = Field(ThreadMember)
+
+
+@wraps_model(Channel)
+class ThreadUpdate(GatewayEvent):
+    """
+    Sent when a thread is updated.
+    """
+
+
+@wraps_model(Channel)
+class ThreadDelete(GatewayEvent):
+    """
+    Sent when a thread relevant to the current user is deleted.
+    """
+
+
+class ThreadListSync(GatewayEvent):
+    """
+    Sent when the current user gains access to a channel.
+    """
+    guild_id = Field(snowflake)
+    channel_ids = ListField(snowflake)
+    threads = ListField(snowflake)
+    members = ListField(ThreadMember)
+
+
+@wraps_model(ThreadMember)
+class ThreadMemberUpdate(GatewayEvent):
+    """
+    Sent when the thread member object for the current user is updated.
+    """
+
+
+class ThreadMembersUpdate(GatewayEvent):
+    """
+    Sent when anyone is added to or removed from a thread.
+    """
+    id = Field(snowflake)
+    guild_id = Field(snowflake)
+    member_count = Field(int)
+    added_members = ListField(ThreadMember)
+    removed_member_ids = ListField(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+    @property
+    def channel(self):
+        return self.client.state.channels.get(self.id)

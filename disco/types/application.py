@@ -1,6 +1,8 @@
-from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property
-from disco.types.guild import GuildMember
+from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property, AutoDictField
+from disco.types.channel import Channel
+from disco.types.guild import GuildMember, Role
 from disco.types.message import MessageEmbed, AllowedMentions, MessageFlagValue
+from disco.types.user import User
 
 
 class ApplicationCommandOptionType(object):
@@ -12,6 +14,7 @@ class ApplicationCommandOptionType(object):
     USER = 6
     CHANNEL = 7
     ROLE = 8
+    MENTIONABLE = 9
 
 
 class ApplicationCommandOptionChoice(SlottedModel):
@@ -23,29 +26,59 @@ class ApplicationCommandOption(SlottedModel):
     type = Field(enum(ApplicationCommandOptionType))
     name = Field(text)
     description = Field(text)
-    default = Field(bool)
+    # default = Field(bool)
     required = Field(bool)
     choices = ListField(ApplicationCommandOptionChoice)
+    # options = ListField(ApplicationCommandOption) ##ISSUE IS THAT IT WANTS TO REFERENCE ITSELF :(
+
+
+class ApplicationCommandInteractionDataResolved(SlottedModel):
+    users = AutoDictField(User, "id")
+    members = AutoDictField(GuildMember, "id")
+    roles = AutoDictField(Role, "id")
+    channels = AutoDictField(Channel, "id")
 
 
 class ApplicationCommandInteractionDataOption(SlottedModel):
     name = Field(text)
+    type = Field(int)
     value = Field(enum(ApplicationCommandOptionType))
+    # options = ListField(ApplicationCommandInteractionDataOption) ##ISSUE IS THAT IT WANTS TO REFERENCE ITSELF :(
 
 
 class ApplicationCommandInteractionData(SlottedModel):
     id = Field(snowflake)
     name = Field(text)
+    resolved = Field(ApplicationCommandInteractionDataResolved)
     options = ListField(ApplicationCommandInteractionDataOption)
 
 
 class ApplicationCommand(SlottedModel):
     id = Field(snowflake)
-    guild_id = Field(snowflake)
+    # guild_id = Field(snowflake)
     application_id = Field(snowflake)
     name = Field(text)
     description = Field(text)
     options = ListField(ApplicationCommandOption)
+    default_permission = Field(bool, default=True)
+
+
+class ApplicationCommandPermissionType(object):
+    ROLE = 1
+    USER = 2
+
+
+class ApplicationCommandPermissions(SlottedModel):
+    id = Field(snowflake)
+    type = Field(enum(ApplicationCommandPermissionType))
+    permission = Field(bool)
+
+
+class GuildApplicationCommandPermissions(SlottedModel):
+    id = Field(snowflake)
+    application_id = Field(snowflake)
+    guild_id = Field(snowflake)
+    permissions = ListField(ApplicationCommandPermissions)
 
 
 class InteractionType(object):
@@ -55,12 +88,15 @@ class InteractionType(object):
 
 class Interaction(SlottedModel):
     id = Field(snowflake)
+    application_id = Field(snowflake)
     type = Field(enum(InteractionType))
     data = Field(ApplicationCommandInteractionData)
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
     member = Field(GuildMember)
+    user = Field(User)
     token = Field(text)
+    version = Field(int)
 
     @cached_property
     def guild(self):
@@ -89,12 +125,12 @@ class Interaction(SlottedModel):
         return self.client.api.interactions_followup_delete(self.token)
 
 
-class InteractionResponseType(object):
+class InteractionCallbackType(object):
     PONG = 1
-    ACKNOWLEDGE = 2
-    CHANNEL_MESSAGE = 3
+    # ACKNOWLEDGE = 2
+    # CHANNEL_MESSAGE = 3
     CHANNEL_MESSAGE_WITH_SOURCE = 4
-    ACK_WITH_SOURCE = 5
+    DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE = 5
 
 
 class InteractionResponseFlags(object):
@@ -110,5 +146,5 @@ class InteractionApplicationCommandCallbackData(SlottedModel):
 
 
 class InteractionResponse(SlottedModel):
-    type = Field(InteractionResponseType)
+    type = Field(InteractionCallbackType)
     data = Field(InteractionApplicationCommandCallbackData)

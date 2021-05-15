@@ -124,6 +124,16 @@ class Routes(object):
     GUILDS_PREVIEW_GET = (HTTPMethod.GET, GUILDS + '/preview')
     GUILDS_AUDITLOGS_LIST = (HTTPMethod.GET, GUILDS + '/audit-logs')
     GUILDS_DISCOVERY_REQUIREMENTS = (HTTPMethod.GET, GUILDS + '/discovery-requirements')
+    # Templates
+    GUILDS_TEMPLATES = GUILDS + '/templates'
+    GUILDS_TEMPLATE_GET = (HTTPMethod.GET, GUILDS_TEMPLATES + '/{template}')
+    GUILDS_CREATE_WITH_TEMPLATE = (HTTPMethod.POST, GUILDS_TEMPLATES + '/{template}')
+    GUILDS_TEMPLATES_GET = (HTTPMethod.GET, GUILDS_TEMPLATES)
+    GUILDS_TEMPLATE_CREATE = (HTTPMethod.POST, GUILDS_TEMPLATES)
+    GUILDS_TEMPLATE_SYNC = (HTTPMethod.PUT, GUILDS_TEMPLATES + '/{template}')
+    GUILD_TEMPLATE_MODIFY = (HTTPMethod.PATCH, GUILDS_TEMPLATES + '/{template}')
+    GUILDS_TEMPLATE_DELETE = (HTTPMethod.DELETE, GUILDS_TEMPLATES + '/{template}')
+
 
     # Users
     USERS = '/users'
@@ -154,26 +164,50 @@ class Routes(object):
     WEBHOOKS_TOKEN_MODIFY = (HTTPMethod.PATCH, WEBHOOKS + '/{token}')
     WEBHOOKS_TOKEN_DELETE = (HTTPMethod.DELETE, WEBHOOKS + '/{token}')
     WEBHOOKS_TOKEN_EXECUTE = (HTTPMethod.POST, WEBHOOKS + '/{token}')
+    # WEBHOOK MESSAGES
+    WEBHOOKS_MESSAGE_GET = (HTTPMethod.GET, WEBHOOKS + '/token/{token}/messages/{message}')
+    WEBHOOKS_MESSAGE_MODIFY = (HTTPMethod.PATCH, WEBHOOKS + '/token/{token}/messages/{message}')
+    WEBHOOKS_MESSAGE_DELETE = (HTTPMethod.DELETE, WEBHOOKS + '/token/{token}/messages/{message}')
 
     # Applications
     APPLICATIONS = '/applications/{application}'
     APPLICATIONS_GLOBAL_COMMANDS_GET = (HTTPMethod.GET, APPLICATIONS + '/commands')
     APPLICATIONS_GLOBAL_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/commands')
+    APPLICATIONS_GLOBAL_COMMAND_GET = (HTTPMethod.GET, APPLICATIONS + '/command/{command}')
     APPLICATIONS_GLOBAL_COMMANDS_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/commands/{command}')
     APPLICATIONS_GLOBAL_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/commands/{command}')
     APPLICATIONS_GUILD_COMMANDS_GET = (HTTPMethod.GET, APPLICATIONS + '/guilds/{guild}/commands')
+    APPLICATION_GLOBAL_BATCH_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/commands')
     APPLICATIONS_GUILD_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/guilds/{guild}/commands')
+    APPLICATIONS_GUILD_COMMAND_GET = (HTTPMethod.GET, APPLICATIONS + '/guilds/{guild}/commands/{command}')
     APPLICATIONS_GUILD_COMMANDS_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/guilds/{guild}/commands/{command}')
     APPLICATIONS_GUILD_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/guilds/{guild}/commands/{command}')
+    APPLICATION_GUILD_BATCH_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/guilds/{guild}/commands')
+    # APPLICATION COMMAND PERMISSIONS
+    APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_GET = (HTTPMethod.GET, APPLICATIONS + '/guilds/{guild}/commands/permissions')
+    APPLICATIONS_GUILD_COMMAND_PERMISSIONS_GET = (HTTPMethod.GET,
+                                                  APPLICATIONS + '/guilds/{guild}/commands/{commands}/permissions')
+    APPLICATIONS_GUILD_COMMAND_PERMISSIONS_MODIFY = (HTTPMethod.PUT,
+                                                     APPLICATIONS + '/guilds/{guild}/commands/{commands}/permissions')
+    APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_MODIFY = (HTTPMethod.PUT,
+                                                      APPLICATIONS + '/guilds/{guild}/commands/permissions')
 
     # Interactions
     INTERACTIONS = '/webhooks/{id}/{token}'
     INTERACTIONS_CREATE = (HTTPMethod.POST, '/interactions/{id}/{token}/callback')
+    INTERACTIONS_GET_ORIGINAL_RESPONSE = (HTTPMethod.GET, '/webhooks/{application}/{token}/messages/@original')
     INTERACTIONS_EDIT = (HTTPMethod.PATCH, INTERACTIONS + '/messages/@original')
     INTERACTIONS_DELETE = (HTTPMethod.DELETE, INTERACTIONS + '/messages/@original')
     INTERACTIONS_FOLLOWUP_CREATE = (HTTPMethod.POST, INTERACTIONS)
     INTERACTIONS_FOLLOWUP_EDIT = (HTTPMethod.PATCH, INTERACTIONS + '/messages/{message}')
     INTERACTIONS_FOLLOWUP_DELETE = (HTTPMethod.DELETE, INTERACTIONS + '/messages/{message}')
+
+    # Stages
+    STAGES = '/stage-instances'
+    STAGES_CREATE = (HTTPMethod.POST, STAGES)
+    STAGES_GET = (HTTPMethod.GET, STAGES + '/{channel}')
+    STAGES_MODIFY = (HTTPMethod.PATCH, STAGES + '/{channel}')
+    STAGES_DELETE = (HTTPMethod.DELETE, STAGES + "/{channel}")
 
 
 class APIResponse(object):

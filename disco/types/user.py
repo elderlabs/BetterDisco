@@ -4,6 +4,7 @@ from disco.types.base import (
     SlottedModel, Field, snowflake, text, with_equality, with_hash, enum, ListField,
     cached_property,
 )
+from disco.types.guild import Integration
 
 
 class DefaultAvatars(object):
@@ -38,6 +39,7 @@ class UserFlags(object):
 
 
 class PremiumType(object):
+    NONE = 0
     CLASSIC = 1
     NITRO = 2
 
@@ -47,6 +49,7 @@ class UserConnection(object):
     name = Field(str)
     type = Field(str)
     revoked = Field(bool)
+    integrations = ListField(Integration)
     verified = Field(bool)
     friend_sync = Field(bool)
     show_activity = Field(bool)
@@ -72,7 +75,6 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     flags = Field(int)
     public_flags = Field(int, default=0)
     premium_type = Field(enum(PremiumType))
-    presence = Field(None)
 
     def get_avatar_url(self, still_format='webp', animated_format='gif', size=1024):
         if not self.avatar:

@@ -729,6 +729,8 @@ class APIClient(LoggingClass):
         r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_CREATE, dict(application=self.client.state.me.id), json=optional(name=name, **data))
         return ApplicationCommand.create(self.client, r.json())
 
+    #TODO: IMPLIMENT ALL THE NEW ROUTES THAT WERE ADDED! @JUSTIN
+
     def applications_global_commands_modify(self, command, data):
         r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_MODIFY, dict(application=self.client.state.me.id, command=command), json=optional(**data))
         return ApplicationCommand.create(self.client, r.json())

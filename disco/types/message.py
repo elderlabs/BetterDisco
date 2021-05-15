@@ -3,13 +3,15 @@ import warnings
 import functools
 import unicodedata
 
+from disco.types import GuildMember
+from disco.types.application import InteractionType
 from disco.types.base import (
     BitsetMap, BitsetValue, SlottedModel, Field, ListField, AutoDictField,
     snowflake, text, datetime, enum, cached_property,
 )
 from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
-from disco.types.channel import ChannelType
+from disco.types.channel import ChannelType, Channel
 from disco.types.user import User
 
 
@@ -32,9 +34,11 @@ class MessageType(object):
     GUILD_DISCOVERY_REQUALIFIED = 15
     GUILD_DISCOVERY_GRACE_PERIOD_INITIAL_WARNING = 16
     GUILD_DISCOVERY_GRACE_PERIOD_FINAL_WARNING = 17
-    # UNDOCUMENTED = 18
+    THREAD_CREATED = 18
     INLINE_REPLY = 19
     APPLICATION_COMMAND = 20
+    THREAD_STARTER_MESSAGE = 21
+    GUILD_INVITE_REMINDER = 22
 
 
 class MessageActivityType(object):
@@ -144,6 +148,7 @@ class MessageReference(SlottedModel):
     message_id = Field(snowflake)
     channel_id = Field(snowflake)
     guild_id = Field(snowflake)
+    fail_if_not_exists = Field(bool, default=True)
 
 
 class MessageActivity(SlottedModel):
@@ -282,7 +287,6 @@ class MessageEmbedField(SlottedModel):
     value = Field(text)
     inline = Field(bool)
 
-
 class MessageEmbed(SlottedModel):
     """
     Message embed object.
@@ -390,9 +394,10 @@ class MessageAttachment(SlottedModel):
     """
     id = Field(str)
     filename = Field(text)
+    content_type = Field(text)
+    size = Field(int)
     url = Field(text)
     proxy_url = Field(text)
-    size = Field(int)
     height = Field(int)
     width = Field(int)
 
@@ -423,6 +428,9 @@ class MessageFlags(BitsetMap):
     SUPPRESS_EMBEDS = 1 << 2
     SOURCE_MESSAGE_DELETED = 1 << 3
     URGENT = 1 << 4
+    HAS_THREAD = 1 << 5
+    EPHEMERAL = 1 << 6
+    LOADING =  1 << 7
 
 
 class MessageFlagValue(BitsetValue):
@@ -444,6 +452,13 @@ class MessageSticker(SlottedModel):
     asset = Field(text)
     preview_asset = Field(text)
     format_type = Field(enum(MessageStickerFormatTypes))
+
+
+class MessageInteraction(SlottedModel):
+    id = Field(snowflake)
+    type = Field(enum(InteractionType))
+    name = Field(text)
+    user = Field(User)
 
 
 class Message(SlottedModel):
@@ -498,6 +513,7 @@ class Message(SlottedModel):
     id = Field(snowflake)
     channel_id = Field(snowflake)
     author = Field(User)
+    member = Field(GuildMember)
     content = Field(text)
     timestamp = Field(datetime)
     edited_timestamp = Field(datetime)
@@ -515,9 +531,13 @@ class Message(SlottedModel):
     type = Field(enum(MessageType))
     activity = Field(MessageActivity)
     application = Field(MessageApplication)
+    application_id = Field(snowflake)
     message_reference = Field(MessageReference)
     flags = Field(MessageFlagValue)
     stickers = ListField(MessageSticker)
+    #referenced_message = Field(Message)?????????????????????????????
+    interaction = None
+    thread = Field(Channel)
 
     def __str__(self):
         return '<Message {} ({})>'.format(self.id, self.channel_id)
