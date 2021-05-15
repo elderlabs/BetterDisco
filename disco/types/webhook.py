@@ -1,8 +1,8 @@
 import re
 
-from disco.types.base import SlottedModel, Field, snowflake, cached_property, enum
+from disco.types.base import SlottedModel, Field, snowflake, cached_property, enum, DictField, text
 from disco.types.channel import Channel
-from disco.types.guild import Guild
+# from disco.types.guild import Guild
 from disco.types.user import User
 
 
@@ -25,7 +25,7 @@ class Webhook(SlottedModel):
     avatar = Field(str)
     token = Field(str)
     application_id = Field(snowflake)
-    source_guild = Field(Guild)
+    source_guild = DictField(text, text)
     source_channel = Field(Channel)
     url = Field(str)
 

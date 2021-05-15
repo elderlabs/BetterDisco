@@ -1,5 +1,4 @@
 from disco.types.base import SlottedModel, Field, ListField, snowflake, text, enum
-from disco.types.guild import Integration
 from disco.types.user import User
 from disco.util.snowflake import to_snowflake
 
@@ -80,20 +79,3 @@ class Application(SlottedModel):
     @property
     def cover_image_url(self):
         return self.get_cover_image_url()
-
-
-class ConnectionVisibility(object):
-    NOBODY = 0
-    EVERYONE = 1
-
-
-class Connection(SlottedModel):
-    id = Field(text)
-    name = Field(text)
-    type = Field(text)
-    revoked = Field(bool)
-    integrations = ListField(Integration)
-    verified = Field(bool)
-    friend_sync = Field(bool)
-    show_activity = Field(bool)
-    visibility = Field(enum(ConnectionVisibility))

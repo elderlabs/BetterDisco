@@ -29,7 +29,7 @@ class ApplicationCommandOption(SlottedModel):
     # default = Field(bool)
     required = Field(bool)
     choices = ListField(ApplicationCommandOptionChoice)
-    # options = ListField(ApplicationCommandOption) ##ISSUE IS THAT IT WANTS TO REFERENCE ITSELF :(
+    options = ListField(super)  # ISSUE IS THAT IT WANTS TO REFERENCE ITSELF :(
 
 
 class ApplicationCommandInteractionDataResolved(SlottedModel):
@@ -43,7 +43,7 @@ class ApplicationCommandInteractionDataOption(SlottedModel):
     name = Field(text)
     type = Field(int)
     value = Field(enum(ApplicationCommandOptionType))
-    # options = ListField(ApplicationCommandInteractionDataOption) ##ISSUE IS THAT IT WANTS TO REFERENCE ITSELF :(
+    options = ListField(super)  # ISSUE IS THAT IT WANTS TO REFERENCE ITSELF :(
 
 
 class ApplicationCommandInteractionData(SlottedModel):
@@ -55,12 +55,12 @@ class ApplicationCommandInteractionData(SlottedModel):
 
 class ApplicationCommand(SlottedModel):
     id = Field(snowflake)
-    # guild_id = Field(snowflake)
     application_id = Field(snowflake)
     name = Field(text)
     description = Field(text)
     options = ListField(ApplicationCommandOption)
     default_permission = Field(bool, default=True)
+    guild_id = Field(snowflake)
 
 
 class ApplicationCommandPermissionType(object):
@@ -79,6 +79,7 @@ class GuildApplicationCommandPermissions(SlottedModel):
     application_id = Field(snowflake)
     guild_id = Field(snowflake)
     permissions = ListField(ApplicationCommandPermissions)
+
 
 
 class InteractionType(object):
@@ -148,3 +149,10 @@ class InteractionApplicationCommandCallbackData(SlottedModel):
 class InteractionResponse(SlottedModel):
     type = Field(InteractionCallbackType)
     data = Field(InteractionApplicationCommandCallbackData)
+
+
+class MessageInteraction(SlottedModel):
+    id = Field(snowflake)
+    type = Field(enum(InteractionType))
+    name = Field(text)
+    user = Field(User)

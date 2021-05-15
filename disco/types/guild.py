@@ -1,7 +1,7 @@
 import warnings
 
 from disco.api.http import APIException
-from disco.types.oauth import Application
+from disco.types.integration import Integration
 from disco.types.webhook import Webhook
 from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
@@ -727,44 +727,6 @@ class Guild(SlottedModel, Permissible):
 
     def get_discovery_requirements(self):
         return self.client.api.guilds_discovery_requirements(self.id)
-
-
-class IntegrationAccount(SlottedModel):
-    id = Field(text)
-    name = Field(text)
-
-
-class IntegrationExpireBehaviors(object):
-    REMOVAL_ROLE = 0
-    KICK = 1
-
-
-class IntegrationApplication(SlottedModel):
-    id = Field(snowflake)
-    name = Field(text)
-    icon = Field(text)
-    description = Field(text)
-    summary = Field(text)
-    bot = Field(User)
-
-
-
-class Integration(SlottedModel):
-    id = Field(snowflake)
-    name = Field(text)
-    type = Field(text)
-    enabled = Field(bool)
-    syncing = Field(bool)
-    role_id = Field(snowflake)
-    enable_emoticons = Field(bool)
-    expire_behavior = Field(enum(IntegrationExpireBehaviors))
-    expire_grace_period = Field(int)
-    user = Field(User)
-    account = Field(IntegrationAccount)
-    synced_at = Field(datetime)
-    subscriber_count = Field(int)
-    revoked = Field(bool)
-    application = Field(Application)
 
 
 class AuditLogActionTypes(object):

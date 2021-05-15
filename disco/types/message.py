@@ -3,8 +3,6 @@ import warnings
 import functools
 import unicodedata
 
-from disco.types import GuildMember
-from disco.types.application import InteractionType
 from disco.types.base import (
     BitsetMap, BitsetValue, SlottedModel, Field, ListField, AutoDictField,
     snowflake, text, datetime, enum, cached_property,
@@ -454,13 +452,6 @@ class MessageSticker(SlottedModel):
     format_type = Field(enum(MessageStickerFormatTypes))
 
 
-class MessageInteraction(SlottedModel):
-    id = Field(snowflake)
-    type = Field(enum(InteractionType))
-    name = Field(text)
-    user = Field(User)
-
-
 class Message(SlottedModel):
     """
     Represents a Message created within a Channel on Discord.
@@ -513,7 +504,6 @@ class Message(SlottedModel):
     id = Field(snowflake)
     channel_id = Field(snowflake)
     author = Field(User)
-    member = Field(GuildMember)
     content = Field(text)
     timestamp = Field(datetime)
     edited_timestamp = Field(datetime)

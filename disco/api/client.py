@@ -6,13 +6,14 @@ from gevent.local import local
 from urllib.parse import quote
 
 from disco.api.http import Routes, HTTPClient
+from disco.types.integration import UserConnection
 from disco.util.functional import optional
 from disco.util.logging import LoggingClass
 from disco.util.sanitize import S
 from disco.types.application import InteractionApplicationCommandCallbackData, InteractionResponse, ApplicationCommand
 from disco.types.user import User
 from disco.types.message import Message
-from disco.types.oauth import Application, Connection
+from disco.types.oauth import Application
 from disco.types.guild import (
     Guild, GuildMember, GuildBan, GuildEmbed, PruneCount, Role, GuildEmoji,
     AuditLogEntry, Integration, DiscoveryRequirements, GuildPreview
@@ -670,7 +671,7 @@ class APIClient(LoggingClass):
 
     def users_me_connections_list(self):
         r = self.http(Routes.USERS_ME_CONNECTIONS_LIST)
-        return Connection.create_map(self.client, r.json())
+        return UserConnection.create_map(self.client, r.json())
 
     def invites_get(self, invite, with_counts=None):
         r = self.http(Routes.INVITES_GET, dict(invite=invite), params=optional(with_counts=with_counts))

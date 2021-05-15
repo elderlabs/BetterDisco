@@ -4,7 +4,6 @@ from disco.types.base import (
     SlottedModel, Field, snowflake, text, with_equality, with_hash, enum, ListField,
     cached_property,
 )
-from disco.types.guild import Integration
 
 
 class DefaultAvatars(object):
@@ -42,23 +41,6 @@ class PremiumType(object):
     NONE = 0
     CLASSIC = 1
     NITRO = 2
-
-
-class UserConnection(object):
-    id = Field(str)
-    name = Field(str)
-    type = Field(str)
-    revoked = Field(bool)
-    integrations = ListField(Integration)
-    verified = Field(bool)
-    friend_sync = Field(bool)
-    show_activity = Field(bool)
-    visibility = Field(int)
-
-
-class VisibilityType(object):
-    NONE = 0
-    EVERYONE = 1
 
 
 class User(SlottedModel, with_equality('id'), with_hash('id')):
