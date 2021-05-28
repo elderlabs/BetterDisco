@@ -428,7 +428,7 @@ class MessageFlags(BitsetMap):
     URGENT = 1 << 4
     HAS_THREAD = 1 << 5
     EPHEMERAL = 1 << 6
-    LOADING =  1 << 7
+    LOADING = 1 << 7
 
 
 class MessageFlagValue(BitsetValue):
@@ -450,6 +450,53 @@ class MessageSticker(SlottedModel):
     asset = Field(text)
     preview_asset = Field(text)
     format_type = Field(enum(MessageStickerFormatTypes))
+
+
+class MessageInteractionType(object):
+    PING = 1
+    APPLICATION_COMMAND = 2
+
+
+class MessageInteraction(SlottedModel):
+    id = Field(snowflake)
+    type = Field(enum(MessageInteractionType))
+    name = Field(text)
+    user = Field(User)
+
+
+class ButtonStyles(object):
+    PRIMARY = 1
+    SECONDARY = 2
+    SUCCESS = 3
+    DANGER = 4
+    LINK = 5
+
+
+class ComponentTypes(object):
+    ACTION_ROW = 1
+    BUTTON = 2
+
+
+class Component(SlottedModel):
+    type = Field(enum(ComponentTypes))
+    style = Field(enum(ButtonStyles))
+    label = Field(text)
+    emoji = Field(Emoji)
+    custom_id = Field(text)
+    url = Field(text)
+    disabled = Field(bool)
+
+
+class ActionRow(SlottedModel):
+    type = Field(int, default=1)
+    components = ListField(Component)
+
+    def add_component(self, *args, **kwargs):
+
+        if len(args) == 1:
+            self.components.append(*args)
+        else:
+            self.components.append(Component(*args, **kwargs))
 
 
 class Message(SlottedModel):
@@ -525,9 +572,10 @@ class Message(SlottedModel):
     message_reference = Field(MessageReference)
     flags = Field(MessageFlagValue)
     stickers = ListField(MessageSticker)
-    #referenced_message = Field(Message)?????????????????????????????
-    interaction = None
+    # referenced_message = Field(????????)
+    interaction = Field(MessageInteraction)
     thread = Field(Channel)
+    components = ListField(Component)
 
     def __str__(self):
         return '<Message {} ({})>'.format(self.id, self.channel_id)
