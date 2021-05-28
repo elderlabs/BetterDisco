@@ -2,6 +2,7 @@ import gevent
 import time
 
 from collections import namedtuple
+from websocket import WebSocketConnectionClosedException
 
 from holster.enum import Enum
 
@@ -339,8 +340,9 @@ class VoiceClient(LoggingClass):
         except Exception:
             self.log.exception('Failed to parse voice gateway message: ')
 
-    def on_error(self, err):
-        self.log.error('[%s] Voice websocket error: %s', self, err)
+    def on_error(self, error):
+        if not isinstance(error, WebSocketConnectionClosedException):
+            self.log.error('[{}] VC WS received error: {}'.format(self, error))
 
     def on_open(self):
         if self._identified:

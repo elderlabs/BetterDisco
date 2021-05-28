@@ -35,6 +35,7 @@ class UserFlags(object):
     UNDERAGE_DELETED = 1 << 15
     VERIFIED_BOT = 1 << 16
     VERIFIED_DEV = 1 << 17
+    CERTIFIED_MOD = 1 << 18
 
 
 class PremiumType(object):
