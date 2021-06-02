@@ -186,9 +186,9 @@ class Routes(object):
     # APPLICATION COMMAND PERMISSIONS
     APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_GET = (HTTPMethod.GET, APPLICATIONS + '/guilds/{guild}/commands/permissions')
     APPLICATIONS_GUILD_COMMAND_PERMISSIONS_GET = (HTTPMethod.GET,
-                                                  APPLICATIONS + '/guilds/{guild}/commands/{commands}/permissions')
+                                                  APPLICATIONS + '/guilds/{guild}/commands/{command}/permissions')
     APPLICATIONS_GUILD_COMMAND_PERMISSIONS_MODIFY = (HTTPMethod.PUT,
-                                                     APPLICATIONS + '/guilds/{guild}/commands/{commands}/permissions')
+                                                     APPLICATIONS + '/guilds/{guild}/commands/{command}/permissions')
     APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_MODIFY = (HTTPMethod.PUT,
                                                       APPLICATIONS + '/guilds/{guild}/commands/permissions')
 

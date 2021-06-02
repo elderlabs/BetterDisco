@@ -11,7 +11,6 @@ from disco.types.user import User, Presence
 from disco.types.voice import VoiceState
 from disco.util.string import underscore
 
-
 # Mapping of discords event name to our event classes
 EVENTS_MAP = {}
 
@@ -98,6 +97,7 @@ def debug(func=None, match=None):
 
         cls.__init__ = new_init
         return cls
+
     return deco
 
 
@@ -110,6 +110,7 @@ def wraps_model(model, alias=None):
         cls._wraps_model = (alias, model)
         cls._proxy = alias
         return cls
+
     return deco
 
 
@@ -117,6 +118,7 @@ def proxy(field):
     def deco(cls):
         cls._proxy = field
         return cls
+
     return deco
 
 
@@ -124,6 +126,7 @@ def attach(field, to=None):
     def deco(cls):
         cls._attach = (field, to)
         return cls
+
     return deco
 
 
@@ -823,6 +826,7 @@ class IntegrationUpdate(GatewayEvent):
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
 
+
 @wraps_model(Interaction)
 class InteractionCreate(GatewayEvent):
     """
@@ -839,6 +843,7 @@ class InteractionCreate(GatewayEvent):
     def channel(self):
         return self.client.state.channels.get(self.channel_id)
 
+
 @wraps_model(ApplicationCommand)
 class ApplicationCommandCreate(GatewayEvent):
     """
@@ -849,6 +854,7 @@ class ApplicationCommandCreate(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
 
 @wraps_model(ApplicationCommand)
 class ApplicationCommandUpdate(GatewayEvent):
@@ -861,6 +867,7 @@ class ApplicationCommandUpdate(GatewayEvent):
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
 
+
 @wraps_model(ApplicationCommand)
 class ApplicationCommandDelete(GatewayEvent):
     """
@@ -871,6 +878,7 @@ class ApplicationCommandDelete(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
 
 class GuildJoinRequestDelete(GatewayEvent):
     """
@@ -883,6 +891,7 @@ class GuildJoinRequestDelete(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
 
 class GiftCodeUpdate(GatewayEvent):
     """

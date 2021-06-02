@@ -492,11 +492,10 @@ class ActionRow(SlottedModel):
     components = ListField(Component)
 
     def add_component(self, *args, **kwargs):
-
         if len(args) == 1:
-            self.components.append(*args)
+            return self.components.append(*args)
         else:
-            self.components.append(Component(*args, **kwargs))
+            return self.components.append(Component(*args, **kwargs))
 
 
 class Message(SlottedModel):

@@ -113,6 +113,12 @@ class BotConfig(Config):
     http_host = '0.0.0.0'
     http_port = 7575
 
+    slash_commands = {
+        'auto_convert': False,
+        'enabled': False,
+        'sync_on_start': False
+    }
+
 
 class Bot(LoggingClass):
     """
