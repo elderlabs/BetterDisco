@@ -1,4 +1,7 @@
-import re
+try:
+    import regex as re
+except:
+    import re
 
 from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, text, cached_property
 from disco.types.permissions import Permissions, Permissible, PermissionValue

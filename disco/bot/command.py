@@ -1,4 +1,7 @@
-import re
+try:
+    import regex as re
+except:
+    import re
 import argparse
 
 from disco.bot.parser import ArgumentSet, ArgumentError

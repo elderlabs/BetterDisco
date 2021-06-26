@@ -785,7 +785,6 @@ class PresencesReplace(GatewayEvent):
     """
     Sent after a Gateway outage.
     """
-    pass
 
 
 @wraps_model(Invite)
@@ -823,6 +822,7 @@ class IntegrationUpdate(GatewayEvent):
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
 
+
 @wraps_model(Interaction)
 class InteractionCreate(GatewayEvent):
     """
@@ -839,6 +839,7 @@ class InteractionCreate(GatewayEvent):
     def channel(self):
         return self.client.state.channels.get(self.channel_id)
 
+
 @wraps_model(ApplicationCommand)
 class ApplicationCommandCreate(GatewayEvent):
     """
@@ -849,6 +850,7 @@ class ApplicationCommandCreate(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
 
 @wraps_model(ApplicationCommand)
 class ApplicationCommandUpdate(GatewayEvent):
@@ -861,6 +863,7 @@ class ApplicationCommandUpdate(GatewayEvent):
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
 
+
 @wraps_model(ApplicationCommand)
 class ApplicationCommandDelete(GatewayEvent):
     """
@@ -871,6 +874,7 @@ class ApplicationCommandDelete(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
 
 class GuildJoinRequestDelete(GatewayEvent):
     """
@@ -883,6 +887,7 @@ class GuildJoinRequestDelete(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
 
 class GiftCodeUpdate(GatewayEvent):
     """

@@ -1,4 +1,7 @@
-import re
+try:
+    import regex as re
+except:
+    import re
 import os
 import gevent
 import inspect
@@ -162,11 +165,11 @@ class Bot(LoggingClass):
                 from flask import Flask
             except ImportError:
                 self.log.warning('Failed to enable HTTP server, Flask is not installed')
-            else:
-                self.log.info('Starting HTTP server bound to %s:%s', self.config.http_host, self.config.http_port)
-                self.http = Flask('disco')
-                self.http_server = WSGIServer((self.config.http_host, self.config.http_port), self.http)
-                self.http_server_greenlet = gevent.spawn(self.http_server.serve_forever)
+
+            self.log.info('Starting HTTP server bound to %s:%s', self.config.http_host, self.config.http_port)
+            self.http = Flask('disco')
+            self.http_server = WSGIServer((self.config.http_host, self.config.http_port), self.http, log=self.http.logger)
+            self.http_server_greenlet = gevent.spawn(self.http_server.serve_forever)
 
         self.plugins = {}
         self.group_abbrev = {}

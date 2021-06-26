@@ -1,4 +1,7 @@
-import re
+try:
+    import regex as re
+except:
+    import re
 
 
 # Taken from inflection library

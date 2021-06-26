@@ -1,4 +1,7 @@
-import re
+try:
+    import regex as re
+except:
+    import re
 
 
 # Zero width (non-rendering) space that can be used to escape mentions
