@@ -97,6 +97,7 @@ class GuildApplicationCommandPermissions(SlottedModel):
 class InteractionType(object):
     PING = 1
     APPLICATION_COMMAND = 2
+    MessageComponent = 3
 
 
 class Interaction(SlottedModel):
