@@ -39,24 +39,9 @@ class UserFlags(object):
 
 
 class PremiumType(object):
+    NONE = 0
     CLASSIC = 1
     NITRO = 2
-
-
-class UserConnection(object):
-    id = Field(str)
-    name = Field(str)
-    type = Field(str)
-    revoked = Field(bool)
-    verified = Field(bool)
-    friend_sync = Field(bool)
-    show_activity = Field(bool)
-    visibility = Field(int)
-
-
-class VisibilityType(object):
-    NONE = 0
-    EVERYONE = 1
 
 
 class User(SlottedModel, with_equality('id'), with_hash('id')):
@@ -73,7 +58,6 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     flags = Field(int)
     public_flags = Field(int, default=0)
     premium_type = Field(enum(PremiumType))
-    presence = Field(None)
 
     def get_avatar_url(self, still_format='webp', animated_format='gif', size=1024):
         if not self.avatar:

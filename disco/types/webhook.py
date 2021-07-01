@@ -3,25 +3,33 @@ try:
 except:
     import re
 
-from disco.types.base import SlottedModel, Field, snowflake, cached_property
+from disco.types.base import SlottedModel, Field, snowflake, cached_property, enum, DictField, text
 from disco.types.channel import Channel
-from disco.types.guild import Guild
 from disco.types.user import User
 
 
 WEBHOOK_URL_RE = re.compile(r'/api/webhooks/(\d+)/(.[^/]+)')
 
 
+class WebhookTypes(object):
+    INCOMING = 1
+    CHANNEL_FOLLOWER = 2
+    APPLICATION = 3
+
+
 class Webhook(SlottedModel):
     id = Field(snowflake)
+    type = Field(enum(WebhookTypes))
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
     user = Field(User)
     name = Field(str)
     avatar = Field(str)
     token = Field(str)
-    source_guild = Field(Guild)
+    application_id = Field(snowflake)
+    source_guild = DictField(text, text)
     source_channel = Field(Channel)
+    url = Field(str)
 
     @classmethod
     def execute_url(cls, url, **kwargs):
@@ -64,7 +72,9 @@ class Webhook(SlottedModel):
             tts=False,
             fobj=None,
             embeds=[],
+            allowed_mentions=None,
             wait=False,
+            thread_id=None,
             client=None):
         # TODO: support file stuff properly
         client = client or self.client.api
@@ -76,4 +86,5 @@ class Webhook(SlottedModel):
             'tts': tts,
             'file': fobj,
             'embeds': [i.to_dict() for i in embeds],
-        }, wait)
+            'allowed_mentions': allowed_mentions,
+        }, wait, thread_id)

@@ -20,6 +20,10 @@ class ChannelType(object):
     GUILD_CATEGORY = 4
     GUILD_NEWS = 5
     GUILD_STORE = 6
+    GUILD_NEWS_THREAD = 10
+    GUILD_PUBLIC_THREAD = 11
+    GUILD_PRIVATE_THREAD = 12
+    GUILD_STAGE_VOICE = 13
 
 
 class PermissionOverwriteType(object):
@@ -91,6 +95,26 @@ class PermissionOverwrite(ChannelSubType):
         self.client.api.channels_permissions_delete(self.channel_id, self.id, **kwargs)
 
 
+class VideoQualityModes(object):
+    AUTO = 1
+    FULL = 2
+
+
+class ThreadMetaData(SlottedModel):
+    archived = Field(bool)
+    archiver_id = Field(snowflake)
+    auto_archive_duration = Field(int)
+    archive_timestamp = Field(datetime)
+    locked = Field(bool)
+
+
+class ThreadMember(SlottedModel):
+    id = Field(snowflake)
+    user_id = Field(snowflake)
+    join_timestamp = Field(datetime)
+    flags = Field(int)
+
+
 class Channel(SlottedModel, Permissible):
     """
     Represents a Discord Channel.
@@ -137,6 +161,12 @@ class Channel(SlottedModel, Permissible):
     lock_permissions = Field(bool)
     parent_id = Field(snowflake)
     last_pin_timestamp = Field(datetime)
+    rtc_region = Field(text)
+    video_quality_mode = Field(enum(VideoQualityModes))
+    message_count = Field(int)
+    member_count = Field(int)
+    thread_metadata = Field(ThreadMetaData)
+    member = Field(ThreadMember)
 
     def __init__(self, *args, **kwargs):
         super(Channel, self).__init__(*args, **kwargs)
@@ -648,3 +678,17 @@ class MessageIterator(object):
             return res
         else:
             return self._buffer.pop()
+
+
+class StageInstancePrivacyLevel(object):
+    PUBLIC = 1
+    GUILD_ONLY = 2
+
+
+class StageInstance(SlottedModel):
+    id = Field(snowflake)
+    guild_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    topic = Field(text)
+    privacy_level = Field(StageInstancePrivacyLevel)
+    discoverable_disabled = Field(bool)

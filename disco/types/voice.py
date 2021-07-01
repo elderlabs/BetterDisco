@@ -1,4 +1,4 @@
-from disco.types.base import SlottedModel, text, Field, snowflake, cached_property
+from disco.types.base import SlottedModel, text, Field, snowflake, cached_property, datetime
 
 
 class VoiceState(SlottedModel):
@@ -13,6 +13,7 @@ class VoiceState(SlottedModel):
     self_stream = Field(bool)
     self_video = Field(bool)
     suppress = Field(bool)
+    request_to_speak_timestamp = Field(datetime)
 
     @cached_property
     def guild(self):
@@ -25,6 +26,10 @@ class VoiceState(SlottedModel):
     @cached_property
     def user(self):
         return self.client.state.users.get(self.user_id)
+
+    @property
+    def member(self):
+        return self.guild.get_member(self.user_id)
 
 
 class VoiceRegion(SlottedModel):

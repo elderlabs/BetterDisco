@@ -1,5 +1,4 @@
 from disco.types.base import SlottedModel, Field, ListField, snowflake, text, enum
-from disco.types.guild import Integration
 from disco.types.user import User
 from disco.util.snowflake import to_snowflake
 
@@ -20,11 +19,18 @@ class Team(SlottedModel):
     icon = Field(text)
     id = Field(snowflake)
     members = ListField(TeamMember)
+    name = Field(text)
     owner_user_id = Field(snowflake)
 
 
 class ApplicationFlags(object):
     NONE = 0
+    GATEWAY_PRESENCE = 1 << 12
+    GATEWAY_PRESENCE_LIMITED = 1 << 13
+    GATEWAY_GUILD_MEMBERS = 1 << 14
+    GATEWAY_GUILD_MEMBERS_LIMITED = 1 << 15
+    VERIFICATION_PENDING_GUILD_LIMIT = 1 << 16
+    EMBEDDED = 1 << 17
 
 
 class Application(SlottedModel):
@@ -35,6 +41,8 @@ class Application(SlottedModel):
     rpc_origins = ListField(text)
     bot_public = Field(bool)
     bot_require_code_grant = Field(bool)
+    terms_of_service_url = Field(text)
+    privacy_policy_url = Field(text)
     owner = Field(User)
     summary = Field(text)
     verify_key = Field(text)
@@ -71,20 +79,3 @@ class Application(SlottedModel):
     @property
     def cover_image_url(self):
         return self.get_cover_image_url()
-
-
-class ConnectionVisibility(object):
-    NOBODY = 0
-    EVERYONE = 1
-
-
-class Connection(SlottedModel):
-    id = Field(text)
-    name = Field(text)
-    type = Field(text)
-    revoked = Field(bool)
-    integrations = ListField(Integration)
-    verified = Field(bool)
-    friend_sync = Field(bool)
-    show_activity = Field(bool)
-    visibility = Field(enum(ConnectionVisibility))
