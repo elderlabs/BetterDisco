@@ -713,10 +713,11 @@ class APIClient(LoggingClass):
     def webhooks_token_delete(self, webhook, token):
         self.http(Routes.WEBHOOKS_TOKEN_DELETE, dict(webhook=webhook, token=token))
 
-    def webhooks_token_execute(self, webhook, token, data, wait=False):
+    def webhooks_token_execute(self, webhook, token, data, wait=False, thread_id=None):
         obj = self.http(
             Routes.WEBHOOKS_TOKEN_EXECUTE,
             dict(webhook=webhook, token=token),
+            # TODO: map thread_id
             json=optional(**data), params={'wait': int(wait)})
 
         if wait:
