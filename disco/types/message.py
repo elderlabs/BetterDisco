@@ -583,7 +583,7 @@ class Message(SlottedModel):
     message_reference = Field(MessageReference)
     flags = Field(MessageFlagValue)
     # referenced_message = Field()
-    sticker_items = ListField(MessageStickerItemStructure)
+    sticker_items = ListField(MessageStickerItemStructure, default=[])
     interaction = Field(MessageInteraction)
     thread = Field(Channel)
     components = ListField(Component)
