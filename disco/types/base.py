@@ -113,7 +113,7 @@ class Field(object):
             def _f(raw, client, **kwargs):
                 return typ.get(raw)
             return _f
-        elif not typ:
+        elif typ is None:
             def _f(*args, **kwargs):
                 return None
         else:
@@ -196,7 +196,7 @@ def snowflake(data):
 
 def enum(typ):
     def _f(data):
-        if not data:
+        if data is None:
             return None
 
         for k, v in get_enum_members(typ):
@@ -226,7 +226,7 @@ def datetime(data):
 
 
 def text(obj):
-    if not obj:
+    if obj is None:
         return None
 
     return str(obj)

@@ -448,7 +448,7 @@ class MessageStickerFormatTypes(object):
 class MessageStickerItemStructure(SlottedModel):
     id = Field(snowflake)
     name = Field(text)
-    format_type = Field(MessageStickerFormatTypes)
+    format_type = Field(enum(MessageStickerFormatTypes))
 
 
 class MessageSticker(SlottedModel):
