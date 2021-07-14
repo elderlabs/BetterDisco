@@ -186,14 +186,18 @@ class State(object):
         self.channels.update(event.guild.channels)
         self.emojis.update(event.guild.emojis)
 
-        for presence in event.presences:
-            if presence.user.id in self.users:
-                self.users[presence.user.id].presence = presence
-
         for voice_state in event.guild.voice_states.values():
             self.voice_states[voice_state.session_id] = voice_state
 
         if self.config.sync_guild_members:
+            for member in event.guild.members.values():
+                if member.user.id not in self.users:
+                    self.users[member.user.id] = member.user
+
+            for presence in event.presences:
+                if presence.user.id in self.users:
+                    self.users[presence.user.id].presence = presence
+
             event.guild.request_guild_members()
 
     def on_guild_update(self, event):
