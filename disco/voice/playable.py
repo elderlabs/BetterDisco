@@ -14,7 +14,7 @@ from disco.voice.opus import OpusEncoder
 
 try:
     import youtube_dl
-    ytdl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best'})
+    ytdl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'default_search': 'ytsearch'})
 except ImportError:
     ytdl = None
 
