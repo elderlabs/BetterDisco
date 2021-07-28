@@ -599,6 +599,8 @@ class Message(SlottedModel):
         `Guild`
             The guild (if applicable) this message was created in.
         """
+        # if self.thread.thread_metadata:
+        #     return self.thread.guild
         return self.channel.guild
 
     @cached_property
@@ -619,6 +621,8 @@ class Message(SlottedModel):
         `Channel`
             The channel this message was created in.
         """
+        # if self.thread.thread_metadata:
+        #     return self.client.state.channels.get(self.thread.id)
         return self.client.state.channels.get(self.channel_id)
 
     def pin(self):
