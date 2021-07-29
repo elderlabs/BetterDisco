@@ -990,3 +990,11 @@ class StageInstanceDelete(GatewayEvent):
     Sent when a stage instance is deleted.
     """
     guild_id = Field(snowflake)
+
+
+class GuildApplicationCommandCountsUpdate(GatewayEvent):
+    """
+    I honestly haven't the foggiest
+    """
+    guild_id = Field(snowflake)
+    # application_command_counts = ???
