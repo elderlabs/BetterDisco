@@ -230,6 +230,11 @@ class Channel(SlottedModel, Permissible):
             ChannelType.GUILD_VOICE,
             ChannelType.GUILD_CATEGORY,
             ChannelType.GUILD_NEWS,
+            ChannelType.GUILD_STORE,
+            ChannelType.GUILD_STAGE_VOICE,
+            ChannelType.GUILD_PUBLIC_THREAD,
+            ChannelType.GUILD_PRIVATE_THREAD,
+            ChannelType.GUILD_NEWS_THREAD,
         )
 
     @property
@@ -238,7 +243,7 @@ class Channel(SlottedModel, Permissible):
         Whether this channel contains news for the guild (used for verified guilds
         to produce activity feed news).
         """
-        return self.type == ChannelType.GUILD_NEWS
+        return self.type  in (ChannelType.GUILD_NEWS, ChannelType.GUILD_NEWS_THREAD)
 
     @property
     def is_dm(self):
@@ -255,11 +260,25 @@ class Channel(SlottedModel, Permissible):
         return bool(self.type == ChannelType.GUILD_TEXT and (self.nsfw or NSFW_RE.match(self.name)))
 
     @property
+    def is_stage(self):
+        """
+        Whether this channel is a stage channel.
+        """
+        return self.type == ChannelType.GUILD_STAGE_VOICE
+
+    @property
+    def is_thread(self):
+        """
+        Whether this channel is a thread.
+        """
+        return self.type in (ChannelType.GUILD_PUBLIC_THREAD, ChannelType.GUILD_PRIVATE_THREAD)
+
+    @property
     def is_voice(self):
         """
         Whether this channel supports voice.
         """
-        return self.type in (ChannelType.GUILD_VOICE, ChannelType.GROUP_DM)
+        return self.type in (ChannelType.GUILD_VOICE, ChannelType.GROUP_DM, ChannelType.GUILD_STAGE_VOICE)
 
     @property
     def messages(self):

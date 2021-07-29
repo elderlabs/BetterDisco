@@ -106,6 +106,7 @@ class State(object):
         self.guilds = HashMap()
         self.channels = HashMap(weakref.WeakValueDictionary())
         self.emojis = HashMap(weakref.WeakValueDictionary())
+        self.threads = HashMap(weakref.WeakValueDictionary())
         self.users = HashMap(weakref.WeakValueDictionary())
         self.voice_clients = HashMap(weakref.WeakValueDictionary())
         self.voice_states = HashMap(weakref.WeakValueDictionary())
@@ -184,6 +185,7 @@ class State(object):
 
         self.guilds[event.guild.id] = event.guild
         self.channels.update(event.guild.channels)
+        self.threads.update(event.guild.threads)
         self.emojis.update(event.guild.emojis)
 
         for voice_state in event.guild.voice_states.values():
@@ -232,6 +234,23 @@ class State(object):
     def on_channel_delete(self, event):
         if event.channel.is_guild and event.channel.guild and event.channel.id in event.channel.guild.channels:
             del event.channel.guild.channels[event.channel.id]
+
+    def on_thread_create(self, event):
+        if event.channel.is_guild and event.channel.guild_id in self.guilds:
+            self.guilds[event.channel.guild_id].threads[event.channel.id] = event.channel
+            self.threads[event.channel.id] = event.channel
+
+    def on_thread_update(self, event):
+        if event.channel.id in self.threads:
+            self.threads[event.channel.id].inplace_update(event.channel)
+
+            if event.overwrites is not UNSET:
+                self.threads[event.channel.id].overwrites = event.overwrites
+                self.threads[event.channel.id].after_load()
+
+    def on_thread_delete(self, event):
+        if event.channel.is_guild and event.channel.guild and event.channel.id in event.channel.guild.threads:
+            del event.channel.guild.threads[event.channel.id]
 
     def on_voice_server_update(self, event):
         if event.guild_id not in self.voice_clients:
