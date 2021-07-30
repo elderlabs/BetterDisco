@@ -1,7 +1,7 @@
 from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property, DictField
 from disco.types.channel import Channel
 from disco.types.guild import GuildMember, Role
-from disco.types.message import MessageEmbed, AllowedMentions, MessageFlagValue, Message, Component
+from disco.types.message import MessageEmbed, AllowedMentions, MessageFlagValue, Message, MessageComponent
 from disco.types.user import User
 
 
@@ -160,7 +160,7 @@ class InteractionApplicationCommandCallbackData(SlottedModel):
     embeds = ListField(MessageEmbed)
     allowed_mentions = Field(AllowedMentions)
     flags = Field(MessageFlagValue)
-    components = ListField(Component)
+    components = ListField(MessageComponent)
 
 
 class InteractionResponse(SlottedModel):

@@ -46,7 +46,7 @@ class PremiumType(object):
 
 class User(SlottedModel, with_equality('id'), with_hash('id')):
     id = Field(snowflake)
-    username = Field(text)
+    username = Field(str)
     discriminator = Field(text)
     avatar = Field(text)
     bot = Field(bool, default=False)
@@ -58,6 +58,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     flags = Field(int)
     public_flags = Field(int, default=0)
     premium_type = Field(enum(PremiumType))
+    # member = Field(GuildMember)
 
     def get_avatar_url(self, still_format='webp', animated_format='gif', size=1024):
         if not self.avatar:

@@ -1,7 +1,7 @@
 from six import with_metaclass
 
 from disco.types.application import ApplicationCommand, Interaction
-from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime
+from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime, text
 from disco.types.channel import Channel, PermissionOverwrite, ThreadMember, StageInstance
 from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration
 from disco.types.invite import Invite
@@ -157,7 +157,7 @@ class Ready(GatewayEvent):
     private_channels = ListField(Channel)
     relationships = ListField(None)
     session_id = Field(str)
-    shard = Field(str)
+    shard = Field(text)
     user = Field(User)
     # user_settings = Field(...)
     version = Field(int, alias='v')
@@ -371,7 +371,7 @@ class GuildMembersChunk(GatewayEvent):
     chunk_count = Field(int)
     not_found = ListField(snowflake)
     presences = ListField(Presence)
-    nonce = Field(str)
+    nonce = Field(text)
 
     @property
     def guild(self):

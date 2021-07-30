@@ -394,7 +394,7 @@ class MessageAttachment(SlottedModel):
     width : int
         Width of the attachment.
     """
-    id = Field(str)
+    id = Field(snowflake)
     filename = Field(text)
     content_type = Field(text)
     size = Field(int)
@@ -489,7 +489,7 @@ class ComponentTypes(object):
     BUTTON = 2
 
 
-class Component(SlottedModel):
+class MessageComponent(SlottedModel):
     type = Field(enum(ComponentTypes))
     style = Field(enum(ButtonStyles))
     label = Field(text)
@@ -501,13 +501,13 @@ class Component(SlottedModel):
 
 class ActionRow(SlottedModel):
     type = Field(int, default=1)
-    components = ListField(Component)
+    components = ListField(MessageComponent)
 
     def add_component(self, *args, **kwargs):
         if len(args) == 1:
             return self.components.append(*args)
         else:
-            return self.components.append(Component(*args, **kwargs))
+            return self.components.append(MessageComponent(*args, **kwargs))
 
 
 class Message(SlottedModel):
@@ -561,8 +561,9 @@ class Message(SlottedModel):
     """
     id = Field(snowflake)
     channel_id = Field(snowflake)
+    guild_id = Field(snowflake)
     author = Field(User)
-    content = Field(text)
+    content = Field(str)
     timestamp = Field(datetime)
     edited_timestamp = Field(datetime)
     tts = Field(bool)
@@ -573,7 +574,7 @@ class Message(SlottedModel):
     attachments = AutoDictField(MessageAttachment, 'id')
     embeds = ListField(MessageEmbed)
     reactions = ListField(MessageReaction)
-    nonce = Field(snowflake)
+    nonce = Field(text)
     pinned = Field(bool)
     webhook_id = Field(snowflake)
     type = Field(enum(MessageType))
@@ -583,10 +584,10 @@ class Message(SlottedModel):
     message_reference = Field(MessageReference)
     flags = Field(MessageFlagValue)
     # referenced_message = Field()
-    sticker_items = ListField(MessageStickerItemStructure, default=[])
     interaction = Field(MessageInteraction)
     thread = Field(Channel)
-    components = ListField(Component)
+    components = ListField(MessageComponent)
+    sticker_items = ListField(MessageStickerItemStructure, default=[])
 
     def __str__(self):
         return '<Message {} ({})>'.format(self.id, self.channel_id)
@@ -599,8 +600,6 @@ class Message(SlottedModel):
         `Guild`
             The guild (if applicable) this message was created in.
         """
-        # if self.thread.thread_metadata:
-        #     return self.thread.guild
         return self.channel.guild
 
     @cached_property
