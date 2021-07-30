@@ -92,7 +92,7 @@ class State(object):
         'Ready', 'GuildCreate', 'GuildUpdate', 'GuildDelete', 'GuildMemberAdd', 'GuildMemberRemove',
         'GuildMemberUpdate', 'GuildMembersChunk', 'GuildRoleCreate', 'GuildRoleUpdate', 'GuildRoleDelete',
         'GuildEmojisUpdate', 'ChannelCreate', 'ChannelUpdate', 'ChannelDelete', 'VoiceServerUpdate', 'VoiceStateUpdate',
-        'MessageCreate', 'PresenceUpdate', 'UserUpdate',
+        'MessageCreate', 'PresenceUpdate', 'UserUpdate', 'ThreadCreate'
     ]
 
     def __init__(self, client, config):
