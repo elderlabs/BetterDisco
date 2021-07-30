@@ -909,7 +909,7 @@ class ThreadCreate(GatewayEvent):
     user, or when the current user is added to a thread.
     """
     guild_id = Field(snowflake)
-    thread_member = Field(ThreadMember)
+    member = Field(ThreadMember)
 
 
 @wraps_model(Channel)

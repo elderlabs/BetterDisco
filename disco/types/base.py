@@ -56,7 +56,7 @@ class ConversionError(Exception):
 
 class Field(object):
     def __init__(self, value_type, alias=None, default=UNSET, create=True, ignore_dump=None, cast=None, **kwargs):
-        # TODO: fix default bullshit
+        # TODO: fix default bs
         self.true_type = value_type
         self.src_name = alias
         self.dst_name = None
@@ -64,7 +64,7 @@ class Field(object):
         self.cast = cast
         self.metadata = kwargs
 
-        # Only set the default value if we where given one
+        # Only set the default value if we were given one
         if default is not UNSET:
             self.default = default
         # Attempt to use the instances default type (e.g. from a subclass)

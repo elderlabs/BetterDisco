@@ -238,12 +238,24 @@ class Channel(SlottedModel, Permissible):
         )
 
     @property
+    def is_guild_text(self):
+        """
+        Whether this channel is a text channel within a guild.
+        """
+        return self.type in (
+            ChannelType.GUILD_TEXT,
+            ChannelType.GUILD_NEWS_THREAD,
+            ChannelType.GUILD_PUBLIC_THREAD,
+            ChannelType.GUILD_PRIVATE_THREAD,
+        )
+
+    @property
     def is_news(self):
         """
         Whether this channel contains news for the guild (used for verified guilds
         to produce activity feed news).
         """
-        return self.type  in (ChannelType.GUILD_NEWS, ChannelType.GUILD_NEWS_THREAD)
+        return self.type in (ChannelType.GUILD_NEWS, ChannelType.GUILD_NEWS_THREAD)
 
     @property
     def is_dm(self):
@@ -271,7 +283,11 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel is a thread.
         """
-        return self.type in (ChannelType.GUILD_PUBLIC_THREAD, ChannelType.GUILD_PRIVATE_THREAD)
+        return self.type in (
+            ChannelType.GUILD_PUBLIC_THREAD,
+            ChannelType.GUILD_PRIVATE_THREAD,
+            ChannelType.GUILD_NEWS_THREAD,
+        )
 
     @property
     def is_voice(self):
@@ -322,6 +338,18 @@ class Channel(SlottedModel, Permissible):
         """
         return self.client.api.channels_messages_get(self.id, to_snowflake(message))
 
+    def send_message(self, *args, **kwargs):
+        """
+        Send a message to this channel. See `APIClient.channels_messages_create`
+        for more information.
+
+        Returns
+        -------
+        `disco.types.message.Message`
+            The created message.
+        """
+        return self.client.api.channels_messages_create(self.id, *args, **kwargs)
+
     def get_invites(self):
         """
         Returns
@@ -340,7 +368,6 @@ class Channel(SlottedModel, Permissible):
         -------
         `Invite`
         """
-
         from disco.types.invite import Invite
         return Invite.create_for_channel(self, *args, **kwargs)
 
@@ -395,18 +422,6 @@ class Channel(SlottedModel, Permissible):
             The created webhook.
         """
         return self.client.api.channels_webhooks_create(self.id, *args, **kwargs)
-
-    def send_message(self, *args, **kwargs):
-        """
-        Send a message to this channel. See `APIClient.channels_messages_create`
-        for more information.
-
-        Returns
-        -------
-        `disco.types.message.Message`
-            The created message.
-        """
-        return self.client.api.channels_messages_create(self.id, *args, **kwargs)
 
     def send_typing(self):
         """
@@ -527,6 +542,7 @@ class Channel(SlottedModel, Permissible):
         """
         Sets the channels topic.
         """
+        assert (self.type == ChannelType.GUILD_TEXT)
         return self.client.api.channels_modify(self.id, topic=topic, reason=reason)
 
     def set_name(self, name, reason=None):
@@ -552,21 +568,21 @@ class Channel(SlottedModel, Permissible):
         """
         Sets the channels bitrate.
         """
-        assert (self.is_voice)
+        assert (self.is_voice and self.type != ChannelType.GUILD_STAGE_VOICE)
         return self.client.api.channels_modify(self.id, bitrate=bitrate, reason=reason)
 
     def set_user_limit(self, user_limit, reason=None):
         """
         Sets the channels user limit.
         """
-        assert (self.is_voice)
+        assert (self.is_voice and self.type != ChannelType.GUILD_STAGE_VOICE)
         return self.client.api.channels_modify(self.id, user_limit=user_limit, reason=reason)
 
     def set_parent(self, parent, reason=None):
         """
         Sets the channels parent.
         """
-        assert (self.is_guild)
+        assert self.is_guild
         return self.client.api.channels_modify(
             self.id,
             parent_id=to_snowflake(parent) if parent else parent,
@@ -576,7 +592,7 @@ class Channel(SlottedModel, Permissible):
         """
         Sets the channels slowmode (rate_limit_per_user).
         """
-        assert (self.type == ChannelType.GUILD_TEXT)
+        assert self.is_guild_text
         return self.client.api.channels_modify(
             self.id,
             rate_limit_per_user=interval,

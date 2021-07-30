@@ -234,9 +234,10 @@ class State(object):
     def on_channel_delete(self, event):
         if event.channel.is_guild and event.channel.guild and event.channel.id in event.channel.guild.channels:
             del event.channel.guild.channels[event.channel.id]
+            self.channels.pop(event.channel.id)
 
     def on_thread_create(self, event):
-        if event.channel.is_guild and event.channel.guild_id in self.guilds:
+        if event.channel.guild_id in self.guilds:
             self.guilds[event.channel.guild_id].threads[event.channel.id] = event.channel
             self.threads[event.channel.id] = event.channel
 
@@ -249,8 +250,9 @@ class State(object):
                 self.threads[event.channel.id].after_load()
 
     def on_thread_delete(self, event):
-        if event.channel.is_guild and event.channel.guild and event.channel.id in event.channel.guild.threads:
+        if event.channel.id in self.threads:
             del event.channel.guild.threads[event.channel.id]
+            self.threads.pop(event.channel.id)
 
     def on_voice_server_update(self, event):
         if event.guild_id not in self.voice_clients:
