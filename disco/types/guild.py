@@ -11,8 +11,8 @@ from disco.types.base import (
 )
 from disco.types.user import User
 from disco.types.voice import VoiceState
-from disco.types.channel import Channel, ChannelType
-from disco.types.message import Emoji
+from disco.types.channel import Channel, ChannelType, StageInstance
+from disco.types.message import Emoji, Sticker
 from disco.types.permissions import PermissionValue, Permissions, Permissible
 
 
@@ -27,6 +27,13 @@ class VerificationLevel(object):
     MEDIUM = 2
     HIGH = 3
     EXTREME = 4
+
+
+class GuildNSFWLevel(object):
+    DEFAULT = 0
+    EXPLICIT = 1
+    SAFE = 2
+    AGE_RESTRICTED = 3
 
 
 class ExplicitContentFilterLevel(object):
@@ -450,7 +457,9 @@ class Guild(SlottedModel, Permissible):
     approximate_member_count = Field(int)
     approximate_presence_count = Field(int)
     # welcome_screen = Field(WelcomeScreen)
-    nsfw = Field(bool)
+    nsfw_level = Field(enum(GuildNSFWLevel))
+    stage_instances = AutoDictField(StageInstance, 'id')
+    stickers = AutoDictField(Sticker, 'id')
 
     def __init__(self, *args, **kwargs):
         super(Guild, self).__init__(*args, **kwargs)

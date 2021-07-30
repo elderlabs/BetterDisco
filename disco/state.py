@@ -106,6 +106,7 @@ class State(object):
         self.guilds = HashMap()
         self.channels = HashMap(weakref.WeakValueDictionary())
         self.emojis = HashMap(weakref.WeakValueDictionary())
+        self.stickers = HashMap(weakref.WeakValueDictionary())
         self.threads = HashMap(weakref.WeakValueDictionary())
         self.users = HashMap(weakref.WeakValueDictionary())
         self.voice_clients = HashMap(weakref.WeakValueDictionary())
@@ -187,6 +188,7 @@ class State(object):
         self.channels.update(event.guild.channels)
         self.threads.update(event.guild.threads)
         self.emojis.update(event.guild.emojis)
+        self.stickers.update(event.guild.stickers)
 
         for voice_state in event.guild.voice_states.values():
             self.voice_states[voice_state.session_id] = voice_state
@@ -385,6 +387,20 @@ class State(object):
         self.emojis = {}
         for guild in self.guilds.values():
             self.emojis.update(guild.emojis)
+
+    # TODO: default stickers
+    def on_guild_stickers_update(self, event):
+        if event.guild_id not in self.guilds:
+            return
+
+        for sticker in event.stickers:
+            sticker.guild_id = event.guild_id
+
+        self.guilds[event.guild_id].stickers = HashMap({i.id: i for i in event.stickers})
+
+        self.stickers = {}
+        for guild in self.guilds.values():
+            self.stickers.update(guild.stickers)
 
     def on_presence_update(self, event):
         # TODO: this is recursive, we hackfix in model

@@ -451,7 +451,7 @@ class MessageStickerItemStructure(SlottedModel):
     format_type = Field(enum(MessageStickerFormatTypes))
 
 
-class MessageSticker(SlottedModel):
+class Sticker(SlottedModel):
     id = Field(snowflake)
     pack_id = Field(snowflake)
     name = Field(text)
