@@ -105,6 +105,7 @@ class State(object):
         self.me = None
         self.guilds = HashMap()
         self.channels = HashMap(weakref.WeakValueDictionary())
+        self.dms = HashMap(weakref.WeakValueDictionary())
         self.emojis = HashMap(weakref.WeakValueDictionary())
         self.stickers = HashMap(weakref.WeakValueDictionary())
         self.threads = HashMap(weakref.WeakValueDictionary())
@@ -158,6 +159,9 @@ class State(object):
 
         if event.message.channel_id in self.channels:
             self.channels[event.message.channel_id].last_message_id = event.message.id
+
+        if not event.message.guild_id and event.message.channel_id not in self.dms:
+            self.dms[event.message.channel_id] = event.message.channel
 
     def on_message_delete(self, event):
         if event.channel_id not in self.messages:

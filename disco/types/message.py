@@ -620,9 +620,14 @@ class Message(SlottedModel):
         `Channel`
             The channel this message was created in.
         """
-        if self.channel_id in self.client.state.threads:
-            return self.client.state.threads.get(self.channel_id)
-        return self.client.state.channels.get(self.channel_id)
+        if self.guild_id:
+            if self.channel_id in self.client.state.threads:
+                return self.client.state.threads.get(self.channel_id)
+            return self.client.state.channels.get(self.channel_id)
+        else:
+            if self.channel_id in self.client.state.dms:
+                return self.client.state.dms[self.channel_id]
+            return self.client.api.channels_get(self.channel_id)
 
     def pin(self):
         """
