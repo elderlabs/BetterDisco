@@ -1005,3 +1005,9 @@ class ApplicationCommandPermissionsUpdate(GatewayEvent):
     /shrug
     """
     guild_id = Field(snowflake)
+
+class GuildScheduledEventUpdate(GatewayEvent):
+    """
+    Sent when a guild schedules an event
+    """
+    guild_id = Field(snowflake)
