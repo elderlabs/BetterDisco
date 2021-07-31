@@ -998,3 +998,10 @@ class GuildApplicationCommandCountsUpdate(GatewayEvent):
     """
     guild_id = Field(snowflake)
     # application_command_counts = ???
+
+
+class ApplicationCommandPermissionsUpdate(GatewayEvent):
+    """
+    /shrug
+    """
+    guild_id = Field(snowflake)
