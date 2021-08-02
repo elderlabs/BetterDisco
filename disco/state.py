@@ -360,12 +360,12 @@ class State(object):
         if event.guild_id not in self.guilds:
             return
 
+        self.guilds[event.guild_id].members.pop(event.user.id, None)
+
         if event.user.id not in self.guilds[event.guild_id].members:
             return
 
         self.guilds[event.guild_id].member_count -= 1
-
-        del self.guilds[event.guild_id].members[event.user.id]
 
     def on_guild_members_chunk(self, event):
         if event.guild_id not in self.guilds or not self.config.sync_guild_members:
