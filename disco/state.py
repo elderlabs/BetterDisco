@@ -1,5 +1,3 @@
-import weakref
-
 from collections import deque, namedtuple
 from gevent.event import Event
 
@@ -89,10 +87,11 @@ class State(object):
         Mapping of channel ids to deques containing `StackMessage` objects.
     """
     EVENTS = [
-        'Ready', 'GuildCreate', 'GuildUpdate', 'GuildDelete', 'GuildMemberAdd', 'GuildMemberRemove',
-        'GuildMemberUpdate', 'GuildMembersChunk', 'GuildRoleCreate', 'GuildRoleUpdate', 'GuildRoleDelete',
-        'GuildEmojisUpdate', 'ChannelCreate', 'ChannelUpdate', 'ChannelDelete', 'VoiceServerUpdate', 'VoiceStateUpdate',
-        'MessageCreate', 'PresenceUpdate', 'UserUpdate', 'ThreadCreate'
+        'Ready', 'GuildCreate', 'GuildUpdate', 'GuildDelete', 'GuildMemberAdd', 'GuildMemberUpdate',
+        'GuildMemberRemove', 'GuildMembersChunk', 'GuildRoleCreate', 'GuildRoleUpdate', 'GuildRoleDelete',
+        'GuildEmojisUpdate', 'GuildStickersUpdate', 'ChannelCreate', 'ChannelUpdate', 'ChannelDelete',
+        'VoiceServerUpdate', 'VoiceStateUpdate', 'MessageCreate', 'PresenceUpdate', 'UserUpdate', 'ThreadCreate',
+        'ThreadUpdate', 'ThreadDelete',
     ]
 
     def __init__(self, client, config):
@@ -104,14 +103,15 @@ class State(object):
 
         self.me = None
         self.guilds = HashMap()
-        self.channels = HashMap(weakref.WeakValueDictionary())
-        self.dms = HashMap(weakref.WeakValueDictionary())
-        self.emojis = HashMap(weakref.WeakValueDictionary())
-        self.stickers = HashMap(weakref.WeakValueDictionary())
-        self.threads = HashMap(weakref.WeakValueDictionary())
-        self.users = HashMap(weakref.WeakValueDictionary())
-        self.voice_clients = HashMap(weakref.WeakValueDictionary())
-        self.voice_states = HashMap(weakref.WeakValueDictionary())
+        self.channels = HashMap()
+        self.commands = HashMap()
+        self.dms = HashMap()
+        self.emojis = HashMap()
+        self.stickers = HashMap()
+        self.threads = HashMap()
+        self.users = HashMap()
+        self.voice_clients = HashMap()
+        self.voice_states = HashMap()
 
         # If message tracking is enabled, listen to those events
         if self.config.track_messages:
@@ -160,6 +160,9 @@ class State(object):
         if event.message.channel_id in self.channels:
             self.channels[event.message.channel_id].last_message_id = event.message.id
 
+        if event.message.channel_id in self.threads:
+            self.threads[event.message.channel_id].last_message_id = event.message.id
+
         if not event.message.guild_id and event.message.channel_id not in self.dms:
             self.dms[event.message.channel_id] = event.message.channel
 
@@ -188,6 +191,9 @@ class State(object):
             if self.guilds_waiting_sync <= 0:
                 self.ready.set()
 
+        if event.guild.id in self.guilds:
+            return
+
         self.guilds[event.guild.id] = event.guild
         self.channels.update(event.guild.channels)
         self.threads.update(event.guild.threads)
@@ -197,32 +203,58 @@ class State(object):
         for voice_state in event.guild.voice_states.values():
             self.voice_states[voice_state.session_id] = voice_state
 
+        for member in event.guild.members.values():
+            if member.user.id not in self.users:
+                self.users[member.user.id] = member.user
+
+        for presence in event.presences:
+            if presence.user.id in self.users:
+                self.users[presence.user.id].presence = presence
+
+        # TODO: better performance on large guild sync
         if self.config.sync_guild_members:
-            for member in event.guild.members.values():
-                if member.user.id not in self.users:
-                    self.users[member.user.id] = member.user
-
-            for presence in event.presences:
-                if presence.user.id in self.users:
-                    self.users[presence.user.id].presence = presence
-
             event.guild.request_guild_members()
 
     def on_guild_update(self, event):
         self.guilds[event.guild.id].inplace_update(event.guild, ignored=[
             'channels',
+            'emojis',
             'members',
+            'stickers',
+            'threads',
             'voice_states',
             'presences',
         ])
 
     def on_guild_delete(self, event):
+        if event.guild.unavailable:
+            return
+
         if event.id in self.guilds:
-            # Just delete the guild, channel references will fall
             del self.guilds[event.id]
 
         if event.id in self.voice_clients:
             self.voice_clients[event.id].disconnect()
+
+        for channel in self.channels:
+            if self.channels[channel].guild_id == event.id:
+                del self.channels[channel]
+
+        for thread in self.threads:
+            if self.threads[thread].guild_id == event.id:
+                del self.threads[thread]
+
+        for emoji in self.emojis:
+            if self.emojis[emoji].guild_id == event.id:
+                del self.emojis[emoji]
+
+        for sticker in self.stickers:
+            if self.stickers[sticker].guild_id == event.id:
+                del self.stickers[sticker]
+
+        for vstate in self.voice_states:
+            if self.voice_states[vstate].guild_id == event.id:
+                del self.voice_states[vstate]
 
     def on_channel_create(self, event):
         if event.channel.is_guild and event.channel.guild_id in self.guilds:
@@ -240,7 +272,7 @@ class State(object):
     def on_channel_delete(self, event):
         if event.channel.is_guild and event.channel.guild and event.channel.id in event.channel.guild.channels:
             del event.channel.guild.channels[event.channel.id]
-            self.channels.pop(event.channel.id)
+            del self.channels[event.channel.id]
 
     def on_thread_create(self, event):
         if event.channel.guild_id in self.guilds:
@@ -258,7 +290,7 @@ class State(object):
     def on_thread_delete(self, event):
         if event.channel.id in self.threads:
             del event.channel.guild.threads[event.channel.id]
-            self.threads.pop(event.channel.id)
+            del self.threads[event.channel.id]
 
     def on_voice_server_update(self, event):
         if event.guild_id not in self.voice_clients:
