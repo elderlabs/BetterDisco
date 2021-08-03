@@ -32,7 +32,14 @@ class Permissions(BitsetMap):
     MANAGE_NICKNAMES = 1 << 27
     MANAGE_ROLES = 1 << 28
     MANAGE_WEBHOOKS = 1 << 29
-    MANAGE_EMOJIS = 1 << 30
+    MANAGE_EMOJIS_AND_STICKERS = 1 << 30
+    USE_SLASH_COMMANDS = 1 << 31
+    REQUEST_TO_SPEAK = 1 << 32
+    # UNDOCUMENTED = 1 << 33
+    MANAGE_THREADS = 1 << 34
+    USE_PUBLIC_THREADS = 1 << 35
+    USE_PRIVATE_THREADS = 1 << 36
+    USE_EXTERNAL_STICKERS = 1 << 37
 
 
 class PermissionValue(BitsetValue):
