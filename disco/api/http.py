@@ -124,8 +124,6 @@ class Routes(object):
     GUILDS_PREVIEW_GET = (HTTPMethod.GET, GUILDS + '/preview')
     GUILDS_AUDITLOGS_LIST = (HTTPMethod.GET, GUILDS + '/audit-logs')
     GUILDS_DISCOVERY_REQUIREMENTS = (HTTPMethod.GET, GUILDS + '/discovery-requirements')
-
-    # Templates
     GUILDS_TEMPLATES = GUILDS + '/templates'
     GUILDS_TEMPLATE_GET = (HTTPMethod.GET, GUILDS_TEMPLATES + '/{template}')
     GUILDS_CREATE_WITH_TEMPLATE = (HTTPMethod.POST, GUILDS_TEMPLATES + '/{template}')
@@ -134,6 +132,10 @@ class Routes(object):
     GUILDS_TEMPLATE_SYNC = (HTTPMethod.PUT, GUILDS_TEMPLATES + '/{template}')
     GUILD_TEMPLATE_MODIFY = (HTTPMethod.PATCH, GUILDS_TEMPLATES + '/{template}')
     GUILDS_TEMPLATE_DELETE = (HTTPMethod.DELETE, GUILDS_TEMPLATES + '/{template}')
+    GUILDS_EVENTS = GUILDS + '/events'
+    GUILDS_EVENTS_GET = (HTTPMethod.GET, GUILDS_EVENTS)
+    GUILDS_EVENTS_MODIFY = (HTTPMethod.PATCH, GUILDS_EVENTS)
+    GUILDS_EVENTS_DELETE = (HTTPMethod.DELETE, GUILDS_EVENTS)
 
     # Users
     USERS = '/users'
