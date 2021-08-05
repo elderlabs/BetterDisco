@@ -77,6 +77,11 @@ class Routes(object):
     CHANNELS_WEBHOOKS_CREATE = (HTTPMethod.POST, CHANNELS + '/webhooks')
     CHANNELS_WEBHOOKS_LIST = (HTTPMethod.GET, CHANNELS + '/webhooks')
 
+    # Stickers
+    STICKER = '/stickers'
+    STICKER_GET = (HTTPMethod.GET, STICKER + '/{sticker}')
+    STICKERS_NITRO_GET = (HTTPMethod.GET, '/sticker-packs')
+
     # Guilds
     GUILDS = '/guilds/{guild}'
     GUILDS_GET = (HTTPMethod.GET, GUILDS)
@@ -130,12 +135,20 @@ class Routes(object):
     GUILDS_TEMPLATES_GET = (HTTPMethod.GET, GUILDS_TEMPLATES)
     GUILDS_TEMPLATE_CREATE = (HTTPMethod.POST, GUILDS_TEMPLATES)
     GUILDS_TEMPLATE_SYNC = (HTTPMethod.PUT, GUILDS_TEMPLATES + '/{template}')
-    GUILD_TEMPLATE_MODIFY = (HTTPMethod.PATCH, GUILDS_TEMPLATES + '/{template}')
+    GUILDS_TEMPLATE_MODIFY = (HTTPMethod.PATCH, GUILDS_TEMPLATES + '/{template}')
     GUILDS_TEMPLATE_DELETE = (HTTPMethod.DELETE, GUILDS_TEMPLATES + '/{template}')
+    GUILDS_THREADS = GUILDS + '/threads'
+    GUILDS_THREADS_ACTIVE = (HTTPMethod.GET, GUILDS_THREADS + '/active')
     GUILDS_EVENTS = GUILDS + '/events'
     GUILDS_EVENTS_GET = (HTTPMethod.GET, GUILDS_EVENTS)
     GUILDS_EVENTS_MODIFY = (HTTPMethod.PATCH, GUILDS_EVENTS)
     GUILDS_EVENTS_DELETE = (HTTPMethod.DELETE, GUILDS_EVENTS)
+    GUILDS_STICKERS = GUILDS + STICKER
+    GUILDS_STICKERS_GET = (HTTPMethod.GET, GUILDS_STICKERS)
+    GUILDS_STICKER_GET = (HTTPMethod.GET, GUILDS_STICKERS + '/{sticker}')
+    GUILDS_STICKER_CREATE = (HTTPMethod.POST, GUILDS_STICKERS)
+    GUILDS_STICKER_MODIFY = (HTTPMethod.PATCH, GUILDS_STICKERS + '/{sticker}')
+    GUILDS_STICKER_DELETE = (HTTPMethod.DELETE, GUILDS_STICKERS + '/{sticker}')
 
     # Users
     USERS = '/users'
@@ -207,7 +220,7 @@ class Routes(object):
     STAGES_CREATE = (HTTPMethod.POST, STAGES)
     STAGES_GET = (HTTPMethod.GET, STAGES + '/{channel}')
     STAGES_MODIFY = (HTTPMethod.PATCH, STAGES + '/{channel}')
-    STAGES_DELETE = (HTTPMethod.DELETE, STAGES + "/{channel}")
+    STAGES_DELETE = (HTTPMethod.DELETE, STAGES + '/{channel}')
 
 
 class APIResponse(object):

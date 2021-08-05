@@ -149,6 +149,8 @@ class APIClient(LoggingClass):
             embed=None,
             allowed_mentions={},
             message_reference={},
+            components={},
+            sticker_ids={},
             sanitize=False):
 
         payload = {
@@ -182,6 +184,12 @@ class APIClient(LoggingClass):
 
         if message_reference:
             payload['message_reference'] = message_reference
+
+        if components:
+            payload['components'] = components
+
+        if sticker_ids:
+            payload['sticker_ids'] = sticker_ids
 
         if attachments:
             if len(attachments) > 1:

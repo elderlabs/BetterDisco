@@ -34,7 +34,7 @@ class VoiceState(SlottedModel):
 
 class VoiceRegion(SlottedModel):
     id = Field(text)
-    name = Field(text)
+    name = Field(str)
     vip = Field(bool)
     optimal = Field(bool)
     deprecated = Field(bool)

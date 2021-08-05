@@ -29,6 +29,7 @@ class UserFlags(object):
     HS_BALANCE = 1 << 8
     EARLY_SUPPORTER = 1 << 9
     TEAM_USER = 1 << 10
+    # UNDOCUMENTED = 1 << 11
     SYSTEM = 1 << 12
     UNREAD_SYS_MSG = 1 << 13
     BUG_HUNTER_LVL2 = 1 << 14
@@ -47,14 +48,16 @@ class PremiumType(object):
 class User(SlottedModel, with_equality('id'), with_hash('id')):
     id = Field(snowflake)
     username = Field(str)
-    discriminator = Field(text)
-    avatar = Field(text)
+    discriminator = Field(int)
+    avatar = Field(str)
     bot = Field(bool, default=False)
     system = Field(bool, default=False)
     mfa_enabled = Field(bool)
-    locale = Field(text)
+    banner = Field(str)
+    accent_color = Field(int)
+    locale = Field(str)
     verified = Field(bool)
-    email = Field(text)
+    email = Field(str)
     flags = Field(int)
     public_flags = Field(int, default=0)
     premium_type = Field(enum(PremiumType))
@@ -75,7 +78,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
 
     @property
     def default_avatar(self):
-        return DefaultAvatars.ALL[int(self.discriminator) % len(DefaultAvatars.ALL)]
+        return DefaultAvatars.ALL[self.discriminator % len(DefaultAvatars.ALL)]
 
     @property
     def avatar_url(self):
@@ -163,12 +166,12 @@ class ActivityFlags(object):
 
 
 class Activity(SlottedModel):
-    name = Field(text)
+    name = Field(str)
     type = Field(enum(ActivityTypes))
-    url = Field(text)
+    url = Field(str)
     timestamps = Field(ActivityTimestamps)
     application_id = Field(text)
-    details = Field(text)
+    details = Field(str)
     state = Field(text)
     party = Field(ActivityParty)
     assets = Field(ActivityAssets)

@@ -63,7 +63,7 @@ class Emoji(SlottedModel):
         Whether this emoji is animated.
     """
     id = Field(snowflake)
-    name = Field(text)
+    name = Field(str)
     animated = Field(bool)
 
     @cached_property
@@ -95,7 +95,7 @@ class MessageReactionEmoji(Emoji):
         The emoji which was reacted.
     """
     id = Field(snowflake)
-    name = Field(text)
+    name = Field(str)
     roles = ListField(snowflake)
     user = Field(User)
     require_colons = Field(bool)
@@ -139,10 +139,10 @@ class MessageApplication(SlottedModel):
         The name of the application.
     """
     id = Field(snowflake)
-    cover_image = Field(text)
-    description = Field(text)
-    icon = Field(text)
-    name = Field(text)
+    cover_image = Field(str)
+    description = Field(str)
+    icon = Field(str)
+    name = Field(str)
 
 
 class MessageReference(SlottedModel):
@@ -164,7 +164,7 @@ class MessageActivity(SlottedModel):
         The party id from a Rich Presence event.
     """
     type = Field(enum(MessageActivityType))
-    party_id = Field(text)
+    party_id = Field(str)
 
 
 class MessageEmbedFooter(SlottedModel):
@@ -180,9 +180,9 @@ class MessageEmbedFooter(SlottedModel):
     proxy_icon_url : str
         A proxy URL for the footer icon, set by Discord.
     """
-    text = Field(text)
-    icon_url = Field(text)
-    proxy_icon_url = Field(text)
+    text = Field(str)
+    icon_url = Field(str)
+    proxy_icon_url = Field(str)
 
 
 class MessageEmbedImage(SlottedModel):
@@ -200,8 +200,8 @@ class MessageEmbedImage(SlottedModel):
     height : int
         The height of the image, set by Discord.
     """
-    url = Field(text)
-    proxy_url = Field(text)
+    url = Field(str)
+    proxy_url = Field(str)
     width = Field(int)
     height = Field(int)
 
@@ -221,8 +221,8 @@ class MessageEmbedThumbnail(SlottedModel):
     height : int
         The height of the thumbnail, set by Discord.
     """
-    url = Field(text)
-    proxy_url = Field(text)
+    url = Field(str)
+    proxy_url = Field(str)
     width = Field(int)
     height = Field(int)
 
@@ -240,14 +240,14 @@ class MessageEmbedVideo(SlottedModel):
     height : int
         The height of the video, set by Discord.
     """
-    url = Field(text)
+    url = Field(str)
     height = Field(int)
     width = Field(int)
 
 
 class MessageEmbedProvider(SlottedModel):
-    name = Field(text)
-    url = Field(text)
+    name = Field(str)
+    url = Field(str)
 
 
 class MessageEmbedAuthor(SlottedModel):
@@ -265,10 +265,10 @@ class MessageEmbedAuthor(SlottedModel):
     proxy_icon_url : str
         A proxy URL for the authors icon, set by Discord.
     """
-    name = Field(text)
-    url = Field(text)
-    icon_url = Field(text)
-    proxy_icon_url = Field(text)
+    name = Field(str)
+    url = Field(str)
+    icon_url = Field(str)
+    proxy_icon_url = Field(str)
 
 
 class MessageEmbedField(SlottedModel):
@@ -284,8 +284,8 @@ class MessageEmbedField(SlottedModel):
     inline : bool
         Whether the field renders inline or by itself.
     """
-    name = Field(text)
-    value = Field(text)
+    name = Field(str)
+    value = Field(str)
     inline = Field(bool)
 
 
@@ -322,10 +322,10 @@ class MessageEmbed(SlottedModel):
     fields : list[`MessageEmbedField]`
         The fields of the embed.
     """
-    title = Field(text)
+    title = Field(str)
     type = Field(str, default='rich')
-    description = Field(text)
-    url = Field(text)
+    description = Field(str)
+    url = Field(str)
     timestamp = Field(datetime)
     color = Field(int)
     footer = Field(MessageEmbedFooter)
@@ -395,11 +395,11 @@ class MessageAttachment(SlottedModel):
         Width of the attachment.
     """
     id = Field(snowflake)
-    filename = Field(text)
-    content_type = Field(text)
+    filename = Field(str)
+    content_type = Field(str)
     size = Field(int)
-    url = Field(text)
-    proxy_url = Field(text)
+    url = Field(str)
+    proxy_url = Field(str)
     height = Field(int)
     width = Field(int)
 
@@ -408,7 +408,7 @@ class ChannelMention(SlottedModel):
     id = Field(snowflake)
     guild_id = Field(snowflake)
     type = Field(enum(ChannelType))
-    name = Field(text)
+    name = Field(str)
 
 
 class AllowedMentionsTypes(object):
@@ -439,29 +439,45 @@ class MessageFlagValue(BitsetValue):
     map = MessageFlags
 
 
-class MessageStickerFormatTypes(object):
+class StickerTypes(object):
+    STANDARD = 1
+    GUILD = 2
+
+
+class StickerFormatTypes(object):
     PNG = 1
     APNG = 2
     LOTTIE = 3
 
 
-class MessageStickerItemStructure(SlottedModel):
+class StickerItemStructure(SlottedModel):
     id = Field(snowflake)
-    name = Field(text)
-    format_type = Field(enum(MessageStickerFormatTypes))
+    name = Field(str)
+    format_type = Field(enum(StickerFormatTypes))
 
 
 class Sticker(SlottedModel):
     id = Field(snowflake)
     pack_id = Field(snowflake)
-    name = Field(text)
-    description = Field(text)
-    tags = Field(text)
-    format_type = Field(enum(MessageStickerFormatTypes))
+    name = Field(str)
+    description = Field(str)
+    tags = Field(str)
+    type = Field(enum(StickerTypes))
+    format_type = Field(enum(StickerFormatTypes))
     available = Field(bool)
     guild_id = Field(snowflake)
     user = Field(User)
     sort_value = Field(int)
+
+
+class StickerPack(SlottedModel):
+    id = Field(snowflake)
+    stickers = ListField(Sticker)
+    name = Field(str)
+    sku_id = Field(snowflake)
+    cover_sticker_id = Field(snowflake)
+    description = Field(str)
+    banner_asset_id = Field(snowflake)
 
 
 class MessageInteractionType(object):
@@ -472,7 +488,7 @@ class MessageInteractionType(object):
 class MessageInteraction(SlottedModel):
     id = Field(snowflake)
     type = Field(enum(MessageInteractionType))
-    name = Field(text)
+    name = Field(str)
     user = Field(User)
 
 
@@ -487,16 +503,30 @@ class ButtonStyles(object):
 class ComponentTypes(object):
     ACTION_ROW = 1
     BUTTON = 2
+    SELECT_MENU = 3
+
+
+class SelectOption(SlottedModel):
+    label = Field(str)
+    value = Field(str)
+    description = Field(str)
+    emoji = Field(Emoji)
+    default = Field(bool)
 
 
 class MessageComponent(SlottedModel):
     type = Field(enum(ComponentTypes))
-    style = Field(enum(ButtonStyles))
-    label = Field(text)
-    emoji = Field(Emoji)
     custom_id = Field(text)
-    url = Field(text)
     disabled = Field(bool)
+    style = Field(enum(ButtonStyles))
+    label = Field(str)
+    emoji = Field(Emoji)
+    url = Field(str)
+    options = ListField(SelectOption)
+    placeholder = Field(str)
+    min_values = Field(int)
+    max_values = Field(int)
+    components = Field(bool)
 
 
 class ActionRow(SlottedModel):
@@ -587,7 +617,7 @@ class Message(SlottedModel):
     interaction = Field(MessageInteraction)
     thread = Field(Channel)
     components = ListField(MessageComponent)
-    sticker_items = ListField(MessageStickerItemStructure, default=[])
+    sticker_items = ListField(StickerItemStructure, default=[])
 
     def __str__(self):
         return '<Message {} ({})>'.format(self.id, self.channel_id)

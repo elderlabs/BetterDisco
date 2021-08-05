@@ -3,7 +3,7 @@ try:
 except:
     import re
 
-from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, text, cached_property
+from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, cached_property
 from disco.types.permissions import Permissions, Permissible, PermissionValue
 from disco.types.user import User
 from disco.util.functional import one_or_many, chunks
@@ -24,6 +24,7 @@ class ChannelType(object):
     GUILD_PUBLIC_THREAD = 11
     GUILD_PRIVATE_THREAD = 12
     GUILD_STAGE_VOICE = 13
+    GUILD_DIRECTORY = 14
 
 
 class PermissionOverwriteType(object):
@@ -147,26 +148,27 @@ class Channel(SlottedModel, Permissible):
     guild_id = Field(snowflake)
     position = Field(int)
     overwrites = AutoDictField(PermissionOverwrite, 'id', alias='permission_overwrites')
-    name = Field(text)
-    topic = Field(text)
+    name = Field(str)
+    topic = Field(str)
     nsfw = Field(bool)
     last_message_id = Field(snowflake)
     bitrate = Field(int)
     user_limit = Field(int)
     rate_limit_per_user = Field(int)
     recipients = AutoDictField(User, 'id')
-    icon = Field(text)
+    icon = Field(str)
     owner_id = Field(snowflake)
     application_id = Field(snowflake)
     lock_permissions = Field(bool)
     parent_id = Field(snowflake)
     last_pin_timestamp = Field(datetime)
-    rtc_region = Field(text)
+    rtc_region = Field(str)
     video_quality_mode = Field(enum(VideoQualityModes))
     message_count = Field(int)
     member_count = Field(int)
     thread_metadata = Field(ThreadMetaData)
     member = Field(ThreadMember)
+    # permissions = Field(str)
 
     def __init__(self, *args, **kwargs):
         super(Channel, self).__init__(*args, **kwargs)
@@ -724,6 +726,6 @@ class StageInstance(SlottedModel):
     id = Field(snowflake)
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
-    topic = Field(text)
+    topic = Field(str)
     privacy_level = Field(StageInstancePrivacyLevel)
     discoverable_disabled = Field(bool)

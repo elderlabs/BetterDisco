@@ -69,7 +69,6 @@ class GatewayEvent(with_metaclass(GatewayEventMeta, Model)):
 
         return obj
 
-    # TODO: FIX THIS
     def __getattr__(self, name):
         try:
             _proxy = object.__getattribute__(self, '_proxy')
@@ -1006,8 +1005,16 @@ class ApplicationCommandPermissionsUpdate(GatewayEvent):
     """
     guild_id = Field(snowflake)
 
+
 class GuildScheduledEventUpdate(GatewayEvent):
     """
     Sent when a guild schedules an event
+    """
+    guild_id = Field(snowflake)
+
+
+class GuildStickersUpdate(GatewayEvent):
+    """
+    Sent when a guild sticker is updated
     """
     guild_id = Field(snowflake)

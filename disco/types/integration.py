@@ -5,7 +5,7 @@ from disco.types.oauth import Application
 
 class IntegrationAccount(SlottedModel):
     id = Field(text)
-    name = Field(text)
+    name = Field(str)
 
 
 class IntegrationExpireBehaviors(object):
@@ -15,16 +15,16 @@ class IntegrationExpireBehaviors(object):
 
 class IntegrationApplication(SlottedModel):
     id = Field(snowflake)
-    name = Field(text)
-    icon = Field(text)
-    description = Field(text)
-    summary = Field(text)
+    name = Field(str)
+    icon = Field(str)
+    description = Field(str)
+    summary = Field(str)
     bot = Field(User)
 
 
 class Integration(SlottedModel):
     id = Field(snowflake)
-    name = Field(text)
+    name = Field(str)
     type = Field(text)
     enabled = Field(bool)
     syncing = Field(bool)
@@ -47,7 +47,7 @@ class UserConnectionVisibilityType(object):
 
 class UserConnection(SlottedModel):
     id = Field(text)
-    name = Field(text)
+    name = Field(str)
     type = Field(text)
     revoked = Field(bool)
     integrations = ListField(Integration)

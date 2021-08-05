@@ -15,17 +15,18 @@ class ApplicationCommandOptionType(object):
     CHANNEL = 7
     ROLE = 8
     MENTIONABLE = 9
+    NUMBER = 10
 
 
 class ApplicationCommandOptionChoice(SlottedModel):
-    name = Field(text)
-    value = Field(text or int)
+    name = Field(str)
+    value = Field(text)
 
 
 class _ApplicationCommandOption(SlottedModel):
     type = Field(enum(ApplicationCommandOptionType))
-    name = Field(text)
-    description = Field(text)
+    name = Field(str)
+    description = Field(str)
     # default = Field(bool)
     required = Field(bool)
     choices = ListField(ApplicationCommandOptionChoice)
@@ -43,7 +44,7 @@ class ApplicationCommandInteractionDataResolved(SlottedModel):
 
 
 class _ApplicationCommandInteractionDataOption(SlottedModel):
-    name = Field(text)
+    name = Field(str)
     type = Field(int)
     value = Field(enum(ApplicationCommandOptionType))
 
@@ -59,7 +60,7 @@ class ComponentTypes(object):
 
 class ApplicationCommandInteractionData(SlottedModel):
     id = Field(snowflake)
-    name = Field(text)
+    name = Field(str)
     resolved = Field(ApplicationCommandInteractionDataResolved)
     options = ListField(ApplicationCommandInteractionDataOption)
     custom_id = Field(text)
@@ -69,11 +70,12 @@ class ApplicationCommandInteractionData(SlottedModel):
 class ApplicationCommand(SlottedModel):
     id = Field(snowflake)
     application_id = Field(snowflake)
-    name = Field(text)
-    description = Field(text)
+    name = Field(str)
+    description = Field(str)
     options = ListField(ApplicationCommandOption)
     default_permission = Field(bool, default=True)
     guild_id = Field(snowflake)
+    version = Field(snowflake)
 
 
 class ApplicationCommandPermissionType(object):
@@ -109,7 +111,7 @@ class Interaction(SlottedModel):
     channel_id = Field(snowflake)
     member = Field(GuildMember)
     user = Field(User)
-    token = Field(text)
+    token = Field(str)
     version = Field(int)
     message = Field(Message)
 
@@ -156,7 +158,7 @@ class InteractionResponseFlags(object):
 
 class InteractionApplicationCommandCallbackData(SlottedModel):
     tts = Field(bool)
-    content = Field(text)
+    content = Field(str)
     embeds = ListField(MessageEmbed)
     allowed_mentions = Field(AllowedMentions)
     flags = Field(MessageFlagValue)

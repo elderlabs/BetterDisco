@@ -16,10 +16,10 @@ class TeamMember(SlottedModel):
 
 
 class Team(SlottedModel):
-    icon = Field(text)
+    icon = Field(str)
     id = Field(snowflake)
     members = ListField(TeamMember)
-    name = Field(text)
+    name = Field(str)
     owner_user_id = Field(snowflake)
 
 
@@ -35,22 +35,22 @@ class ApplicationFlags(object):
 
 class Application(SlottedModel):
     id = Field(snowflake)
-    name = Field(text)
-    icon = Field(text)
-    description = Field(text)
-    rpc_origins = ListField(text)
+    name = Field(str)
+    icon = Field(str)
+    description = Field(str)
+    rpc_origins = ListField(str)
     bot_public = Field(bool)
     bot_require_code_grant = Field(bool)
-    terms_of_service_url = Field(text)
-    privacy_policy_url = Field(text)
+    terms_of_service_url = Field(str)
+    privacy_policy_url = Field(str)
     owner = Field(User)
-    summary = Field(text)
-    verify_key = Field(text)
+    summary = Field(str)
+    verify_key = Field(str)
     team = Field(Team)
     guild_id = Field(snowflake)
     primary_sku_id = Field(snowflake)
-    slug = Field(text)
-    cover_image = Field(text)
+    slug = Field(str)
+    cover_image = Field(str)
     flags = Field(int)
 
     def user_is_owner(self, user):
