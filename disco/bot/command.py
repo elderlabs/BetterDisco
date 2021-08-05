@@ -224,7 +224,10 @@ class Command(object):
                 username, discrim = raw.split('#')
                 resolved = (username, int(discrim))
             elif reg:
-                res = reg.match(raw)
+                try:
+                    res = reg.match(raw, concurrent=True)
+                except:
+                    res = reg.match(raw)
                 if res:
                     resolved = int(res.group(1))
                 else:

@@ -358,12 +358,19 @@ class Bot(LoggingClass):
             if not require_mention:  # don't want to prematurely return
                 return []
 
-        if not self.command_matches_re or not self.command_matches_re.match(content):
-            return []
+        try:
+            if not self.command_matches_re or not self.command_matches_re.match(content, concurrent=True):
+                return []
+        except:
+            if not self.command_matches_re or not self.command_matches_re.match(content):
+                return []
 
         options = []
         for command in self.commands:
-            match = command.compiled_regex.match(content)
+            try:
+                match = command.compiled_regex.match(content, concurrent=True)
+            except:
+                match = command.compiled_regex.match(content)
             if match:
                 options.append((command, match))
 
