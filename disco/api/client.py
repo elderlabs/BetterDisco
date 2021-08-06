@@ -748,7 +748,7 @@ class APIClient(LoggingClass):
         ))
         return ApplicationCommand.create(self.client, r.json())
 
-    def applications_global_commands_modify(self, command, name=None, description=None, options=None, default_permission=None, *args):
+    def applications_global_commands_modify(self, command, name=None, description=None, options=None, default_permission=None):
         r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_MODIFY, dict(application=self.client.state.me.id, command=command), json=optional(
             name=name,
             description=description,
@@ -771,22 +771,12 @@ class APIClient(LoggingClass):
         r = self.http(Routes.APPLICATIONS_GUILD_COMMAND_GET, dict(application=self.client.state.me.id, guild=guild))
         return ApplicationCommand.create_map(self.client, r.json())
 
-    def applications_guild_commands_create(self, guild, name, description, options=None, default_permission=None):
-        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_CREATE, dict(application=self.client.state.me.id, guild=guild), json=optional(
-            name=name,
-            description=description,
-            options=options,
-            default_permission=default_permission,
-        ))
+    def applications_guild_commands_create(self, guild, name, data):
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_CREATE, dict(application=self.client.state.me.id, guild=guild, name=name), json=optional(**data))
         return ApplicationCommand.create(self.client, r.json())
 
-    def applications_guild_commands_modify(self, guild, command, name=None, description=None, options=None, default_permission=None):
-        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_MODIFY, dict(application=self.client.state.me.id, guild=guild, command=command), json=optional(
-            name=name,
-            description=description,
-            options=options,
-            default_permission=default_permission,
-        ))
+    def applications_guild_commands_modify(self, guild, command, data):
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_MODIFY, dict(application=self.client.state.me.id, guild=guild, command=command), json=optional(**data))
         return ApplicationCommand.create(self.client, r.json())
 
     def applications_guild_commands_delete(self, guild, command):

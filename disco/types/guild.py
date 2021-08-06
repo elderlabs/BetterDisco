@@ -502,18 +502,20 @@ class Guild(SlottedModel, Permissible):
     def get_commands(self):
         return self.client.api.applications_guild_commands_get(self.id)
 
-    def register_command(self, name, description, options=None):
+    def register_command(self, name, description, options=None, default_permission=None):
         data = {}
         data['name'] = name
         data['description'] = description
         data['options'] = options
+        data['default_permission'] = default_permission
         return self.client.api.applications_guild_commands_create(self.id, name, data)
 
-    def update_command(self, command_id, name, description, options):
+    def update_command(self, command_id, name, description, options=None, default_permission=None):
         data = {}
         data['name'] = name
         data['description'] = description
         data['options'] = options
+        data['default_permission'] = default_permission
         return self.client.api.applications_guild_commands_modify(self.id, command_id, data)
 
     def delete_command(self, command_id):
