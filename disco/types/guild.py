@@ -521,6 +521,11 @@ class Guild(SlottedModel, Permissible):
     def delete_command(self, command_id):
         return self.client.api.applications_guild_commands_delete(self.id, command_id)
 
+    def delete_commands_all(self):
+        commands = self.get_commands()
+        for cmd in commands:
+            self.delete_command(cmd.id)
+
     def get_permissions(self, member):
         """
         Get the permissions a user has in this guild.
