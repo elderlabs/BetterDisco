@@ -54,7 +54,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     system = Field(bool, default=False)
     mfa_enabled = Field(bool)
     banner = Field(str)
-    accent_color = Field(int)
+    accent_color = Field(text)
     locale = Field(str)
     verified = Field(bool)
     email = Field(str)
