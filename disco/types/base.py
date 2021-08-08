@@ -229,6 +229,13 @@ def text(obj):
     if obj is None:
         return None
 
+    return str(obj)
+
+
+def str_or_int(obj):
+    if obj is None:
+        return None
+
     if str(obj).isdigit():
         return int(obj)
 

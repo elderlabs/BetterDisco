@@ -1,7 +1,7 @@
 from six import with_metaclass
 
 from disco.types.application import ApplicationCommand, Interaction
-from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime, text
+from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime, text, str_or_int
 from disco.types.channel import Channel, PermissionOverwrite, ThreadMember, StageInstance
 from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration
 from disco.types.invite import Invite
@@ -155,8 +155,8 @@ class Ready(GatewayEvent):
     # presences = Field(...)
     private_channels = ListField(Channel)
     relationships = ListField(None)
-    session_id = Field(str)
-    shard = Field(text)
+    session_id = Field(text)
+    shard = Field(str_or_int)
     user = Field(User)
     # user_settings = Field(...)
     version = Field(int, alias='v')
@@ -370,7 +370,7 @@ class GuildMembersChunk(GatewayEvent):
     chunk_count = Field(int)
     not_found = ListField(snowflake)
     presences = ListField(Presence)
-    nonce = Field(text)
+    nonce = Field(str_or_int)
 
     @property
     def guild(self):
@@ -625,8 +625,8 @@ class VoiceServerUpdate(GatewayEvent):
     guild_id : snowflake
         The guild ID this voice server update is for.
     """
-    token = Field(str)
-    endpoint = Field(str)
+    token = Field(text)
+    endpoint = Field(text)
     guild_id = Field(snowflake)
 
 
@@ -896,7 +896,7 @@ class GiftCodeUpdate(GatewayEvent):
     """
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
-    code = Field(str)
+    code = Field(text)
     sku_id = Field(snowflake)
     uses = Field(int)
 
@@ -970,7 +970,7 @@ class StageInstanceCreate(GatewayEvent):
     """
     guild_id = Field(snowflake)
     guild_scheduled_event_id = Field(snowflake)
-    invite_code = Field(str)
+    invite_code = Field(text)
 
 
 @wraps_model(StageInstance)
@@ -980,7 +980,7 @@ class StageInstanceUpdate(GatewayEvent):
     """
     guild_id = Field(snowflake)
     guild_scheduled_event_id = Field(snowflake)
-    invite_code = Field(str)
+    invite_code = Field(text)
 
 
 @wraps_model(StageInstance)

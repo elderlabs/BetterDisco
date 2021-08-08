@@ -88,13 +88,13 @@ class GuildFeatures(object):
 
 class WelcomeScreenChannel(object):
     channel_id = Field(snowflake)
-    description = Field(str)
+    description = Field(text)
     emoji_id = Field(snowflake)
-    emoji_name = Field(str)
+    emoji_name = Field(text)
 
 
 class WelcomeScreen(object):
-    description = Field(str)
+    description = Field(text)
     welcome_channels = AutoDictField(WelcomeScreenChannel, 'channel_id')
 
 
@@ -120,7 +120,7 @@ class GuildEmoji(Emoji):
         Whether this emoji is animated.
     """
     id = Field(snowflake)
-    name = Field(str)
+    name = Field(text)
     roles = ListField(snowflake)
     user = Field(User)
     require_colons = Field(bool)
@@ -180,7 +180,7 @@ class Role(SlottedModel):
     """
     id = Field(snowflake)
     guild_id = Field(snowflake)
-    name = Field(str)
+    name = Field(text)
     hoist = Field(bool)
     managed = Field(bool)
     color = Field(int)
@@ -209,7 +209,7 @@ class Role(SlottedModel):
 
 class GuildBan(SlottedModel):
     user = Field(User)
-    reason = Field(str)
+    reason = Field(text)
 
 
 class GuildEmbed(SlottedModel):
@@ -219,15 +219,15 @@ class GuildEmbed(SlottedModel):
 
 class GuildPreview(SlottedModel):
     id = Field(int)
-    name = Field(str)
-    icon = Field(str)
-    splash = Field(str)
-    discovery_splash = Field(str)
+    name = Field(text)
+    icon = Field(text)
+    splash = Field(text)
+    discovery_splash = Field(text)
     emojis = AutoDictField(GuildEmoji, 'id')
     features = ListField(str)
     approximate_member_count = Field(int)
     approximate_presence_count = Field(int)
-    description = Field(str)
+    description = Field(text)
 
 
 class GuildMember(SlottedModel):
@@ -256,7 +256,7 @@ class GuildMember(SlottedModel):
         Whether the user has passed Discord's role gate.
     """
     user = Field(User)
-    nick = Field(str, default=None)
+    nick = Field(text, default=None)
     roles = ListField(snowflake)
     joined_at = Field(datetime)
     premium_since = Field(datetime)
@@ -437,14 +437,14 @@ class Guild(SlottedModel, Permissible):
         The amount of users using their Nitro boost on this guild.
     """
     id = Field(snowflake)
-    name = Field(str)
-    icon = Field(str)
-    splash = Field(str)
-    discovery_splash = Field(str)
+    name = Field(text)
+    icon = Field(text)
+    splash = Field(text)
+    discovery_splash = Field(text)
     owner = Field(bool)
     owner_id = Field(snowflake)
     permissions = Field(PermissionValue, cast=int)
-    region = Field(str)
+    region = Field(text)
     afk_channel_id = Field(snowflake)
     afk_timeout = Field(int)
     verification_level = Field(enum(VerificationLevel))
@@ -471,12 +471,12 @@ class Guild(SlottedModel, Permissible):
     # presences = AutoDictField(Presence)
     max_presences = Field(int, default=None)
     max_members = Field(int)
-    vanity_url_code = Field(str, default=None)
-    description = Field(str)
-    banner = Field(str)
+    vanity_url_code = Field(text, default=None)
+    description = Field(text)
+    banner = Field(text)
     premium_tier = Field(enum(PremiumTier))
     premium_subscription_count = Field(int, default=0)
-    preferred_locale = Field(str)
+    preferred_locale = Field(text)
     public_updates_channel_id = Field(snowflake)
     max_video_channel_users = Field(int)
     approximate_member_count = Field(int)
@@ -873,8 +873,8 @@ INTEGRATIONS_ACTIONS = (
 
 class AuditLogObjectChange(SlottedModel):
     key = Field(text)
-    new_value = Field(str)
-    old_value = Field(str)
+    new_value = Field(text)
+    old_value = Field(text)
 
 
 class AuditLogOptionalEntryInfo(SlottedModel):
@@ -885,7 +885,7 @@ class AuditLogOptionalEntryInfo(SlottedModel):
     count = Field(text)
     id = Field(snowflake)
     type = Field(text)
-    role_name = Field(str)
+    role_name = Field(text)
 
 
 class AuditLogEntry(SlottedModel):
@@ -895,7 +895,7 @@ class AuditLogEntry(SlottedModel):
     id = Field(snowflake)
     action_type = Field(enum(AuditLogActionTypes))
     options = Field(AuditLogActionTypes)
-    reason = Field(str)
+    reason = Field(text)
     guild_id = Field(snowflake)
 
     _cached_target = Field(None)
@@ -936,15 +936,15 @@ class AuditLogEntry(SlottedModel):
 
 
 class AuditLogChangeKey(SlottedModel):
-    name = Field(str)  # any
-    description = Field(str)  # Guild or Sticker
-    icon_hash = Field(str)  # Guild
-    splash_hash = Field(str)  # Guild
-    discovery_splash_hash = Field(str)  # Guild
-    banner_hash = Field(str)  # Guild
+    name = Field(text)  # any
+    description = Field(text)  # Guild or Sticker
+    icon_hash = Field(text)  # Guild
+    splash_hash = Field(text)  # Guild
+    discovery_splash_hash = Field(text)  # Guild
+    banner_hash = Field(text)  # Guild
     owner_id = Field(snowflake)  # Guild
-    region = Field(str)  # Guild
-    preferred_locale = Field(str)  # Guild
+    region = Field(text)  # Guild
+    preferred_locale = Field(text)  # Guild
     afk_channel_id = Field(snowflake)  # Guild
     afk_timeout = Field(int)  # Guild
     rules_channel_id = Field(snowflake)  # Guild
@@ -953,7 +953,7 @@ class AuditLogChangeKey(SlottedModel):
     verification_level = Field(int)  # Guild
     explicit_content_filter = Field(int)  # Guild
     default_message_notifications = Field(int)  # Guild
-    vanity_url_code = Field(str)  # Guild
+    vanity_url_code = Field(text)  # Guild
     _add = ListField(Role)  # Guild
     _remove = ListField(Role)  # Guild
     prune_delete_days = Field(int)  # Guild
@@ -961,19 +961,19 @@ class AuditLogChangeKey(SlottedModel):
     widget_channel_id = Field(snowflake)  # Guild
     system_channel_id = Field(snowflake)  # Guild
     position = Field(int)  # Channel
-    topic = Field(str)  # Channel or StageInstance
+    topic = Field(text)  # Channel or StageInstance
     bitrate = Field(int)  # Channel
     overwrites = AutoDictField(PermissionOverwrite, 'id', alias='permission_overwrites')  # Channel
     nsfw = Field(bool)  # Channel
     application_id = Field(snowflake)  # Channel
     rate_limit_per_user = Field(int)  # Channel
-    permissions = Field(str)  # Role
+    permissions = Field(text)  # Role
     color = Field(int)  # Role
     hoist = Field(bool)  # Role
     mentionable = Field(bool)  # Role
-    allow = Field(str)  # Role
-    deny = Field(str)  # Role
-    code = Field(str)  # Invite
+    allow = Field(text)  # Role
+    deny = Field(text)  # Role
+    code = Field(text)  # Invite
     channel_id = Field(snowflake)  # Invite
     inviter_id = Field(snowflake)  # Invite
     max_uses = Field(int)  # Invite
@@ -982,8 +982,8 @@ class AuditLogChangeKey(SlottedModel):
     temporary = Field(bool)  # Invite
     deaf = Field(bool)  # User
     mute = Field(bool)  # User
-    nick = Field(str)  # User
-    avatar_hash = Field(str)  # User
+    nick = Field(text)  # User
+    avatar_hash = Field(text)  # User
     id = Field(snowflake)  # any
     type = Field(text)  # any
     enable_emoticons = Field(bool)  # Integration
@@ -991,9 +991,9 @@ class AuditLogChangeKey(SlottedModel):
     expire_grace_period = Field(int)  # Integration
     user_limit = Field(int)  # Channel (Voice)
     privacy_level = Field(StageInstancePrivacyLevel)  # StageInstance
-    tags = Field(str)  # Sticker
+    tags = Field(text)  # Sticker
     format_type = Field(StickerFormatTypes)  # Sticker
-    asset = Field(str)  # Sticker
+    asset = Field(text)  # Sticker
     available = Field(bool)  # Sticker
     guild_id = Field(snowflake)  # Sticker
     archived = Field(bool)  # Channel (Thread)
@@ -1037,7 +1037,7 @@ class DiscoveryRequirements(SlottedModel):
 
 
 class DiscoveryCategoryName(SlottedModel):
-    default = Field(str)
+    default = Field(text)
     # localizations = Field
 
 
@@ -1049,7 +1049,7 @@ class DiscoveryCategory(SlottedModel):
 
 class DiscoveryGuild(SlottedModel):
     guild_id = Field(snowflake)
-    primary_category_id = Field(str)
+    primary_category_id = Field(text)
     keywords = ListField(str)
     emoji_discoverability_enabled = Field(bool)
     category_ids = ListField(str)
@@ -1057,8 +1057,8 @@ class DiscoveryGuild(SlottedModel):
 
 class GuildTemplate(SlottedModel):
     code = Field(text)
-    name = Field(str)
-    description = Field(str)
+    name = Field(text)
+    description = Field(text)
     usage_count = Field(int)
     creator_id = Field(snowflake)
     creator = Field(User)

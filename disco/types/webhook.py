@@ -23,13 +23,13 @@ class Webhook(SlottedModel):
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
     user = Field(User)
-    name = Field(str)
-    avatar = Field(str)
-    token = Field(str)
+    name = Field(text)
+    avatar = Field(text)
+    token = Field(text)
     application_id = Field(snowflake)
     source_guild = DictField(text, text)
     source_channel = Field(Channel)
-    url = Field(str)
+    url = Field(text)
 
     @classmethod
     def execute_url(cls, url, **kwargs):

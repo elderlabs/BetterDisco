@@ -2,7 +2,7 @@ from datetime import datetime
 
 from disco.types.base import (
     SlottedModel, Field, snowflake, text, with_equality, with_hash, enum, ListField,
-    cached_property,
+    cached_property, str_or_int,
 )
 
 
@@ -47,17 +47,17 @@ class PremiumType(object):
 
 class User(SlottedModel, with_equality('id'), with_hash('id')):
     id = Field(snowflake)
-    username = Field(str)
+    username = Field(text)
     discriminator = Field(int)
-    avatar = Field(str)
+    avatar = Field(text)
     bot = Field(bool, default=False)
     system = Field(bool, default=False)
     mfa_enabled = Field(bool)
-    banner = Field(str)
-    accent_color = Field(text)
-    locale = Field(str)
+    banner = Field(text)
+    accent_color = Field(str_or_int)
+    locale = Field(text)
     verified = Field(bool)
-    email = Field(str)
+    email = Field(text)
     flags = Field(int)
     public_flags = Field(int, default=0)
     premium_type = Field(enum(PremiumType))
@@ -120,9 +120,9 @@ class Status(object):
 
 
 class ClientStatus(SlottedModel):
-    desktop = Field(str)
-    mobile = Field(str)
-    web = Field(str)
+    desktop = Field(text)
+    mobile = Field(text)
+    web = Field(text)
 
 
 class ActivityParty(SlottedModel):
@@ -166,12 +166,12 @@ class ActivityFlags(object):
 
 
 class Activity(SlottedModel):
-    name = Field(str)
+    name = Field(text)
     type = Field(enum(ActivityTypes))
-    url = Field(str)
+    url = Field(text)
     timestamps = Field(ActivityTimestamps)
     application_id = Field(text)
-    details = Field(str)
+    details = Field(text)
     state = Field(text)
     party = Field(ActivityParty)
     assets = Field(ActivityAssets)

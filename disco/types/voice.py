@@ -5,7 +5,7 @@ class VoiceState(SlottedModel):
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
     user_id = Field(snowflake)
-    session_id = Field(str)
+    session_id = Field(text)
     deaf = Field(bool)
     mute = Field(bool)
     self_deaf = Field(bool)
@@ -34,7 +34,7 @@ class VoiceState(SlottedModel):
 
 class VoiceRegion(SlottedModel):
     id = Field(text)
-    name = Field(str)
+    name = Field(text)
     vip = Field(bool)
     optimal = Field(bool)
     deprecated = Field(bool)

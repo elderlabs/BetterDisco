@@ -1,4 +1,4 @@
-from disco.types.base import SlottedModel, Field, datetime
+from disco.types.base import SlottedModel, Field, datetime, text
 from disco.types.user import User
 from disco.types.guild import Guild
 from disco.types.channel import Channel
@@ -43,7 +43,7 @@ class Invite(SlottedModel):
     created_at : datetime
         When this invite was created.
     """
-    code = Field(str)
+    code = Field(text)
     guild = Field(Guild)
     channel = Field(Channel)
     inviter = Field(User)

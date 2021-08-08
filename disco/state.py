@@ -368,7 +368,7 @@ class State(object):
         self.guilds[event.guild_id].member_count -= 1
 
     def on_guild_members_chunk(self, event):
-        if event.guild_id not in self.guilds or not self.config.sync_guild_members:
+        if event.guild_id not in self.guilds:
             return
 
         guild = self.guilds[event.guild_id]
@@ -439,17 +439,16 @@ class State(object):
             self.stickers.update(guild.stickers)
 
     def on_presence_update(self, event):
-        # TODO: this is recursive, we hackfix in model
-        if self.config.sync_guild_members:
-            user = event.presence.user
-            user.presence = event.presence
+        # TODO: this is recursive, we hackfix in Model
+        user = event.presence.user
+        user.presence = event.presence
 
-            # if we have the user tracked locally, we can just use the presence
-            #  update to update both their presence and the cached user object.
-            if user.id in self.users:
-                self.users[user.id].inplace_update(user)
-            else:
-                # Otherwise this user does not exist in our local cache, so we can
-                #  use this opportunity to add them. They will quickly fall out of
-                #  scope and be deleted if they aren't used below
-                self.users[user.id] = user
+        # if we have the user tracked locally, we can just use the presence
+        #  update to update both their presence and the cached user object.
+        if user.id in self.users:
+            self.users[user.id].inplace_update(user)
+        else:
+            # Otherwise this user does not exist in our local cache, so we can
+            #  use this opportunity to add them. They will quickly fall out of
+            #  scope and be deleted if they aren't used below
+            self.users[user.id] = user

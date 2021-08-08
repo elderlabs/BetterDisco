@@ -1,11 +1,11 @@
 from disco.types.user import User
-from disco.types.base import SlottedModel, text, Field, snowflake, enum, datetime, ListField
+from disco.types.base import SlottedModel, text, Field, snowflake, enum, datetime, ListField, str_or_int
 from disco.types.oauth import Application
 
 
 class IntegrationAccount(SlottedModel):
-    id = Field(text)
-    name = Field(str)
+    id = Field(str_or_int)
+    name = Field(text)
 
 
 class IntegrationExpireBehaviors(object):
@@ -15,17 +15,17 @@ class IntegrationExpireBehaviors(object):
 
 class IntegrationApplication(SlottedModel):
     id = Field(snowflake)
-    name = Field(str)
-    icon = Field(str)
-    description = Field(str)
-    summary = Field(str)
+    name = Field(text)
+    icon = Field(text)
+    description = Field(text)
+    summary = Field(text)
     bot = Field(User)
 
 
 class Integration(SlottedModel):
     id = Field(snowflake)
-    name = Field(str)
-    type = Field(text)
+    name = Field(text)
+    type = Field(str_or_int)
     enabled = Field(bool)
     syncing = Field(bool)
     role_id = Field(snowflake)
@@ -46,9 +46,9 @@ class UserConnectionVisibilityType(object):
 
 
 class UserConnection(SlottedModel):
-    id = Field(text)
-    name = Field(str)
-    type = Field(text)
+    id = Field(str_or_int)
+    name = Field(text)
+    type = Field(str_or_int)
     revoked = Field(bool)
     integrations = ListField(Integration)
     verified = Field(bool)
