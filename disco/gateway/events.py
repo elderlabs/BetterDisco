@@ -190,7 +190,7 @@ class GuildCreate(GatewayEvent):
         """
         Shortcut property which is true when we actually joined the guild.
         """
-        return self.unavailable is UNSET
+        return self.unavailable is None
 
 
 @wraps_model(Guild)
@@ -225,7 +225,7 @@ class GuildDelete(GatewayEvent):
         """
         Shortcut property which is true when we actually have left the guild.
         """
-        return self.unavailable is UNSET
+        return self.unavailable is None
 
 
 @wraps_model(Channel)

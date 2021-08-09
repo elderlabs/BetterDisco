@@ -265,7 +265,7 @@ class State(object):
         if event.channel.id in self.channels:
             self.channels[event.channel.id].inplace_update(event.channel)
 
-            if event.overwrites is not UNSET:
+            if event.overwrites is not None:
                 self.channels[event.channel.id].overwrites = event.overwrites
                 self.channels[event.channel.id].after_load()
 
@@ -283,7 +283,7 @@ class State(object):
         if event.channel.id in self.threads:
             self.threads[event.channel.id].inplace_update(event.channel)
 
-            if event.overwrites is not UNSET:
+            if event.overwrites is not None:
                 self.threads[event.channel.id].overwrites = event.overwrites
                 self.threads[event.channel.id].after_load()
 

@@ -55,8 +55,9 @@ class ConversionError(Exception):
 
 
 class Field(object):
-    def __init__(self, value_type, alias=None, default=UNSET, create=True, ignore_dump=None, cast=None, **kwargs):
+    def __init__(self, value_type, alias=None, default=None, create=True, ignore_dump=None, cast=None, **kwargs):
         # TODO: fix default bs
+        ## why do we use UNSET here, when it would be preferable to use NoneType for uniformity?
         self.true_type = value_type
         self.src_name = alias
         self.dst_name = None
@@ -65,22 +66,22 @@ class Field(object):
         self.metadata = kwargs
 
         # Only set the default value if we were given one
-        if default is not UNSET:
+        if default is not None:
             self.default = default
         # Attempt to use the instances default type (e.g. from a subclass)
         elif not hasattr(self, 'default'):
-            self.default = UNSET
+            self.default = None
 
         self.deserializer = None
 
         if value_type:
             self.deserializer = self.type_to_deserializer(value_type)
 
-            if isinstance(self.deserializer, Field) and self.default is UNSET:
+            if isinstance(self.deserializer, Field) and self.default is None:
                 self.default = self.deserializer.default
             elif (inspect.isclass(self.deserializer) and
                     issubclass(self.deserializer, Model) and
-                    self.default is UNSET and
+                    self.default is None and
                     create):
                 self.default = self.deserializer
 
@@ -97,7 +98,7 @@ class Field(object):
             self.src_name = name
 
     def has_default(self):
-        return self.default is not UNSET
+        return self.default is not None
 
     def try_convert(self, raw, client, **kwargs):
         try:
@@ -357,7 +358,7 @@ class Model(with_metaclass(ModelMeta, Chainable)):
                 if consume and not isinstance(raw, dict):
                     del obj[field.src_name]
             except KeyError:
-                raw = UNSET
+                raw = None
 
             # If the field is unset/none, and we have a default we need to set it
             if raw in (None, UNSET) and field.has_default():
@@ -366,7 +367,7 @@ class Model(with_metaclass(ModelMeta, Chainable)):
                 continue
 
             # Otherwise if the field is UNSET and has no default, skip conversion
-            if raw is UNSET:
+            if raw is None:
                 setattr(inst, field.dst_name, raw)
                 continue
 
@@ -378,7 +379,7 @@ class Model(with_metaclass(ModelMeta, Chainable)):
             if ignored and name in ignored:
                 continue
 
-            if hasattr(other, name) and not getattr(other, name) is UNSET:
+            if hasattr(other, name) and not getattr(other, name) is None:
                 setattr(self, name, getattr(other, name))
 
         # Clear cached properties
@@ -398,7 +399,7 @@ class Model(with_metaclass(ModelMeta, Chainable)):
             if field.metadata.get('private'):
                 continue
 
-            if getattr(self, name) is UNSET:
+            if getattr(self, name) is None:
                 continue
             obj[name] = field.serialize(getattr(self, name), field)
         return obj
