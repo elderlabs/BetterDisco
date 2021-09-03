@@ -36,17 +36,6 @@ setup(
     include_package_data=True,
     install_requires=requirements,
     extras_require=extras_require,
-    # test_suite='tests',
-    # setup_requires=['pytest-runner==2.11.1'],
-    # tests_require=[
-    #     'pytest==3.2.1',
-    #     'pytest-benchmark==3.1.1',
-    #     'flake8-tuple==0.2.13',
-    #     'flake8-quotes==1.0.0',
-    #     'flake8-comprehensions==1.4.1',
-    #     'flake8-commas==2.0.0',
-    #     'flake8-builtins==1.4.1',
-    # ],
     classifiers=[
         'Development Status :: 4 - Beta',
         'License :: OSI Approved :: MIT License',

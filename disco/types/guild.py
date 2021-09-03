@@ -148,7 +148,7 @@ class GuildEmoji(Emoji):
 
 
 class PruneCount(SlottedModel):
-    pruned = Field(int, default=None)
+    pruned = Field(int)
 
 
 class Role(SlottedModel):
@@ -256,7 +256,7 @@ class GuildMember(SlottedModel):
         Whether the user has passed Discord's role gate.
     """
     user = Field(User)
-    nick = Field(text, default=None)
+    nick = Field(text)
     roles = ListField(snowflake)
     joined_at = Field(datetime)
     premium_since = Field(datetime)
@@ -469,9 +469,9 @@ class Guild(SlottedModel, Permissible):
     channels = AutoDictField(Channel, 'id')
     threads = AutoDictField(Channel, 'id')
     # presences = AutoDictField(Presence)
-    max_presences = Field(int, default=None)
+    max_presences = Field(int)
     max_members = Field(int)
-    vanity_url_code = Field(text, default=None)
+    vanity_url_code = Field(text)
     description = Field(text)
     banner = Field(text)
     premium_tier = Field(enum(PremiumTier))
@@ -1011,10 +1011,10 @@ class AuditLog(SlottedModel):
 
 
 class DiscoveryRequirementsHealthScore(SlottedModel):
-    avg_nonnew_participators = Field(text, default=None)
-    avg_nonnew_communicators = Field(text, default=None)
-    num_intentful_joiners = Field(text, default=None)
-    perc_ret_w1_intentful = Field(text, default=None)
+    avg_nonnew_participators = Field(text)
+    avg_nonnew_communicators = Field(text)
+    num_intentful_joiners = Field(text)
+    perc_ret_w1_intentful = Field(text)
 
 
 class DiscoveryRequirements(SlottedModel):

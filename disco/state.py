@@ -411,6 +411,11 @@ class State(object):
 
         del self.guilds[event.guild_id].roles[event.role_id]
 
+        # This _should_ update roles on each user when a role is removed
+        for member in self.guilds[event.guild_id].members.values():
+            if event.role_id in member.roles:
+                member.roles.remove(event.role_id)
+
     def on_guild_emojis_update(self, event):
         if event.guild_id not in self.guilds:
             return
