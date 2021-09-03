@@ -546,8 +546,10 @@ class Guild(SlottedModel, Permissible):
         value = PermissionValue(self.roles.get(self.id).permissions)
 
         # Iterate over all roles the user has (plus the @everyone role)
+        ## account for Discord's API being a complete knob on role deletion
         for role in map(self.roles.get, member.roles + [self.id]):
-            value += role.permissions
+            if role is not None and hasattr(role, 'permissions'):
+                value += role.permissions
 
         return value
 
