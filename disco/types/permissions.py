@@ -37,9 +37,11 @@ class Permissions(BitsetMap):
     REQUEST_TO_SPEAK = 1 << 32
     # UNDOCUMENTED = 1 << 33
     MANAGE_THREADS = 1 << 34
-    USE_PUBLIC_THREADS = 1 << 35
-    USE_PRIVATE_THREADS = 1 << 36
+    CREATE_PUBLIC_THREADS = 1 << 35
+    CREATE_PRIVATE_THREADS = 1 << 36
     USE_EXTERNAL_STICKERS = 1 << 37
+    SEND_MESSAGES_IN_THREADS = 1 << 38
+    START_EMBEDDED_ACTIVITIES = 1 << 39
 
 
 class PermissionValue(BitsetValue):
