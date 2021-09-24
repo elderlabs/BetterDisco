@@ -67,6 +67,7 @@ class Routes(object):
                                                CHANNELS + '/messages/{message}/reactions/{emoji}/{user}')
     CHANNELS_MESSAGES_REACTIONS_DELETE_EMOJI = (HTTPMethod.DELETE, CHANNELS + '/messages/{message}/reactions/{emoji}')
     CHANNELS_MESSAGES_PUBLISH = (HTTPMethod.POST, CHANNELS + '/messages/{message}/crosspost')
+    CHANNELS_MESSAGES_THREAD_START = (HTTPMethod.POST, CHANNELS + '/messages/{message}/threads')
     CHANNELS_PERMISSIONS_MODIFY = (HTTPMethod.PUT, CHANNELS + '/permissions/{permission}')
     CHANNELS_PERMISSIONS_DELETE = (HTTPMethod.DELETE, CHANNELS + '/permissions/{permission}')
     CHANNELS_INVITES_LIST = (HTTPMethod.GET, CHANNELS + '/invites')
@@ -76,6 +77,18 @@ class Routes(object):
     CHANNELS_PINS_DELETE = (HTTPMethod.DELETE, CHANNELS + '/pins/{message}')
     CHANNELS_WEBHOOKS_CREATE = (HTTPMethod.POST, CHANNELS + '/webhooks')
     CHANNELS_WEBHOOKS_LIST = (HTTPMethod.GET, CHANNELS + '/webhooks')
+    CHANNELS_THREAD_START = (HTTPMethod.POST, CHANNELS +  '/threads')
+    CHANNELS_THREAD_MEMBERS = CHANNELS + '/thread-members'
+    CHANNELS_THREAD_JOIN = (HTTPMethod.PUT, CHANNELS_THREAD_MEMBERS + '/@me')
+    CHANNELS_THREAD_LEAVE = (HTTPMethod.DELETE, CHANNELS_THREAD_MEMBERS + '/@me')
+    CHANNELS_THREAD_MEMBER_ADD = (HTTPMethod.PUT, CHANNELS_THREAD_MEMBERS + '/{member}')
+    CHANNELS_THREAD_MEMBER_REMOVE = (HTTPMethod.DELETE, CHANNELS_THREAD_MEMBERS + '/{member}')
+    CHANNELS_THREAD_MEMBERS_LIST = (HTTPMethod.GET, CHANNELS_THREAD_MEMBERS)
+    CHANNELS_THREADS = CHANNELS + '/threads'
+    CHANNELS_THREADS_LIST = (HTTPMethod.GET, CHANNELS_THREADS + '/active')
+    CHANNELS_THREADS_LIST_ARCHIVED_PUBLIC = (HTTPMethod.GET, CHANNELS_THREADS + '/archived/public')
+    CHANNELS_THREADS_LIST_ARCHIVED_PRIVATE = (HTTPMethod.GET, CHANNELS_THREADS + '/archived/private')
+    CHANNELS_THREADS_LIST_JOINED_PRIVATE = (HTTPMethod.GET, CHANNELS + '/users/@me/threads/archived/private')
 
     # Stickers
     STICKER = '/stickers'
