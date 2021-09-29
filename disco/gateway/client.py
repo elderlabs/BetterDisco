@@ -95,6 +95,7 @@ class GatewayClient(LoggingClass):
                 self.last_conn_state = 'HEARTBEAT'
                 self._heartbeat_acknowledged = True
                 self.ws.close(status=1000)
+                self.client.gw.on_close(0, 'HEARTBEAT failure')
                 return
             self._last_heartbeat = time.perf_counter()
 
@@ -239,7 +240,7 @@ class GatewayClient(LoggingClass):
                 },
             })
 
-    def on_close(self, code, reason):
+    def on_close(self, code=None, reason=None):
         # Make sure we cleanup any old data
         self._buffer = None
 
