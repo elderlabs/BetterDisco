@@ -56,8 +56,6 @@ class ConversionError(Exception):
 
 class Field(object):
     def __init__(self, value_type, alias=None, default=None, create=True, ignore_dump=None, cast=None, **kwargs):
-        # TODO: fix default bs
-        ## why do we use UNSET here, when it would be preferable to use NoneType for uniformity?
         self.true_type = value_type
         self.src_name = alias
         self.dst_name = None

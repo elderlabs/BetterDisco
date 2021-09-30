@@ -3,7 +3,7 @@ import gevent
 from collections import defaultdict
 from gevent.event import AsyncResult
 from gevent.queue import Queue, Full
-
+from websocket import WebSocketConnectionClosedException
 
 from disco.util.logging import LoggingClass
 
@@ -133,12 +133,13 @@ class Emitter(LoggingClass):
             try:
                 listener(*args, **kwargs)
             except Exception as e:
-                self.log.warning('AFTER {} event handler `{}` raised {}: {}'.format(
-                    name,
-                    listener.callback.__name__,
-                    e.__class__.__name__,
-                    e,
-                ))
+                if not isinstance(e.__class__, WebSocketConnectionClosedException):
+                    self.log.warning('AFTER {} event handler `{}` raised {}: {}'.format(
+                        name,
+                        listener.callback.__name__,
+                        e.__class__.__name__,
+                        e,
+                    ))
 
         # Next enqueue all sequential handlers. This just puts stuff into a queue
         #  without blocking, so we don't have to worry too much

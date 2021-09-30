@@ -727,5 +727,5 @@ class StageInstance(SlottedModel):
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
     topic = Field(text)
-    privacy_level = Field(StageInstancePrivacyLevel)
+    privacy_level = Field(enum(StageInstancePrivacyLevel))
     discoverable_disabled = Field(bool)

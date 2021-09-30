@@ -814,6 +814,14 @@ class InviteDelete(GatewayEvent):
 
 
 @wraps_model(Integration)
+class IntegrationCreate(GatewayEvent):
+    """
+    Sent when a guild integration is created
+    """
+    guild_id = Field(snowflake)
+
+
+@wraps_model(Integration)
 class IntegrationUpdate(GatewayEvent):
     """
     Sent when a guild integration is updated
@@ -823,6 +831,14 @@ class IntegrationUpdate(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
+
+@wraps_model(Integration)
+class IntegrationDelete(GatewayEvent):
+    """
+    Sent when a guild integration is deleted
+    """
+    guild_id = Field(snowflake)
 
 
 @wraps_model(Interaction)

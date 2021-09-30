@@ -377,14 +377,13 @@ class VoiceClient(LoggingClass):
 
         self.set_state(VoiceState.RECONNECTING)
 
+        self._reconnects += 1
+        if self.max_reconnects and self._reconnects > self.max_reconnects:
+            raise VoiceException(
+                'Failed to reconnect after {} attempts, giving up'.format(self.max_reconnects), self)
+
         # Check if code is not None, was not from us
         if code is not None:
-            self._reconnects += 1
-
-            if self.max_reconnects and self._reconnects > self.max_reconnects:
-                raise VoiceException(
-                    'Failed to reconnect after {} attempts, giving up'.format(self.max_reconnects), self)
-
             # Don't resume for these error codes:
             if 4000 <= code <= 4016:
                 self._identified = False

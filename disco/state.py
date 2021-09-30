@@ -227,8 +227,9 @@ class State(object):
         ])
 
     def on_guild_delete(self, event):
-        if event.guild.unavailable:
-            return
+        if hasattr(event, 'guild'):
+            if event.guild.unavailable:
+                return
 
         if event.id in self.guilds:
             del self.guilds[event.id]
@@ -236,23 +237,28 @@ class State(object):
         if event.id in self.voice_clients:
             self.voice_clients[event.id].disconnect()
 
-        for channel in self.channels:
+        channels = tuple(self.channels.keys())
+        for channel in channels:
             if self.channels[channel].guild_id == event.id:
                 del self.channels[channel]
 
-        for thread in self.threads:
+        threads = tuple(self.threads.keys())
+        for thread in threads:
             if self.threads[thread].guild_id == event.id:
                 del self.threads[thread]
 
-        for emoji in self.emojis:
+        emojis = tuple(self.emojis.keys())
+        for emoji in emojis:
             if self.emojis[emoji].guild_id == event.id:
                 del self.emojis[emoji]
 
-        for sticker in self.stickers:
+        stickers = tuple(self.stickers.keys())
+        for sticker in stickers:
             if self.stickers[sticker].guild_id == event.id:
                 del self.stickers[sticker]
 
-        for vstate in self.voice_states:
+        voice_states = tuple(self.voice_states.keys())
+        for vstate in voice_states:
             if self.voice_states[vstate].guild_id == event.id:
                 del self.voice_states[vstate]
 
@@ -431,7 +437,7 @@ class State(object):
 
     # TODO: default stickers
     def on_guild_stickers_update(self, event):
-        if event.guild_id not in self.guilds:
+        if event.guild_id not in self.guilds or not hasattr(event, 'stickers'):
             return
 
         for sticker in event.stickers:
