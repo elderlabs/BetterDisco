@@ -513,7 +513,7 @@ class Channel(SlottedModel, Permissible):
             List of messages (or message ids) to delete. All messages must originate
             from this channel.
         """
-        message_ids = list(map(to_snowflake, messages))
+        message_ids = tuple(map(to_snowflake, messages))
 
         if not message_ids:
             return

@@ -181,7 +181,7 @@ class State(object):
             return
 
         # TODO: performance
-        for sm in list(self.messages[event.channel_id]):
+        for sm in tuple(self.messages[event.channel_id]):
             if sm.id in event.ids:
                 self.messages[event.channel_id].remove(sm)
 

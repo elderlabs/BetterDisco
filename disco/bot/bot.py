@@ -200,7 +200,7 @@ class Bot(LoggingClass):
         # Convert our configured mapping of entities to levels into something
         #  we can actually use. This ensures IDs are converted properly, and maps
         #  any level names (e.g. `role_id: admin`) map to their numerical values.
-        for entity_id, level in list(self.config.levels.items()):
+        for entity_id, level in tuple(self.config.levels.items()):
             del self.config.levels[entity_id]
             entity_id = int(entity_id) if str(entity_id).isdigit() else entity_id
             level = int(level) if str(level).isdigit() else get_enum_value_by_name(CommandLevels, level)
@@ -279,7 +279,7 @@ class Bot(LoggingClass):
         """
         Computes a single regex which matches all possible command combinations.
         """
-        commands = list(self.commands)
+        commands = tuple(self.commands)
         re_str = '|'.join(command.regex(grouped=False) for command in commands)
         if re_str:
             self.command_matches_re = re.compile(re_str, re.I)
@@ -318,7 +318,7 @@ class Bot(LoggingClass):
 
             mention_roles = []
             if msg.guild:
-                mention_roles = list(filter(lambda r: msg.is_mentioned(r),
+                mention_roles = tuple(filter(lambda r: msg.is_mentioned(r),
                                             msg.guild.get_member(self.client.state.me).roles))
 
             if not any((
@@ -420,7 +420,7 @@ class Bot(LoggingClass):
         custom_message_prefixes = (self.config.commands_prefix_getter(msg)
                                    if self.config.commands_prefix_getter else [])
 
-        commands = list(self.get_commands_for_message(
+        commands = tuple(self.get_commands_for_message(
             self.config.commands_require_mention,
             self.config.commands_mention_rules,
             custom_message_prefixes or self.config.command_prefixes,
