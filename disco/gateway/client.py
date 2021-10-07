@@ -4,7 +4,7 @@ import ssl
 import time
 import zlib
 
-from websocket import ABNF, WebSocketConnectionClosedException
+from websocket import ABNF, WebSocketConnectionClosedException, WebSocketTimeoutException
 
 from disco.gateway.packets import OPCode, RECV, SEND
 from disco.gateway.events import GatewayEvent
@@ -206,6 +206,8 @@ class GatewayClient(LoggingClass):
         if isinstance(error, KeyboardInterrupt):
             self.shutting_down = True
             self.ws_event.set()
+        if isinstance(error, WebSocketTimeoutException):
+            return self.log.error('Websocket connection has timed out. An upstream connection issue is likely present.')
         if not isinstance(error, WebSocketConnectionClosedException):
             raise Exception('WS received error: {}'.format(error))
 
