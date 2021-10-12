@@ -76,6 +76,8 @@ class BotConfig(Config):
     http_enabled : bool
         Whether to enable the built-in Flask server which allows plugins to handle
         and route HTTP requests.
+    http_logging : bool
+        Whether to enable the built-in wsgi logging mechanism.
     http_host : str
         The host string for the HTTP Flask server (if enabled).
     http_port : int
@@ -113,6 +115,7 @@ class BotConfig(Config):
     storage_path = 'storage.json'
 
     http_enabled = False
+    http_logging = True
     http_host = '0.0.0.0'
     http_port = 7575
 
@@ -166,9 +169,9 @@ class Bot(LoggingClass):
             except ImportError:
                 self.log.warning('Failed to enable HTTP server, Flask is not installed')
 
-            self.log.info('Starting HTTP server bound to %s:%s', self.config.http_host, self.config.http_port)
+            self.log.info(f'Starting HTTP server bound to {self.config.http_host}:{self.config.http_port}')
             self.http = Flask('disco')
-            self.http_server = WSGIServer((self.config.http_host, self.config.http_port), self.http, log=self.http.logger)
+            self.http_server = WSGIServer((self.config.http_host, self.config.http_port), self.http, log=self.log if self.config.http_logging else None)
             self.http_server_greenlet = gevent.spawn(self.http_server.serve_forever)
 
         self.plugins = {}
