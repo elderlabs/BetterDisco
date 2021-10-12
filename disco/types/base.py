@@ -3,6 +3,7 @@ import gevent
 import inspect
 
 from datetime import datetime as real_datetime
+from json import JSONEncoder
 from holster.enum import BaseEnumMeta, EnumAttr
 from six import with_metaclass
 
@@ -43,6 +44,13 @@ def strict_cached_property(*args):
         method._cached_property = set(args)
         return method
     return _cached_property
+
+
+def _json_default(self, obj):
+    return getattr(obj.__class__, "to_dict", _json_default.default)(obj)
+
+_json_default.default = JSONEncoder().default
+JSONEncoder.default = _json_default
 
 
 class ConversionError(Exception):
