@@ -38,6 +38,8 @@ def to_snowflake(i):
         return int(i)
     elif hasattr(i, 'id'):
         return i.id
+    elif isinstance(i, datetime):
+        return from_datetime(i)
 
     raise Exception('{} ({}) is not convertible to a snowflake'.format(type(i), i))
 

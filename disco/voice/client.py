@@ -2,9 +2,7 @@ import gevent
 import time
 
 from collections import namedtuple
-from websocket import WebSocketConnectionClosedException
-
-from holster.enum import Enum
+from websocket import WebSocketConnectionClosedException, WebSocketTimeoutException
 
 from disco.gateway.encoding.json import JSONEncoder
 from disco.gateway.packets import OPCode
@@ -16,24 +14,27 @@ from disco.voice.packets import VoiceOPCode
 from disco.voice.udp import AudioCodecs, RTPPayloadTypes, UDPVoiceClient
 
 
-SpeakingFlags = Enum(
-    NONE=0,
-    VOICE=1 << 0,
-    SOUNDSHARE=1 << 1,
-    PRIORITY=1 << 2,
-)
+class SpeakingFlags(object):
+    NONE = 0
+    VOICE = 1 << 0
+    SOUNDSHARE = 1 << 1
+    PRIORITY = 1 << 2
 
-VoiceState = Enum(
-    DISCONNECTED=0,
-    RECONNECTING=1,
-    AWAITING_ENDPOINT=2,
-    AUTHENTICATING=3,
-    AUTHENTICATED=4,
-    CONNECTING=5,
-    CONNECTED=6,
-    VOICE_CONNECTING=7,
-    VOICE_CONNECTED=8,
-)
+
+class VoiceState(object):
+    DISCONNECTED = 'DISCONNECTED'
+    AWAITING_ENDPOINT = 'AWAITING_ENDPOINT'
+    AUTHENTICATING = 'AUTHENTICATING'
+    CONNECTING = 'CONNECTING'
+    CONNECTED = 'CONNECTED'
+    VOICE_DISCONNECTED = 'VOICE_DISCONNECTED'
+    VOICE_CONNECTING = 'VOICE_CONNECTING'
+    VOICE_CONNECTED = 'VOICE_CONNECTED'
+    NO_ROUTE = 'NO_ROUTE'
+    ICE_CHECKING = 'ICE_CHECKING'
+    RECONNECTING = 'RECONNECTING'
+    AUTHENTICATED = 'AUTHENTICATED'
+
 
 VoiceSpeaking = namedtuple('VoiceSpeaking', [
     'client',
@@ -75,13 +76,16 @@ class VoiceClient(LoggingClass):
 
         # Bind to some WS packets
         self.packets = Emitter()
-        self.packets.on(VoiceOPCode.HELLO, self.on_voice_hello)
         self.packets.on(VoiceOPCode.READY, self.on_voice_ready)
-        self.packets.on(VoiceOPCode.RESUMED, self.on_voice_resumed)
+        self.packets.on(VoiceOPCode.HEARTBEAT, self.handle_heartbeat)
         self.packets.on(VoiceOPCode.SESSION_DESCRIPTION, self.on_voice_sdp)
         self.packets.on(VoiceOPCode.SPEAKING, self.on_voice_speaking)
+        self.packets.on(VoiceOPCode.HEARTBEAT_ACK, self.handle_heartbeat_acknowledge)
+        self.packets.on(VoiceOPCode.HELLO, self.on_voice_hello)
+        self.packets.on(VoiceOPCode.RESUMED, self.on_voice_resumed)
         self.packets.on(VoiceOPCode.CLIENT_CONNECT, self.on_voice_client_connect)
         self.packets.on(VoiceOPCode.CLIENT_DISCONNECT, self.on_voice_client_disconnect)
+        # TODO: is this still a thing?
         self.packets.on(VoiceOPCode.CODECS, self.on_voice_codecs)
 
         # State + state change emitter
@@ -106,7 +110,12 @@ class VoiceClient(LoggingClass):
         self._session_id = self.client.gw.session_id
         self._reconnects = 0
         self._heartbeat_task = None
+        self._heartbeat_acknowledged = True
         self._identified = False
+
+        # Latency
+        self._last_heartbeat = 0
+        self.latency = -1
 
         # SSRCs
         self.audio_ssrcs = {}
@@ -143,7 +152,7 @@ class VoiceClient(LoggingClass):
         return self.ssrc + 3
 
     def set_state(self, state):
-        self.log.debug('[%s] state %s -> %s', self, self.state, state)
+        self.log.debug('[{}] state {} -> {}'.format(self, self.state, state))
         prev_state = self.state
         self.state = state
         self.state_emitter.emit(state, prev_state)
@@ -153,7 +162,7 @@ class VoiceClient(LoggingClass):
         if self.endpoint == endpoint:
             return
 
-        self.log.info('[%s] Set endpoint from VOICE_SERVER_UPDATE (state = %s / endpoint = %s)', self, self.state, endpoint)
+        self.log.info('[{}] {} ({})'.format(self, self.state, endpoint))
 
         self.endpoint = endpoint
 
@@ -168,9 +177,9 @@ class VoiceClient(LoggingClass):
             return
         self.token = token
         if not self._identified:
-            self._connect_and_run()
+            self.connect_and_run()
 
-    def _connect_and_run(self):
+    def connect_and_run(self):
         self.ws = Websocket('wss://' + self.endpoint + '/?v={}'.format(self.VOICE_GATEWAY_VERSION))
         self.ws.emitter.on('on_open', self.on_open)
         self.ws.emitter.on('on_error', self.on_error)
@@ -178,19 +187,36 @@ class VoiceClient(LoggingClass):
         self.ws.emitter.on('on_message', self.on_message)
         self.ws.run_forever()
 
-    def _heartbeat(self, interval):
+    def heartbeat_task(self, interval):
         while True:
+            if not self._heartbeat_acknowledged:
+                self.log.warning('[{}] WS Received HEARTBEAT without HEARTBEAT_ACK, reconnecting...'.format(self))
+                self._heartbeat_acknowledged = True
+                self.ws.close(status=4000)
+                self.on_close(0, 'HEARTBEAT failure')
+                return
+            self._last_heartbeat = time.perf_counter()
+
             self.send(VoiceOPCode.HEARTBEAT, time.time())
+            self._heartbeat_acknowledged = False
             gevent.sleep(interval / 1000)
 
+    def handle_heartbeat(self, _):
+        self.send(VoiceOPCode.HEARTBEAT, time.time())
+
+    def handle_heartbeat_acknowledge(self, _):
+        self.log.debug('[{}] Received WS HEARTBEAT_ACK'.format(self))
+        self._heartbeat_acknowledged = True
+        self.latency = float('{:.2f}'.format((time.perf_counter() - self._last_heartbeat) * 1000))
+
     def set_speaking(self, voice=False, soundshare=False, priority=False, delay=0):
-        value = SpeakingFlags.NONE.value
+        value = SpeakingFlags.NONE
         if voice:
-            value |= SpeakingFlags.VOICE.value
+            value |= SpeakingFlags.VOICE
         if soundshare:
-            value |= SpeakingFlags.SOUNDSHARE.value
+            value |= SpeakingFlags.SOUNDSHARE
         if priority:
-            value |= SpeakingFlags.PRIORITY.value
+            value |= SpeakingFlags.PRIORITY
 
         self.send(VoiceOPCode.SPEAKING, {
             'speaking': value,
@@ -209,13 +235,10 @@ class VoiceClient(LoggingClass):
 
     def send(self, op, data):
         if self.ws and self.ws.sock and self.ws.sock.connected:
-            self.log.debug('[%s] sending OP %s (data = %s)', self, op, data)
-            self.ws.send(self.encoder.encode({
-                'op': op.value,
-                'd': data,
-            }), self.encoder.OPCODE)
+            self.log.debug('[{}] sending OP {} (data = {})'.format(self, op, data))
+            self.ws.send(self.encoder.encode({'op': op, 'd': data}), self.encoder.OPCODE)
         else:
-            self.log.debug('[%s] dropping because ws is closed OP %s (data = %s)', self, op, data)
+            self.log.debug('[{}] dropping because ws is closed OP {} (data = {})'.format(self, op, data))
 
     def on_voice_client_connect(self, data):
         user_id = int(data['user_id'])
@@ -240,13 +263,13 @@ class VoiceClient(LoggingClass):
         # Set the UDP's RTP Audio Header's Payload Type
         self.udp.set_audio_codec(data['audio_codec'])
 
-    def on_voice_hello(self, data):
-        self.log.info('[%s] Received Voice HELLO payload, starting heartbeater', self)
-        self._heartbeat_task = gevent.spawn(self._heartbeat, data['heartbeat_interval'])
+    def on_voice_hello(self, packet):
+        self.log.info('[{}] Received Voice HELLO payload, starting heartbeater'.format(self))
+        self._heartbeat_task = gevent.spawn(self.heartbeat_task, packet['heartbeat_interval'])
         self.set_state(VoiceState.AUTHENTICATED)
 
     def on_voice_ready(self, data):
-        self.log.info('[%s] Received Voice READY payload, attempting to negotiate voice connection w/ remote', self)
+        self.log.info('[{}] Received READY payload, RTC connecting'.format(self))
         self.set_state(VoiceState.CONNECTING)
         self.ssrc = data['ssrc']
         self.ip = data['ip']
@@ -256,17 +279,17 @@ class VoiceClient(LoggingClass):
         for mode in self.SUPPORTED_MODES:
             if mode in data['modes']:
                 self.mode = mode
-                self.log.debug('[%s] Selected mode %s', self, mode)
+                self.log.debug('[{}] Selected mode {}'.format(self, mode))
                 break
         else:
             raise Exception('Failed to find a supported voice mode')
 
-        self.log.debug('[%s] Attempting IP discovery over UDP to %s:%s', self, self.ip, self.port)
+        self.log.debug('[{}] Attempting IP discovery over UDP to {}:{}'.format(self, self.ip, self.port))
         self.udp = UDPVoiceClient(self)
         ip, port = self.udp.connect(self.ip, self.port)
 
         if not ip:
-            self.log.error('Failed to discover our IP, perhaps a NAT or firewall is fucking us')
+            self.log.error('Failed to discover bot IP, perhaps a network configuration error is present.')
             self.disconnect()
             return
 
@@ -281,7 +304,7 @@ class VoiceClient(LoggingClass):
                 'payload_type': RTPPayloadTypes.get(codec).value,
             })
 
-        self.log.debug('[%s] IP discovery completed (ip = %s, port = %s), sending SELECT_PROTOCOL', self, ip, port)
+        self.log.debug('[{}] IP discovery completed ({}:{}), sending SELECT_PROTOCOL'.format(self, ip, port))
         self.send(VoiceOPCode.SELECT_PROTOCOL, {
             'protocol': 'udp',
             'data': {
@@ -298,11 +321,11 @@ class VoiceClient(LoggingClass):
         })
 
     def on_voice_resumed(self, data):
-        self.log.info('[%s] Received resumed', self)
+        self.log.info('[{}] WS Resumed'.format(self))
         self.set_state(VoiceState.CONNECTED)
 
     def on_voice_sdp(self, sdp):
-        self.log.info('[%s] Received session description, connection completed', self)
+        self.log.info('[{}] Received session description; connected'.format(self))
 
         self.mode = sdp['mode']
         self.audio_codec = sdp['audio_codec']
@@ -326,9 +349,9 @@ class VoiceClient(LoggingClass):
         payload = VoiceSpeaking(
             client=self,
             user_id=user_id,
-            speaking=bool(data['speaking'] & SpeakingFlags.VOICE.value),
-            soundshare=bool(data['speaking'] & SpeakingFlags.SOUNDSHARE.value),
-            priority=bool(data['speaking'] & SpeakingFlags.PRIORITY.value),
+            speaking=bool(data['speaking'] & SpeakingFlags.VOICE),
+            soundshare=bool(data['speaking'] & SpeakingFlags.SOUNDSHARE),
+            priority=bool(data['speaking'] & SpeakingFlags.PRIORITY),
         )
 
         self.client.gw.events.emit('VoiceSpeaking', payload)
@@ -336,13 +359,15 @@ class VoiceClient(LoggingClass):
     def on_message(self, msg):
         try:
             data = self.encoder.decode(msg)
-            self.packets.emit(VoiceOPCode[data['op']], data['d'])
+            self.packets.emit(data['op'], data['d'])
         except Exception:
             self.log.exception('Failed to parse voice gateway message: ')
 
     def on_error(self, error):
+        if isinstance(error, WebSocketTimeoutException):
+            return self.log.error('[{}] WS has timed out. An upstream connection issue is likely present.'.format(self))
         if not isinstance(error, WebSocketConnectionClosedException):
-            self.log.error('[{}] VC WS received error: {}'.format(self, error))
+            self.log.error('[{}] WS received error: {}'.format(self, error))
 
     def on_open(self):
         if self._identified:
@@ -360,10 +385,11 @@ class VoiceClient(LoggingClass):
                 'video': self.video_enabled,
             })
 
-    def on_close(self, code, reason):
-        self.log.warning('[%s] Voice websocket closed: [%s] %s (%s)', self, code, reason, self._reconnects)
+    def on_close(self, code=None, reason=None):
+        self.log.info('[{}] WS Closed:{}{} ({})'.format(self, ' [{}]'.format(code) if code else '', ' {}'.format(reason) if reason else '', self._reconnects))
 
         if self._heartbeat_task:
+            self.log.info('[{}] WS Closed: killing heartbeater'.format(self))
             self._heartbeat_task.kill()
             self._heartbeat_task = None
 
@@ -373,33 +399,28 @@ class VoiceClient(LoggingClass):
         if self.state == VoiceState.DISCONNECTED:
             return
 
-        self.log.info('[%s] Attempting Websocket Resumption', self)
-
+        self.log.info('[{}] Attempting WS resumption'.format(self))
         self.set_state(VoiceState.RECONNECTING)
-
         self._reconnects += 1
+
         if self.max_reconnects and self._reconnects > self.max_reconnects:
             raise VoiceException(
                 'Failed to reconnect after {} attempts, giving up'.format(self.max_reconnects), self)
 
         # Check if code is not None, was not from us
-        if code is not None:
-            # Don't resume for these error codes:
-            if 4000 <= code <= 4016:
-                self._identified = False
+        if code and (4000 < code <= 4016 or code == 1001):
+            self._identified = False
 
-                if self.udp and self.udp.connected:
-                    self.udp.disconnect()
+            if self.udp and self.udp.connected:
+                self.udp.disconnect()
 
             wait_time = 5
         else:
             wait_time = 1
 
-        self.log.info(
-            '[%s] Will attempt to %s after %s seconds', self, 'resume' if self._identified else 'reconnect', wait_time)
+        self.log.info('[{}] Will attempt {} after {} seconds'.format(self, 'resumption' if self._identified else 'reconnection', wait_time))
         gevent.sleep(wait_time)
-
-        self._connect_and_run()
+        self.connect_and_run()
 
     def connect(self, channel_id, timeout=10, **kwargs):
         if self.is_dm:
@@ -410,13 +431,13 @@ class VoiceClient(LoggingClass):
 
         if self.channel_id == channel_id:
             if self.state == VoiceState.CONNECTED:
-                self.log.debug('[%s] Already connected to %s, returning', self, self.channel)
+                self.log.debug('[{}] Already connected to {}, returning'.format(self, self.channel))
                 return self
         else:
             if self.state == VoiceState.CONNECTED:
-                self.log.debug('[%s] Moving to channel %s', self, channel_id)
+                self.log.debug('[{}] Moving to channel {}'.format(self, channel_id))
             else:
-                self.log.debug('[%s] Attempting connection to channel id %s', self, channel_id)
+                self.log.debug('[{}] Attempting connection to channel id {}'.format(self, channel_id))
                 self.set_state(VoiceState.AWAITING_ENDPOINT)
 
         self.set_voice_state(channel_id, **kwargs)
@@ -431,7 +452,7 @@ class VoiceClient(LoggingClass):
         if self.state == VoiceState.DISCONNECTED:
             return
 
-        self.log.debug('[%s] disconnect called', self)
+        self.log.debug('[{}] disconnect called'.format(self))
         self.set_state(VoiceState.DISCONNECTED)
 
         del self.client.state.voice_clients[self.server_id]

@@ -1,8 +1,6 @@
 import time
 import gevent
 
-from holster.enum import Enum
-
 from disco.types.channel import Channel
 from disco.util.emitter import Emitter
 from disco.util.logging import LoggingClass
@@ -11,13 +9,13 @@ from disco.voice.queue import PlayableQueue
 
 
 class Player(LoggingClass):
-    Events = Enum(
-        'START_PLAY',
-        'STOP_PLAY',
-        'PAUSE_PLAY',
-        'RESUME_PLAY',
-        'DISCONNECT',
-    )
+    class Events(object):
+        START_PLAY = 'START_PLAY'
+        STOP_PLAY = 'STOP_PLAY'
+        PAUSE_PLAY = 'PAUSE_PLAY'
+        RESUME_PLAY = 'RESUME_PLAY'
+        DISCONNECT = 'DISCONNECT'
+
 
     def __init__(self, client, queue=None):
         super(Player, self).__init__()

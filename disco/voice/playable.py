@@ -2,19 +2,17 @@ import abc
 import audioop
 import gevent
 import struct
-import subprocess
 import types
 
 from gevent.lock import Semaphore
 from gevent.queue import Queue
-from io import BytesIO as BufferedIO
 from six import add_metaclass
 
 from disco.voice.opus import OpusEncoder
 
 try:
-    import youtube_dl
-    ytdl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'default_search': 'ytsearch'})
+    import yt_dlp
+    ytdl = yt_dlp.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'default_search': 'ytsearch'})
 except ImportError:
     ytdl = None
 
@@ -25,7 +23,7 @@ class AbstractOpus(object):
     def __init__(self, sampling_rate=48000, frame_length=20, channels=2):
         self.sampling_rate = sampling_rate
         self.frame_length = frame_length
-        self.channels = 2
+        self.channels = channels
         self.sample_size = 2 * self.channels
         self.samples_per_frame = int(self.sampling_rate / 1000 * self.frame_length)
         self.frame_size = self.samples_per_frame * self.sample_size
@@ -60,39 +58,24 @@ class BaseInput(BaseUtil):
     def read(self, size):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def fileobj(self):
-        raise NotImplementedError
-
 
 class FFmpegInput(BaseInput, AbstractOpus):
-    def __init__(self, source='-', command='ffmpeg', streaming=False, **kwargs):
+    def __init__(self, source='-', command='ffmpeg', **kwargs):
         super(FFmpegInput, self).__init__(**kwargs)
         if source:
             self.source = source
-        self.streaming = streaming
         self.command = command
 
         self._buffer = None
         self._proc = None
 
     def read(self, sz):
-        if self.streaming:
-            raise TypeError('Cannot read from a streaming FFmpegInput')
-
-        # First read blocks until the subprocess finishes
         if not self._buffer:
-            data, _ = self.proc.communicate()
-            self._buffer = BufferedIO(data)
+            # allows time for a buffer to form, otherwise there is nothing to send
+            gevent.sleep(1)
+            self._buffer = self.proc.stdout
 
-        # Subsequent reads can just do dis thang
         return self._buffer.read(sz)
-
-    def fileobj(self):
-        if self.streaming:
-            return self.proc.stdout
-        else:
-            return self
 
     @property
     def proc(self):
@@ -104,35 +87,21 @@ class FFmpegInput(BaseInput, AbstractOpus):
                 self.source, self.metadata = self.source
 
             args = [
+                'stdbuf', '-oL',
                 self.command,
                 '-i', str(self.source),
                 '-f', 's16le',
                 '-ar', str(self.sampling_rate),
                 '-ac', str(self.channels),
+                '-ab', '192k',
+                '-bufsize', str(self.sampling_rate),
                 '-loglevel', 'warning',
+                '-hls_time', '10',
+                '-hls_playlist_type', 'vod',
                 'pipe:1',
             ]
-            self._proc = subprocess.Popen(args, stdin=None, stdout=subprocess.PIPE, bufsize=4096)
+            self._proc = gevent.subprocess.Popen(args, stdout=gevent.subprocess.PIPE)
         return self._proc
-
-
-class VolumeHandler(FFmpegInput):
-    def __init__(self, ffmpeg, volume=1.0, **kwargs):
-        super(VolumeHandler, self).__init__(**kwargs)
-        self.ffmpeg = ffmpeg
-        self.volume = volume
-
-    @property
-    def volume(self):
-        return self._volume
-
-    @volume.setter
-    def volume(self, value):
-        self._volume = max(value, 0.0)
-
-    def read(self, sz):
-        frag = self.ffmpeg.read(sz)
-        return audioop.mul(frag, 2, min(self._volume, 2.0))
 
 
 class YoutubeDLInput(FFmpegInput):
@@ -142,38 +111,28 @@ class YoutubeDLInput(FFmpegInput):
         self._ie_info = ie_info
         self._info = None
         self._info_lock = Semaphore()
-        self.streaming = False
 
     @property
     def info(self):
         with self._info_lock:
             if not self._info:
-                assert ytdl is not None, 'YoutubeDL isn\'t installed'
+                assert ytdl is not None, 'yt_dlp isn\'t installed'
                 if self._url:
-                    # ytdl.extract_info(self._url, download=False, process=False)
                     results = ytdl.extract_info(self._url, download=False)
+
                     if 'entries' not in results:
-                        self._ie_info = [results]
+                        self._ie_info = results
                     else:
-                        self._ie_info = results['entries']
+                        self._ie_info = results['entries'][0]
 
-                    for result in self._ie_info:
-                        if 'youtube' in result['extractor']:
-                            audio_formats = [fmt for fmt in result['formats'] if
-                                             fmt['vcodec'] == 'none' and fmt['acodec'] == 'opus']
-                        elif result['extractor'] == 'twitch:stream':
-                            audio_formats = [fmt for fmt in result['formats'] if fmt['format_id'] == 'audio_only']
-                        else:
-                            audio_formats = [fmt for fmt in result['formats'] if fmt['ext'] in ['opus', 'mp3']]
-                        if not audio_formats:
-                            raise Exception("Couldn't find valid audio format for {}".format(self._url))
+                    if self._ie_info['extractor'] == 'twitch:stream':
+                        audio_formats = [fmt for fmt in self._ie_info['formats'] if fmt['format_id'] == 'audio_only']
+                        self._info = audio_formats[0]
+                    else:
+                        self._info = self._ie_info
 
-                        if result['extractor'] == 'twitch:stream':
-                            self._info = audio_formats[0]
-                            self.streaming = True
-                        else:
-                            self._info = sorted(audio_formats, key=lambda i: i['abr'], reverse=True)[0]
-                            self.streaming = False
+                    if not self._info:
+                        raise Exception("Couldn't find valid audio format for {}".format(self._url))
 
             return self._info
 
@@ -184,8 +143,7 @@ class YoutubeDLInput(FFmpegInput):
     # TODO: :thinking:
     @classmethod
     def many(cls, url, *args, **kwargs):
-        # ytdl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best'})
-        info = ytdl.extract_info(url, download=False, process=False)
+        info = ytdl.extract_info(url, download=False)
 
         if 'entries' not in info:
             yield cls(ie_info=info, *args, **kwargs)
@@ -198,19 +156,13 @@ class YoutubeDLInput(FFmpegInput):
     def source(self):
         return self.info['url']
 
-    @property
-    def streaming(self):
-        return self._streaming
-
-    @streaming.setter
-    def streaming(self, value):
-        self._streaming = value
-
 
 class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
-    def __init__(self, source, *args, **kwargs):
+    def __init__(self, source, volume=1.0, frame_buffer=100, *args, **kwargs):
         self.source = source
         self.frames = Queue(kwargs.pop('queue_size', 4096))
+        self.frame_buffer = frame_buffer
+        self.volume = volume
 
         # Call the AbstractOpus constructor, as we need properties it sets
         AbstractOpus.__init__(self, *args, **kwargs)
@@ -224,17 +176,31 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
 
     def _encoder_loop(self):
         while self.source:
-            raw = self.source.read(self.frame_size)
-            if len(raw) < self.frame_size:
-                break
+            if len(self.frames.queue) < self.frame_buffer:
+                if self._volume != 1.0:
+                    raw = audioop.mul(self.source.read(self.frame_size), 2, min(self._volume, 2.0))
+                else:
+                    raw = self.source.read(self.frame_size)
+                if len(raw) < self.frame_size:
+                    break
 
-            self.frames.put(self.encode(raw, self.samples_per_frame))
+                self.frames.put(self.encode(raw, self.samples_per_frame))
             gevent.idle()
         self.source = None
         self.frames.put(None)
 
     def next_frame(self):
         return self.frames.get()
+
+    @property
+    def volume(self):
+        return self._volume
+
+    @volume.setter
+    def volume(self, value):
+        if 0.0 > value:
+            raise Exception('Volume accepts float values between 0.0 and 1.0 only')
+        self._volume = max(value, 0.0)
 
 
 class PlaylistPlayable(BasePlayable, AbstractOpus):

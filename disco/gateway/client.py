@@ -268,7 +268,7 @@ class GatewayClient(LoggingClass):
             raise Exception('Failed to reconnect after {} attempts, giving up'.format(self.max_reconnects))
 
         # Don't resume for these error codes
-        if code and 4000 < code <= 4010 or code == 1001:
+        if code and (4000 < code <= 4010 or code == 1001):
             self.session_id = None
 
         wait_time = (self.reconnects if self.reconnects > 1 else 0) * 5 if self.reconnects < 6 else 30

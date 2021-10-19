@@ -3,8 +3,6 @@ import ctypes
 import ctypes.util
 import sys
 
-from holster.enum import Enum
-
 from disco.util.logging import LoggingClass
 
 
@@ -58,19 +56,17 @@ class BaseOpus(LoggingClass):
         return ctypes.util.find_library('opus')
 
 
-Application = Enum(
-    AUDIO=2049,
-    VOIP=2048,
-    LOWDELAY=2051,
-)
+class Application(object):
+    AUDIO = 2049
+    VOIP = 2048
+    LOWDELAY = 2051
 
 
-Control = Enum(
-    SET_BITRATE=4002,
-    SET_BANDWIDTH=4008,
-    SET_FEC=4012,
-    SET_PLP=4014,
-)
+class Control(object):
+    SET_BITRATE = 4002
+    SET_BANDWIDTH = 4008
+    SET_FEC = 4012
+    SET_PLP = 4014
 
 
 class OpusEncoder(BaseOpus):
@@ -120,7 +116,7 @@ class OpusEncoder(BaseOpus):
 
     def create(self):
         ret = ctypes.c_int()
-        result = self.opus_encoder_create(self.sampling_rate, self.channels, self.application.value, ctypes.byref(ret))
+        result = self.opus_encoder_create(self.sampling_rate, self.channels, self.application, ctypes.byref(ret))
 
         if ret.value != 0:
             raise Exception('Failed to create opus encoder: {}'.format(ret.value))

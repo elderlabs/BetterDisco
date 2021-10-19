@@ -105,7 +105,7 @@ class UDPVoiceClient(LoggingClass):
 
         ptype = RTPPayloadTypes.get(codec)
         self._rtp_audio_header[1] = ptype.value
-        self.log.debug('[%s] Set UDP\'s Audio Codec to %s, RTP payload type %s', self.vc, ptype.name, ptype.value)
+        self.log.debug('[{}] Set UDP\'s Audio Codec to {}, RTP payload type {}'.format(self.vc, ptype.name, ptype.value))
 
     def increment_timestamp(self, by):
         self.timestamp += by
@@ -170,7 +170,7 @@ class UDPVoiceClient(LoggingClass):
 
             # Data cannot be less than the bare minimum, just ignore
             if len(data) <= 12:
-                self.log.debug('[%s] [VoiceData] Received voice data under 13 bytes', self.vc)
+                self.log.debug('[{}] [VoiceData] Received voice data under 13 bytes'.format(self.vc))
                 continue
 
             first, second = struct.unpack_from('>BB', data)
@@ -222,14 +222,14 @@ class UDPVoiceClient(LoggingClass):
 
                 # Check if rtp version is 2
                 if rtp.version != 2:
-                    self.log.debug('[%s] [VoiceData] Received an invalid RTP packet version, %s', self.vc, rtp.version)
+                    self.log.debug('[{}] [VoiceData] Received an invalid RTP packet version, {}'.format(self.vc, rtp.version))
                     continue
 
                 payload_type = RTPPayloadTypes.get(rtp.payload_type)
 
                 # Unsupported payload type received
                 if not payload_type:
-                    self.log.debug('[%s] [VoiceData] Received unsupported payload type, %s', self.vc, rtp.payload_type)
+                    self.log.debug('[{}] [VoiceData] Received unsupported payload type, {}'.format(self.vc, rtp.payload_type))
                     continue
 
                 nonce = bytearray(24)
@@ -242,13 +242,13 @@ class UDPVoiceClient(LoggingClass):
                 elif self.vc.mode == 'xsalsa20_poly1305':
                     nonce[:12] = data[:12]
                 else:
-                    self.log.debug('[%s] [VoiceData] Unsupported Encryption Mode, %s', self.vc, self.vc.mode)
+                    self.log.debug('[{}] [VoiceData] Unsupported Encryption Mode, {}'.format(self.vc, self.vc.mode))
                     continue
 
                 try:
                     data = self._secret_box.decrypt(bytes(data[12:]), bytes(nonce))
                 except Exception:
-                    self.log.debug('[%s] [VoiceData] Failed to decode data from ssrc %s', self.vc, rtp.ssrc)
+                    self.log.debug('[{}] [VoiceData] Failed to decode data from ssrc {}'.format(self.vc, rtp.ssrc))
                     continue
 
                 # RFC3550 Section 5.1 (Padding)
@@ -292,7 +292,7 @@ class UDPVoiceClient(LoggingClass):
                 # RFC3550 Section 5.3: Profile-Specific Modifications to the RTP Header
                 # clients send it sometimes, definitely on fresh connects to a server, dunno what to do here
                 if rtp.marker:
-                    self.log.debug('[%s] [VoiceData] Received RTP data with the marker set, skipping', self.vc)
+                    self.log.debug('[{}] [VoiceData] Received RTP data with the marker set, skipping'.format(self.vc))
                     continue
 
                 payload = VoiceData(
