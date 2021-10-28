@@ -11,7 +11,7 @@ from disco.types.user import User
 WEBHOOK_URL_RE = re.compile(r'/api/webhooks/(\d+)/(.[^/]+)')
 
 
-class WebhookTypes(object):
+class WebhookTypes:
     INCOMING = 1
     CHANNEL_FOLLOWER = 2
     APPLICATION = 3

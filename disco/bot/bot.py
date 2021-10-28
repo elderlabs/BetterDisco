@@ -570,6 +570,7 @@ class Bot(LoggingClass):
         if os.path.exists(path):
             with open(path, 'r') as f:
                 data.update(Serializer.loads(self.config.plugin_config_format, f.read()))
+                f.close()
 
         if hasattr(cls, 'config_cls'):
             inst = cls.config_cls()

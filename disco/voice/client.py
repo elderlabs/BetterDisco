@@ -14,14 +14,14 @@ from disco.voice.packets import VoiceOPCode
 from disco.voice.udp import AudioCodecs, RTPPayloadTypes, UDPVoiceClient
 
 
-class SpeakingFlags(object):
+class SpeakingFlags:
     NONE = 0
     VOICE = 1 << 0
     SOUNDSHARE = 1 << 1
     PRIORITY = 1 << 2
 
 
-class VoiceState(object):
+class VoiceState:
     DISCONNECTED = 'DISCONNECTED'
     AWAITING_ENDPOINT = 'AWAITING_ENDPOINT'
     AUTHENTICATING = 'AUTHENTICATING'

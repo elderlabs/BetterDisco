@@ -16,12 +16,12 @@ from disco.types.message import Emoji, Sticker, StickerFormatTypes
 from disco.types.permissions import PermissionValue, Permissions, Permissible
 
 
-class MFALevel(object):
+class MFALevel:
     NONE = 0
     ELEVATED = 1
 
 
-class VerificationLevel(object):
+class VerificationLevel:
     NONE = 0
     LOW = 1
     MEDIUM = 2
@@ -29,39 +29,39 @@ class VerificationLevel(object):
     EXTREME = 4
 
 
-class GuildNSFWLevel(object):
+class GuildNSFWLevel:
     DEFAULT = 0
     EXPLICIT = 1
     SAFE = 2
     AGE_RESTRICTED = 3
 
 
-class ExplicitContentFilterLevel(object):
+class ExplicitContentFilterLevel:
     NONE = 0
     WITHOUT_ROLES = 1
     ALL = 2
 
 
-class DefaultMessageNotificationsLevel(object):
+class DefaultMessageNotificationsLevel:
     ALL_MESSAGES = 0
     ONLY_MENTIONS = 1
 
 
-class PremiumTier(object):
+class PremiumTier:
     NONE = 0
     TIER_1 = 1
     TIER_2 = 2
     TIER_3 = 3
 
 
-class SystemChannelFlag(object):
+class SystemChannelFlag:
     NONE = 0
     SUPPRESS_JOIN_NOTIFICATIONS = 1 << 0
     SUPPRESS_PREMIUM_SUBSCRIPTIONS = 1 << 1
     SUPPRESS_GUILD_REMINDER_NOTIFICATIONS = 1 << 2
 
 
-class GuildFeatures(object):
+class GuildFeatures:
     ANIMATED_ICON = 'ANIMATED_ICON'
     BANNER = 'BANNER'
     COMMERCE = 'COMMERCE'
@@ -86,14 +86,14 @@ class GuildFeatures(object):
     PRIVATE_THREADS = 'PRIVATE_THREADS'
 
 
-class WelcomeScreenChannel(object):
+class WelcomeScreenChannel:
     channel_id = Field(snowflake)
     description = Field(text)
     emoji_id = Field(snowflake)
     emoji_name = Field(text)
 
 
-class WelcomeScreen(object):
+class WelcomeScreen:
     description = Field(text)
     welcome_channels = AutoDictField(WelcomeScreenChannel, 'channel_id')
 
@@ -772,7 +772,7 @@ class Guild(SlottedModel, Permissible):
         return self.client.api.guilds_discovery_requirements(self.id)
 
 
-class AuditLogActionTypes(object):
+class AuditLogActionTypes:
     GUILD_UPDATE = 1
     CHANNEL_CREATE = 10
     CHANNEL_UPDATE = 11

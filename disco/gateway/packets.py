@@ -2,7 +2,7 @@ SEND = 1
 RECV = 2
 
 
-class OPCode(object):
+class OPCode:
     DISPATCH = 0
     HEARTBEAT = 1
     IDENTIFY = 2

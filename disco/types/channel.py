@@ -12,7 +12,7 @@ from disco.util.snowflake import to_snowflake
 NSFW_RE = re.compile('^nsfw(-|$)')
 
 
-class ChannelType(object):
+class ChannelType:
     GUILD_TEXT = 0
     DM = 1
     GUILD_VOICE = 2
@@ -27,7 +27,7 @@ class ChannelType(object):
     GUILD_DIRECTORY = 14
 
 
-class PermissionOverwriteType(object):
+class PermissionOverwriteType:
     ROLE = 'role'
     MEMBER = 'member'
 
@@ -96,7 +96,7 @@ class PermissionOverwrite(ChannelSubType):
         self.client.api.channels_permissions_delete(self.channel_id, self.id, **kwargs)
 
 
-class VideoQualityModes(object):
+class VideoQualityModes:
     AUTO = 1
     FULL = 2
 
@@ -629,7 +629,7 @@ class Channel(SlottedModel, Permissible):
         )
 
 
-class MessageIterator(object):
+class MessageIterator:
     """
     An iterator which supports scanning through the messages for a channel.
 
@@ -651,7 +651,7 @@ class MessageIterator(object):
     chunk_size : int
         The number of messages to request per API call.
     """
-    class Direction(object):
+    class Direction:
         UP = 1
         DOWN = 2
 
@@ -717,7 +717,7 @@ class MessageIterator(object):
             return self._buffer.pop()
 
 
-class StageInstancePrivacyLevel(object):
+class StageInstancePrivacyLevel:
     PUBLIC = 1
     GUILD_ONLY = 2
 

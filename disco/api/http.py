@@ -11,7 +11,7 @@ from disco.util.logging import LoggingClass
 from disco.api.ratelimit import RateLimiter
 
 
-class HTTPMethod(object):
+class HTTPMethod:
     GET = 'GET'
     POST = 'POST'
     PUT = 'PUT'
@@ -31,7 +31,7 @@ def random_backoff():
     return random.randint(500, 5000) / 1000.0
 
 
-class Routes(object):
+class Routes:
     """
     Simple Python object-enum of all method/url route combinations available to
     this client.
@@ -236,7 +236,7 @@ class Routes(object):
     STAGES_DELETE = (HTTPMethod.DELETE, STAGES + '/{channel}')
 
 
-class APIResponse(object):
+class APIResponse:
     def __init__(self):
         self.response = None
         self.exception = None

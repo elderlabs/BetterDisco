@@ -8,7 +8,7 @@ from websocket import WebSocketConnectionClosedException
 from disco.util.logging import LoggingClass
 
 
-class Priority(object):
+class Priority:
     # BEFORE is the most dangerous priority level. Every event that flows through
     #  the given emitter instance will be dispatched _sequentially_ to all BEFORE
     #  handlers. Until these before handlers complete execution, no other event
@@ -31,7 +31,7 @@ class Priority(object):
     ALL = {BEFORE, AFTER, SEQUENTIAL, NONE}
 
 
-class Event(object):
+class Event:
     def __init__(self, parent, data):
         self.parent = parent
         self.data = data
@@ -42,7 +42,7 @@ class Event(object):
         raise AttributeError
 
 
-class EmitterSubscription(object):
+class EmitterSubscription:
     def __init__(self, events, callback, priority=Priority.NONE, conditional=None, metadata=None, max_queue_size=8096):
         self.events = events
         self.callback = callback

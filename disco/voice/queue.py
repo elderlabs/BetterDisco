@@ -6,7 +6,7 @@ from six import add_metaclass
 
 
 @add_metaclass(abc.ABCMeta)
-class BaseQueue(object):
+class BaseQueue:
     @abc.abstractmethod
     def get(self):
         raise NotImplementedError

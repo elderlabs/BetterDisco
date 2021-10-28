@@ -56,13 +56,13 @@ class BaseOpus(LoggingClass):
         return ctypes.util.find_library('opus')
 
 
-class Application(object):
+class Application:
     AUDIO = 2049
     VOIP = 2048
     LOWDELAY = 2051
 
 
-class Control(object):
+class Control:
     SET_BITRATE = 4002
     SET_BANDWIDTH = 4008
     SET_FEC = 4012

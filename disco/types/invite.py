@@ -5,7 +5,7 @@ from disco.types.channel import Channel
 from disco.types.oauth import Application
 
 
-class InviteTargetTypes(object):
+class InviteTargetTypes:
     STREAM = 1
     EMBEDDED_APPLICATION = 2
 

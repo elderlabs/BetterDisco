@@ -38,7 +38,7 @@ class StorageDict(UserDict):
         self._parent._update()
 
 
-class Storage(object):
+class Storage:
     def __init__(self, ctx, config):
         self._ctx = ctx
         self._path = config.path
@@ -51,6 +51,7 @@ class Storage(object):
                 self._data = Serializer.loads(self._serializer, f.read())
                 if not self._data:
                     self._data = {}
+                f.close()
 
     def __getitem__(self, key):
         if key not in self._data:
@@ -67,6 +68,7 @@ class Storage(object):
 
         with open(self._path, 'w') as f:
             f.write(Serializer.dumps(self._serializer, self._data))
+            f.close()
 
     def guild(self, key):
         return ContextAwareProxy(

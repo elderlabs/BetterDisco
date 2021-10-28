@@ -26,7 +26,7 @@ def setup_logging(**kwargs):
         logging.getLogger(logger).setLevel(level)
 
 
-class LoggingClass(object):
+class LoggingClass:
     __slots__ = ['_log']
 
     @property

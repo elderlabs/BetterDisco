@@ -1,4 +1,4 @@
-class VoiceOPCode(object):
+class VoiceOPCode:
     IDENTIFY = 0
     SELECT_PROTOCOL = 1
     READY = 2

@@ -62,7 +62,7 @@ class PermissionValue(BitsetValue):
         return cls(66060288)
 
 
-class Permissible(object):
+class Permissible:
     __slots__ = []
 
     def get_permissions(self):

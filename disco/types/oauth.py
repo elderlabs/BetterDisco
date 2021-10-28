@@ -3,7 +3,7 @@ from disco.types.user import User
 from disco.util.snowflake import to_snowflake
 
 
-class TeamMembershipState(object):
+class TeamMembershipState:
     INVITED = 1
     ACCEPTED = 2
 
@@ -23,7 +23,7 @@ class Team(SlottedModel):
     owner_user_id = Field(snowflake)
 
 
-class ApplicationFlags(object):
+class ApplicationFlags:
     NONE = 0
     GATEWAY_PRESENCE = 1 << 12
     GATEWAY_PRESENCE_LIMITED = 1 << 13

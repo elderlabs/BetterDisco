@@ -19,7 +19,7 @@ except ImportError:
 OPUS_HEADER_SIZE = struct.calcsize('<h')
 
 
-class AbstractOpus(object):
+class AbstractOpus:
     def __init__(self, sampling_rate=48000, frame_length=20, channels=2):
         self.sampling_rate = sampling_rate
         self.frame_length = frame_length
@@ -29,7 +29,7 @@ class AbstractOpus(object):
         self.frame_size = self.samples_per_frame * self.sample_size
 
 
-class BaseUtil(object):
+class BaseUtil:
     def pipe(self, other, *args, **kwargs):
         child = other(self, *args, **kwargs)
         setattr(child, 'metadata', self.metadata)

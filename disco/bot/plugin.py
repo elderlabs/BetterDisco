@@ -62,7 +62,7 @@ def find_loadable_plugins(mod):
         yield modattr
 
 
-class BasePluginDeco(object):
+class BasePluginDeco:
     Prio = Priority
 
     # TODO: don't smash class methods

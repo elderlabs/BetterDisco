@@ -8,7 +8,7 @@ class IntegrationAccount(SlottedModel):
     name = Field(text)
 
 
-class IntegrationExpireBehaviors(object):
+class IntegrationExpireBehaviors:
     REMOVAL_ROLE = 0
     KICK = 1
 
@@ -40,7 +40,7 @@ class Integration(SlottedModel):
     application = Field(Application)
 
 
-class UserConnectionVisibilityType(object):
+class UserConnectionVisibilityType:
     NONE = 0
     EVERYONE = 1
 

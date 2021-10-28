@@ -3,7 +3,7 @@ import os
 from .serializer import Serializer
 
 
-class Config(object):
+class Config:
     def __init__(self, obj=None):
         self.__dict__.update({
             k: getattr(self, k) for k in dir(self.__class__)
@@ -31,6 +31,7 @@ class Config(object):
 
         with open(path, 'r') as f:
             data = f.read()
+            f.close()
 
         _, ext = os.path.splitext(path)
         Serializer.check_format(ext[1:])

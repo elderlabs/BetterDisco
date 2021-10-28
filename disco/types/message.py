@@ -16,7 +16,7 @@ from disco.types.channel import ChannelType, Channel
 from disco.types.user import User
 
 
-class MessageType(object):
+class MessageType:
     DEFAULT = 0
     RECIPIENT_ADD = 1
     RECIPIENT_REMOVE = 2
@@ -42,7 +42,7 @@ class MessageType(object):
     GUILD_INVITE_REMINDER = 22
 
 
-class MessageActivityType(object):
+class MessageActivityType:
     JOIN = 1
     SPECTATE = 2
     LISTEN = 3
@@ -411,7 +411,7 @@ class ChannelMention(SlottedModel):
     name = Field(text)
 
 
-class AllowedMentionsTypes(object):
+class AllowedMentionsTypes:
     ROLE = 'role'
     USER = 'user'
     EVERYONE = 'everyone'
@@ -439,12 +439,12 @@ class MessageFlagValue(BitsetValue):
     map = MessageFlags
 
 
-class StickerTypes(object):
+class StickerTypes:
     STANDARD = 1
     GUILD = 2
 
 
-class StickerFormatTypes(object):
+class StickerFormatTypes:
     PNG = 1
     APNG = 2
     LOTTIE = 3
@@ -480,7 +480,7 @@ class StickerPack(SlottedModel):
     banner_asset_id = Field(snowflake)
 
 
-class MessageInteractionType(object):
+class MessageInteractionType:
     PING = 1
     APPLICATION_COMMAND = 2
 
@@ -492,7 +492,7 @@ class MessageInteraction(SlottedModel):
     user = Field(User)
 
 
-class ButtonStyles(object):
+class ButtonStyles:
     PRIMARY = 1
     SECONDARY = 2
     SUCCESS = 3
@@ -500,7 +500,7 @@ class ButtonStyles(object):
     LINK = 5
 
 
-class ComponentTypes(object):
+class ComponentTypes:
     ACTION_ROW = 1
     BUTTON = 2
     SELECT_MENU = 3
@@ -899,7 +899,7 @@ class Message(SlottedModel):
         return content
 
 
-class MessageTable(object):
+class MessageTable:
     def __init__(self, sep=' | ', codeblock=True, header_break=True, language=None):
         self.header = []
         self.entries = []

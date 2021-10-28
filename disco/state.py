@@ -57,7 +57,7 @@ class StateConfig(Config):
     sync_guild_members = True
 
 
-class State(object):
+class State:
     """
     The State class is used to track global state based on events emitted from
     the `GatewayClient`. State tracking is a core component of the Disco client,

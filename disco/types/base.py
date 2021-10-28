@@ -23,7 +23,7 @@ def get_item_by_path(obj, path):
     return obj
 
 
-class Unset(object):
+class Unset:
     def __nonzero__(self):
         return False
 
@@ -62,7 +62,7 @@ class ConversionError(Exception):
         self.__cause__ = e
 
 
-class Field(object):
+class Field:
     def __init__(self, value_type, alias=None, default=None, create=True, ignore_dump=None, cast=None, **kwargs):
         self.true_type = value_type
         self.src_name = alias
@@ -250,7 +250,7 @@ def str_or_int(obj):
 
 
 def with_equality(field):
-    class T(object):
+    class T:
         def __eq__(self, other):
             if isinstance(other, self.__class__):
                 return getattr(self, field) == getattr(other, field)
@@ -260,7 +260,7 @@ def with_equality(field):
 
 
 def with_hash(field):
-    class T(object):
+    class T:
         def __hash__(self):
             return hash(getattr(self, field))
     return T
@@ -442,7 +442,7 @@ class SlottedModel(Model):
     __slots__ = ['client']
 
 
-class BitsetMap(object):
+class BitsetMap:
     @classmethod
     def keys(cls):
         for k, v in cls.__dict__.items():
@@ -450,7 +450,7 @@ class BitsetMap(object):
                 yield k
 
 
-class BitsetValue(object):
+class BitsetValue:
     __slots__ = ['value', 'map']
 
     def __init__(self, value=0):

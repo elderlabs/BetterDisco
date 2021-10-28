@@ -27,7 +27,7 @@ def run_shard(config, shard_id, pipe):
     bot.run_forever()
 
 
-class ShardHelper(object):
+class ShardHelper:
     def __init__(self, count, bot):
         self.count = count
         self.bot = bot
@@ -59,7 +59,7 @@ class ShardHelper(object):
         return self.on(shard, func)
 
 
-class AutoSharder(object):
+class AutoSharder:
     def __init__(self, config):
         self.config = config
         self.client = APIClient(config.token)

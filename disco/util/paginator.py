@@ -1,7 +1,7 @@
 import operator
 
 
-class Paginator(object):
+class Paginator:
     """
     Implements a class which provides paginated iteration over an endpoint.
     """

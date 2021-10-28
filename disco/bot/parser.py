@@ -44,7 +44,7 @@ class ArgumentError(Exception):
     """
 
 
-class Argument(object):
+class Argument:
     """
     A single argument, which is normally the member of a :class:`ArgumentSet`.
 
@@ -103,7 +103,7 @@ class Argument(object):
         self.name = part.strip()
 
 
-class ArgumentSet(object):
+class ArgumentSet:
     """
     A set of :class:`Argument` instances which forms a larger argument specification.
 

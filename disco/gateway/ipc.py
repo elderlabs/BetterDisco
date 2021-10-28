@@ -11,7 +11,7 @@ def get_random_str(size):
     return ''.join([random.choice(string.printable) for _ in range(size)])
 
 
-class IPCMessageType(object):
+class IPCMessageType:
     CALL_FUNC = 1
     GET_ATTR = 2
     EXECUTE = 3

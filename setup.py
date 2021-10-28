@@ -5,28 +5,30 @@ from disco import VERSION
 
 with open('requirements.txt') as f:
     requirements = f.readlines()
+    f.close()
 
 with open('README.md') as f:
     readme = f.read()
+    f.close()
 
 extras_require = {
     'voice': ['telecom-py==0.0.4'],
-    'http': ['flask==1.1.2'],
-    'yaml': ['pyyaml==5.3.1'],
-    'music': ['youtube_dl>=2018.1.21'],
+    'http': ['flask>=1.1.2'],
+    'yaml': ['pyyaml>=5.3.1'],
+    'music': ['yt-dlp>=2021.10.10'],
     'performance': [
-        'earl-etf==2.1.2',
-        'regex==2021.4.4',
-        'ujson==3.2.0',
-        'wsaccel==0.6.3',
+        'earl-etf>=2.1.2',
+        'regex>=2021.4.4',
+        'ujson>=3.2.0',
+        'wsaccel>=0.6.3',
     ],
-    'sharding': ['gipc==1.3.0'],
+    'sharding': ['gipc>=1.3.0'],
 }
 
 setup(
-    name='disco-py',
-    author='b1nzy',
-    url='https://github.com/b1naryth1ef/disco',
+    name='betterdisco-py',
+    author='The BetterDisco Team; b1nzy',
+    url='https://github.com/elderlabs/betterdisco',
     version=VERSION,
     packages=find_packages(include=['disco*']),
     license='MIT',
@@ -44,6 +46,7 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'Topic :: Internet',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules',

@@ -6,7 +6,7 @@ from disco.types.base import (
 )
 
 
-class DefaultAvatars(object):
+class DefaultAvatars:
     BLURPLE = 0
     GREY = 1
     GREEN = 2
@@ -16,7 +16,7 @@ class DefaultAvatars(object):
     ALL = [BLURPLE, GREY, GREEN, ORANGE, RED]
 
 
-class UserFlags(object):
+class UserFlags:
     NONE = 0
     DISCORD_EMPLOYEE = 1 << 0
     DISCORD_PARTNER = 1 << 1
@@ -39,7 +39,7 @@ class UserFlags(object):
     CERTIFIED_MOD = 1 << 18
 
 
-class PremiumType(object):
+class PremiumType:
     NONE = 0
     CLASSIC = 1
     NITRO = 2
@@ -102,7 +102,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
         return '<User {} ({})>'.format(self.id, self)
 
 
-class ActivityTypes(object):
+class ActivityTypes:
     DEFAULT = 0
     STREAMING = 1
     LISTENING = 2
@@ -111,7 +111,7 @@ class ActivityTypes(object):
     COMPETING = 5
 
 
-class Status(object):
+class Status:
     ONLINE = 'ONLINE'
     IDLE = 'IDLE'
     DND = 'DND'
@@ -156,7 +156,7 @@ class ActivityTimestamps(SlottedModel):
         return datetime.utcfromtimestamp(self.end / 1000)
 
 
-class ActivityFlags(object):
+class ActivityFlags:
     INSTANCE = 1 << 0
     JOIN = 1 << 1
     SPECTATE = 1 << 2

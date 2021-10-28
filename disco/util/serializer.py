@@ -1,7 +1,7 @@
 import types
 
 
-class Serializer(object):
+class Serializer:
     FORMATS = {
         'json',
         'yaml',

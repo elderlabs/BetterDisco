@@ -2,7 +2,7 @@ import gevent
 import weakref
 
 
-class ThreadLocal(object):
+class ThreadLocal:
     ___slots__ = ['storage']
 
     def __init__(self):

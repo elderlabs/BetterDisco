@@ -9,7 +9,7 @@ from disco.voice.queue import PlayableQueue
 
 
 class Player(LoggingClass):
-    class Events(object):
+    class Events:
         START_PLAY = 'START_PLAY'
         STOP_PLAY = 'STOP_PLAY'
         PAUSE_PLAY = 'PAUSE_PLAY'

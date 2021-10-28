@@ -5,7 +5,7 @@ from disco.types.message import MessageEmbed, AllowedMentions, MessageFlagValue,
 from disco.types.user import User
 
 
-class ApplicationCommandOptionType(object):
+class ApplicationCommandOptionType:
     SUB_COMMAND = 1
     SUB_COMMAND_GROUP = 2
     STRING = 3
@@ -53,7 +53,7 @@ class ApplicationCommandInteractionDataOption(_ApplicationCommandInteractionData
     options = ListField(_ApplicationCommandInteractionDataOption)
 
 
-class ComponentTypes(object):
+class ComponentTypes:
     ACTION_ROW = 1
     BUTTON = 2
 
@@ -78,7 +78,7 @@ class ApplicationCommand(SlottedModel):
     version = Field(snowflake)
 
 
-class ApplicationCommandPermissionType(object):
+class ApplicationCommandPermissionType:
     ROLE = 1
     USER = 2
 
@@ -96,7 +96,7 @@ class GuildApplicationCommandPermissions(SlottedModel):
     permissions = ListField(ApplicationCommandPermissions)
 
 
-class InteractionType(object):
+class InteractionType:
     PING = 1
     APPLICATION_COMMAND = 2
     MessageComponent = 3
@@ -142,7 +142,7 @@ class Interaction(SlottedModel):
         return self.client.api.interactions_followup_delete(self.token)
 
 
-class InteractionCallbackType(object):
+class InteractionCallbackType:
     PONG = 1
     # ACKNOWLEDGE = 2
     # CHANNEL_MESSAGE = 3
@@ -152,7 +152,7 @@ class InteractionCallbackType(object):
     UPDATE_MESSAGE = 7
 
 
-class InteractionResponseFlags(object):
+class InteractionResponseFlags:
     EPHEMERAL = 1 << 6
 
 
