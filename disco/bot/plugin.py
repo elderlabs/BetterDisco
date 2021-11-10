@@ -1,7 +1,6 @@
 import types
 import gevent
 import inspect
-import weakref
 import warnings
 import functools
 
@@ -237,7 +236,7 @@ class Plugin(LoggingClass, PluginDeco):
         self.listeners = []
         self.commands = []
         self.schedules = {}
-        self.greenlets = weakref.WeakSet()
+        self.greenlets = set()
         self._pre = {}
         self._post = {}
 
@@ -263,7 +262,7 @@ class Plugin(LoggingClass, PluginDeco):
         self.listeners = []
         self.commands = []
         self.schedules = {}
-        self.greenlets = weakref.WeakSet()
+        self.greenlets = set()
 
         self._pre = {'command': [], 'listener': []}
         self._post = {'command': [], 'listener': []}

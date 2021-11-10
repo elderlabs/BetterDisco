@@ -250,7 +250,10 @@ class GatewayClient(LoggingClass):
         #  respawn it
         if self._heartbeat_task:
             self.log.info('WS Closed: killing heartbeater')
-            self._heartbeat_task.kill()
+            try:
+                self._heartbeat_task.kill(timeout=5)
+            except TimeoutError:
+                self.log.info('Heartbeater kill timeout')
 
         # If we're quitting, just break out of here
         if self.shutting_down:

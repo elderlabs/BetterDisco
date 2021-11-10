@@ -1,7 +1,6 @@
 from collections import deque, namedtuple
 from gevent.event import Event
 
-from disco.types.base import UNSET
 from disco.util.config import Config
 from disco.util.string import underscore
 from disco.util.hashmap import HashMap, DefaultHashMap
@@ -228,7 +227,7 @@ class State:
 
     def on_guild_delete(self, event):
         if hasattr(event, 'guild'):
-            if event.guild.unavailable:
+            if event.unavailable:
                 return
 
         if event.id in self.guilds:
@@ -336,23 +335,23 @@ class State:
         else:
             event.member.user = self.users[event.member.user.id]
 
-        if event.member.guild_id not in self.guilds:
+        if event.guild_id not in self.guilds:
             return
 
         # Avoid adding duplicate events to member_count.
-        if event.member.id not in self.guilds[event.member.guild_id].members:
-            self.guilds[event.member.guild_id].member_count += 1
+        if event.member.id not in self.guilds[event.guild_id].members:
+            self.guilds[event.guild_id].member_count += 1
 
-        self.guilds[event.member.guild_id].members[event.member.id] = event.member
+        self.guilds[event.guild_id].members[event.member.id] = event.member
 
     def on_guild_member_update(self, event):
-        if event.member.guild_id not in self.guilds:
+        if event.guild_id not in self.guilds:
             return
 
-        if event.member.id not in self.guilds[event.member.guild_id].members:
+        if event.member.id not in self.guilds[event.guild_id].members:
             return
 
-        self.guilds[event.member.guild_id].members[event.member.id].inplace_update(event.member)
+        self.guilds[event.guild_id].members[event.member.id].inplace_update(event.member)
 
         if not event.user.id in self.users:
             self.users[event.user.id] = event.user
@@ -366,12 +365,11 @@ class State:
         if event.guild_id not in self.guilds:
             return
 
-        self.guilds[event.guild_id].members.pop(event.user.id, None)
-
         if event.user.id not in self.guilds[event.guild_id].members:
             return
 
         self.guilds[event.guild_id].member_count -= 1
+        del self.guilds[event.guild_id].members[event.user.id]
 
     def on_guild_members_chunk(self, event):
         if event.guild_id not in self.guilds:

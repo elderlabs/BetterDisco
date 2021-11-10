@@ -1,7 +1,6 @@
 import random
 import gevent
 import string
-import weakref
 
 from disco.util.logging import LoggingClass
 from disco.util.serializer import dump_function, load_function
@@ -23,7 +22,7 @@ class GIPCProxy(LoggingClass):
         super(GIPCProxy, self).__init__()
         self.obj = obj
         self.pipe = pipe
-        self.results = weakref.WeakValueDictionary()
+        self.results = {}
         gevent.spawn(self.read_loop)
 
     def resolve(self, parts):
