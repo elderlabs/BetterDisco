@@ -702,18 +702,16 @@ class Guild(SlottedModel, Permissible):
     def get_voice_regions(self):
         return self.client.api.guilds_voice_regions_list(self.id)
 
-    def get_icon_url(self, still_format='webp', animated_format='gif', size=1024):
+    def get_icon_url(self, fmt=None, size=1024):
         if not self.icon:
             return ''
 
-        if self.icon.startswith('a_'):
-            return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}'.format(
-                self.id, self.icon, animated_format, size
-            )
-        else:
-            return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}'.format(
-                self.id, self.icon, still_format, size
-            )
+        if not fmt:
+            fmt = 'gif' if self.icon.startswith('a_') else 'webp'
+        elif fmt == 'gif' and not self.icon.startswith('a_'):
+            fmt = 'webp'
+
+        return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}'.format(self.id, self.icon, fmt, size)
 
     def get_vanity_url(self):
         if not self.vanity_url_code:
@@ -721,15 +719,25 @@ class Guild(SlottedModel, Permissible):
 
         return 'https://discord.gg/' + self.vanity_url_code
 
-    def get_splash_url(self, fmt='webp', size=1024):
+    def get_splash_url(self, fmt=None, size=1024):
         if not self.splash:
             return ''
 
+        if not fmt:
+            fmt = 'gif' if self.splash.startswith('a_') else 'webp'
+        elif fmt == 'gif' and not self.splash.startswith('a_'):
+            fmt = 'webp'
+
         return 'https://cdn.discordapp.com/splashes/{}/{}.{}?size={}'.format(self.id, self.splash, fmt, size)
 
-    def get_banner_url(self, fmt='webp', size=1024):
+    def get_banner_url(self, fmt=None, size=1024):
         if not self.banner:
             return ''
+
+        if not fmt:
+            fmt = 'gif' if self.banner.startswith('a_') else 'webp'
+        elif fmt == 'gif' and not self.banner.startswith('a_'):
+            fmt = 'webp'
 
         return 'https://cdn.discordapp.com/banners/{}/{}.{}?size={}'.format(self.id, self.banner, fmt, size)
 
