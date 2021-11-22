@@ -1,11 +1,13 @@
-from disco.types.base import SlottedModel, Field, datetime, enum, snowflake
+from disco.types.base import SlottedModel, Field, datetime, text
 from disco.types.user import User
 from disco.types.guild import Guild
 from disco.types.channel import Channel
+from disco.types.oauth import Application
 
 
-class InviteTargetUserType(object):
+class InviteTargetTypes:
     STREAM = 1
+    EMBEDDED_APPLICATION = 2
 
 
 class Invite(SlottedModel):
@@ -41,14 +43,16 @@ class Invite(SlottedModel):
     created_at : datetime
         When this invite was created.
     """
-    code = Field(str)
+    code = Field(text)
     guild = Field(Guild)
     channel = Field(Channel)
-    target_user_id = Field(snowflake)
-    target_user_type = Field(enum(InviteTargetUserType))
+    inviter = Field(User)
+    target_type = Field(int)
+    target_user = Field(User)
+    target_application = Field(Application)
     approximate_presence_count = Field(int)
     approximate_member_count = Field(int)
-    inviter = Field(User)
+    expires_at = Field(datetime)
     uses = Field(int)
     max_uses = Field(int)
     max_age = Field(int)

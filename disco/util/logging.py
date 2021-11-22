@@ -1,5 +1,6 @@
-import warnings
 import logging
+import sys
+import warnings
 
 
 LEVEL_OVERRIDES = {
@@ -11,6 +12,7 @@ LOG_FORMAT = '[%(levelname)s] %(asctime)s - %(name)s:%(lineno)d - %(message)s'
 
 def setup_logging(**kwargs):
     kwargs.setdefault('format', LOG_FORMAT)
+    kwargs.setdefault('stream', sys.stdout)
 
     # Setup warnings module correctly
     warnings.simplefilter('always', DeprecationWarning)
@@ -24,7 +26,7 @@ def setup_logging(**kwargs):
         logging.getLogger(logger).setLevel(level)
 
 
-class LoggingClass(object):
+class LoggingClass:
     __slots__ = ['_log']
 
     @property

@@ -8,7 +8,7 @@ Object.async_chain -> creates an async chain where each action happens at the sa
 """
 
 
-class Chainable(object):
+class Chainable:
     __slots__ = []
 
     def chain(self, pass_result=True):
@@ -18,7 +18,7 @@ class Chainable(object):
         return Chain(self, pass_result=False, async_=True)
 
 
-class Chain(object):
+class Chain:
     def __init__(self, obj, pass_result=True, async_=False):
         self._obj = obj
         self._pass_result = pass_result

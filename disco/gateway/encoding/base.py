@@ -1,7 +1,7 @@
 from websocket import ABNF
 
 
-class BaseEncoder(object):
+class BaseEncoder:
     TYPE = None
     OPCODE = ABNF.OPCODE_TEXT
 

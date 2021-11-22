@@ -27,7 +27,7 @@ def run_shard(config, shard_id, pipe):
     bot.run_forever()
 
 
-class ShardHelper(object):
+class ShardHelper:
     def __init__(self, count, bot):
         self.count = count
         self.bot = bot
@@ -59,7 +59,7 @@ class ShardHelper(object):
         return self.on(shard, func)
 
 
-class AutoSharder(object):
+class AutoSharder:
     def __init__(self, config):
         self.config = config
         self.client = APIClient(config.token)
@@ -86,18 +86,18 @@ class AutoSharder(object):
     @staticmethod
     def dumps(data):
         if isinstance(data, (str, int, bool, list, set, dict)):
-            return '\x01' + marshal.dumps(data)
+            return b'\x01' + marshal.dumps(data)
         elif isinstance(data, object) and data.__class__.__name__ == 'code':
-            return '\x01' + marshal.dumps(data)
+            return b'\x01' + marshal.dumps(data)
         else:
-            return '\x02' + pickle.dumps(data)
+            return b'\x02' + pickle.dumps(data)
 
     @staticmethod
     def loads(data):
         enc_type = data[0]
-        if enc_type == '\x01':
+        if enc_type == b'\x01':
             return marshal.loads(data[1:])
-        elif enc_type == '\x02':
+        elif enc_type == b'\x02':
             return pickle.loads(data[1:])
 
     def start_shard(self, sid):

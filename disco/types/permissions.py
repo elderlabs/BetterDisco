@@ -32,7 +32,16 @@ class Permissions(BitsetMap):
     MANAGE_NICKNAMES = 1 << 27
     MANAGE_ROLES = 1 << 28
     MANAGE_WEBHOOKS = 1 << 29
-    MANAGE_EMOJIS = 1 << 30
+    MANAGE_EMOJIS_AND_STICKERS = 1 << 30
+    USE_SLASH_COMMANDS = 1 << 31
+    REQUEST_TO_SPEAK = 1 << 32
+    # UNDOCUMENTED = 1 << 33
+    MANAGE_THREADS = 1 << 34
+    CREATE_PUBLIC_THREADS = 1 << 35
+    CREATE_PRIVATE_THREADS = 1 << 36
+    USE_EXTERNAL_STICKERS = 1 << 37
+    SEND_MESSAGES_IN_THREADS = 1 << 38
+    START_EMBEDDED_ACTIVITIES = 1 << 39
 
 
 class PermissionValue(BitsetValue):
@@ -53,7 +62,7 @@ class PermissionValue(BitsetValue):
         return cls(66060288)
 
 
-class Permissible(object):
+class Permissible:
     __slots__ = []
 
     def get_permissions(self):

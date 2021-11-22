@@ -1,7 +1,6 @@
 import types
 import gevent
 import inspect
-import weakref
 import warnings
 import functools
 
@@ -62,7 +61,7 @@ def find_loadable_plugins(mod):
         yield modattr
 
 
-class BasePluginDeco(object):
+class BasePluginDeco:
     Prio = Priority
 
     # TODO: don't smash class methods
@@ -237,7 +236,7 @@ class Plugin(LoggingClass, PluginDeco):
         self.listeners = []
         self.commands = []
         self.schedules = {}
-        self.greenlets = weakref.WeakSet()
+        self.greenlets = set()
         self._pre = {}
         self._post = {}
 
@@ -263,7 +262,7 @@ class Plugin(LoggingClass, PluginDeco):
         self.listeners = []
         self.commands = []
         self.schedules = {}
-        self.greenlets = weakref.WeakSet()
+        self.greenlets = set()
 
         self._pre = {'command': [], 'listener': []}
         self._post = {'command': [], 'listener': []}
@@ -296,6 +295,7 @@ class Plugin(LoggingClass, PluginDeco):
             raise Exception('unhandled meta type {}'.format(meta))
 
     def handle_exception(self, greenlet, event):
+        self.log.error('[disco.bot.plugin - handle_exception] - {}\n{}'.format(greenlet, event.__dict__))
         pass
 
     def wait_for_event(self, event_name, conditional=None, **kwargs):

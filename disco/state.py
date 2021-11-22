@@ -1,9 +1,6 @@
-import weakref
-
 from collections import deque, namedtuple
 from gevent.event import Event
 
-from disco.types.base import UNSET
 from disco.util.config import Config
 from disco.util.string import underscore
 from disco.util.hashmap import HashMap, DefaultHashMap
@@ -59,7 +56,7 @@ class StateConfig(Config):
     sync_guild_members = True
 
 
-class State(object):
+class State:
     """
     The State class is used to track global state based on events emitted from
     the `GatewayClient`. State tracking is a core component of the Disco client,
@@ -89,10 +86,11 @@ class State(object):
         Mapping of channel ids to deques containing `StackMessage` objects.
     """
     EVENTS = [
-        'Ready', 'GuildCreate', 'GuildUpdate', 'GuildDelete', 'GuildMemberAdd', 'GuildMemberRemove',
-        'GuildMemberUpdate', 'GuildMembersChunk', 'GuildRoleCreate', 'GuildRoleUpdate', 'GuildRoleDelete',
-        'GuildEmojisUpdate', 'ChannelCreate', 'ChannelUpdate', 'ChannelDelete', 'VoiceServerUpdate', 'VoiceStateUpdate',
-        'MessageCreate', 'PresenceUpdate', 'UserUpdate',
+        'Ready', 'GuildCreate', 'GuildUpdate', 'GuildDelete', 'GuildMemberAdd', 'GuildMemberUpdate',
+        'GuildMemberRemove', 'GuildMembersChunk', 'GuildRoleCreate', 'GuildRoleUpdate', 'GuildRoleDelete',
+        'GuildEmojisUpdate', 'GuildStickersUpdate', 'ChannelCreate', 'ChannelUpdate', 'ChannelDelete',
+        'VoiceServerUpdate', 'VoiceStateUpdate', 'MessageCreate', 'PresenceUpdate', 'UserUpdate', 'ThreadCreate',
+        'ThreadUpdate', 'ThreadDelete',
     ]
 
     def __init__(self, client, config):
@@ -104,11 +102,15 @@ class State(object):
 
         self.me = None
         self.guilds = HashMap()
-        self.channels = HashMap(weakref.WeakValueDictionary())
-        self.emojis = HashMap(weakref.WeakValueDictionary())
-        self.users = HashMap(weakref.WeakValueDictionary())
-        self.voice_clients = HashMap(weakref.WeakValueDictionary())
-        self.voice_states = HashMap(weakref.WeakValueDictionary())
+        self.channels = HashMap()
+        self.commands = HashMap()
+        self.dms = HashMap()
+        self.emojis = HashMap()
+        self.stickers = HashMap()
+        self.threads = HashMap()
+        self.users = HashMap()
+        self.voice_clients = HashMap()
+        self.voice_states = HashMap()
 
         # If message tracking is enabled, listen to those events
         if self.config.track_messages:
@@ -157,6 +159,12 @@ class State(object):
         if event.message.channel_id in self.channels:
             self.channels[event.message.channel_id].last_message_id = event.message.id
 
+        if event.message.channel_id in self.threads:
+            self.threads[event.message.channel_id].last_message_id = event.message.id
+
+        if not event.message.guild_id and event.message.channel_id not in self.dms:
+            self.dms[event.message.channel_id] = event.message.channel
+
     def on_message_delete(self, event):
         if event.channel_id not in self.messages:
             return
@@ -172,7 +180,7 @@ class State(object):
             return
 
         # TODO: performance
-        for sm in list(self.messages[event.channel_id]):
+        for sm in tuple(self.messages[event.channel_id]):
             if sm.id in event.ids:
                 self.messages[event.channel_id].remove(sm)
 
@@ -182,9 +190,17 @@ class State(object):
             if self.guilds_waiting_sync <= 0:
                 self.ready.set()
 
+        if event.guild.id in self.guilds:
+            return
+
         self.guilds[event.guild.id] = event.guild
         self.channels.update(event.guild.channels)
+        self.threads.update(event.guild.threads)
         self.emojis.update(event.guild.emojis)
+        self.stickers.update(event.guild.stickers)
+
+        for voice_state in event.guild.voice_states.values():
+            self.voice_states[voice_state.session_id] = voice_state
 
         for member in event.guild.members.values():
             if member.user.id not in self.users:
@@ -194,27 +210,56 @@ class State(object):
             if presence.user.id in self.users:
                 self.users[presence.user.id].presence = presence
 
-        for voice_state in event.guild.voice_states.values():
-            self.voice_states[voice_state.session_id] = voice_state
-
+        # TODO: better performance on large guild sync
         if self.config.sync_guild_members:
             event.guild.request_guild_members()
 
     def on_guild_update(self, event):
         self.guilds[event.guild.id].inplace_update(event.guild, ignored=[
             'channels',
+            'emojis',
             'members',
+            'stickers',
+            'threads',
             'voice_states',
             'presences',
         ])
 
     def on_guild_delete(self, event):
+        if hasattr(event, 'guild'):
+            if event.unavailable:
+                return
+
         if event.id in self.guilds:
-            # Just delete the guild, channel references will fall
             del self.guilds[event.id]
 
         if event.id in self.voice_clients:
             self.voice_clients[event.id].disconnect()
+
+        channels = tuple(self.channels.keys())
+        for channel in channels:
+            if self.channels[channel].guild_id == event.id:
+                del self.channels[channel]
+
+        threads = tuple(self.threads.keys())
+        for thread in threads:
+            if self.threads[thread].guild_id == event.id:
+                del self.threads[thread]
+
+        emojis = tuple(self.emojis.keys())
+        for emoji in emojis:
+            if self.emojis[emoji].guild_id == event.id:
+                del self.emojis[emoji]
+
+        stickers = tuple(self.stickers.keys())
+        for sticker in stickers:
+            if self.stickers[sticker].guild_id == event.id:
+                del self.stickers[sticker]
+
+        voice_states = tuple(self.voice_states.keys())
+        for vstate in voice_states:
+            if self.voice_states[vstate].guild_id == event.id:
+                del self.voice_states[vstate]
 
     def on_channel_create(self, event):
         if event.channel.is_guild and event.channel.guild_id in self.guilds:
@@ -225,13 +270,32 @@ class State(object):
         if event.channel.id in self.channels:
             self.channels[event.channel.id].inplace_update(event.channel)
 
-            if event.overwrites is not UNSET:
+            if event.overwrites is not None:
                 self.channels[event.channel.id].overwrites = event.overwrites
                 self.channels[event.channel.id].after_load()
 
     def on_channel_delete(self, event):
         if event.channel.is_guild and event.channel.guild and event.channel.id in event.channel.guild.channels:
             del event.channel.guild.channels[event.channel.id]
+            del self.channels[event.channel.id]
+
+    def on_thread_create(self, event):
+        if event.channel.guild_id in self.guilds:
+            self.guilds[event.channel.guild_id].threads[event.channel.id] = event.channel
+            self.threads[event.channel.id] = event.channel
+
+    def on_thread_update(self, event):
+        if event.channel.id in self.threads:
+            self.threads[event.channel.id].inplace_update(event.channel)
+
+            if event.overwrites is not None:
+                self.threads[event.channel.id].overwrites = event.overwrites
+                self.threads[event.channel.id].after_load()
+
+    def on_thread_delete(self, event):
+        if event.channel.id in self.threads:
+            del event.channel.guild.threads[event.channel.id]
+            del self.threads[event.channel.id]
 
     def on_voice_server_update(self, event):
         if event.guild_id not in self.voice_clients:
@@ -271,23 +335,23 @@ class State(object):
         else:
             event.member.user = self.users[event.member.user.id]
 
-        if event.member.guild_id not in self.guilds:
+        if event.guild_id not in self.guilds:
             return
 
         # Avoid adding duplicate events to member_count.
-        if event.member.id not in self.guilds[event.member.guild_id].members:
-            self.guilds[event.member.guild_id].member_count += 1
+        if event.member.id not in self.guilds[event.guild_id].members:
+            self.guilds[event.guild_id].member_count += 1
 
-        self.guilds[event.member.guild_id].members[event.member.id] = event.member
+        self.guilds[event.guild_id].members[event.member.id] = event.member
 
     def on_guild_member_update(self, event):
-        if event.member.guild_id not in self.guilds:
+        if event.guild_id not in self.guilds:
             return
 
-        if event.member.id not in self.guilds[event.member.guild_id].members:
+        if event.member.id not in self.guilds[event.guild_id].members:
             return
 
-        self.guilds[event.member.guild_id].members[event.member.id].inplace_update(event.member)
+        self.guilds[event.guild_id].members[event.member.id].inplace_update(event.member)
 
         if not event.user.id in self.users:
             self.users[event.user.id] = event.user
@@ -305,7 +369,6 @@ class State(object):
             return
 
         self.guilds[event.guild_id].member_count -= 1
-
         del self.guilds[event.guild_id].members[event.user.id]
 
     def on_guild_members_chunk(self, event):
@@ -352,6 +415,11 @@ class State(object):
 
         del self.guilds[event.guild_id].roles[event.role_id]
 
+        # This _should_ update roles on each user when a role is removed
+        for member in self.guilds[event.guild_id].members.values():
+            if event.role_id in member.roles:
+                member.roles.remove(event.role_id)
+
     def on_guild_emojis_update(self, event):
         if event.guild_id not in self.guilds:
             return
@@ -365,8 +433,22 @@ class State(object):
         for guild in self.guilds.values():
             self.emojis.update(guild.emojis)
 
+    # TODO: default stickers
+    def on_guild_stickers_update(self, event):
+        if event.guild_id not in self.guilds or not hasattr(event, 'stickers'):
+            return
+
+        for sticker in event.stickers:
+            sticker.guild_id = event.guild_id
+
+        self.guilds[event.guild_id].stickers = HashMap({i.id: i for i in event.stickers})
+
+        self.stickers = {}
+        for guild in self.guilds.values():
+            self.stickers.update(guild.stickers)
+
     def on_presence_update(self, event):
-        # TODO: this is recursive, we hackfix in model
+        # TODO: this is recursive, we hackfix in Model
         user = event.presence.user
         user.presence = event.presence
 

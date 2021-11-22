@@ -4,16 +4,14 @@ import requests
 import platform
 
 from requests import __version__ as requests_version
-from requests.adapters import HTTPAdapter
 from requests.exceptions import ConnectionError
-from urllib3.util.retry import Retry
 
 from disco import VERSION as disco_version
 from disco.util.logging import LoggingClass
 from disco.api.ratelimit import RateLimiter
 
 
-class HTTPMethod(object):
+class HTTPMethod:
     GET = 'GET'
     POST = 'POST'
     PUT = 'PUT'
@@ -33,7 +31,7 @@ def random_backoff():
     return random.randint(500, 5000) / 1000.0
 
 
-class Routes(object):
+class Routes:
     """
     Simple Python object-enum of all method/url route combinations available to
     this client.
@@ -69,6 +67,7 @@ class Routes(object):
                                                CHANNELS + '/messages/{message}/reactions/{emoji}/{user}')
     CHANNELS_MESSAGES_REACTIONS_DELETE_EMOJI = (HTTPMethod.DELETE, CHANNELS + '/messages/{message}/reactions/{emoji}')
     CHANNELS_MESSAGES_PUBLISH = (HTTPMethod.POST, CHANNELS + '/messages/{message}/crosspost')
+    CHANNELS_MESSAGES_THREAD_START = (HTTPMethod.POST, CHANNELS + '/messages/{message}/threads')
     CHANNELS_PERMISSIONS_MODIFY = (HTTPMethod.PUT, CHANNELS + '/permissions/{permission}')
     CHANNELS_PERMISSIONS_DELETE = (HTTPMethod.DELETE, CHANNELS + '/permissions/{permission}')
     CHANNELS_INVITES_LIST = (HTTPMethod.GET, CHANNELS + '/invites')
@@ -78,6 +77,23 @@ class Routes(object):
     CHANNELS_PINS_DELETE = (HTTPMethod.DELETE, CHANNELS + '/pins/{message}')
     CHANNELS_WEBHOOKS_CREATE = (HTTPMethod.POST, CHANNELS + '/webhooks')
     CHANNELS_WEBHOOKS_LIST = (HTTPMethod.GET, CHANNELS + '/webhooks')
+    CHANNELS_THREAD_START = (HTTPMethod.POST, CHANNELS +  '/threads')
+    CHANNELS_THREAD_MEMBERS = CHANNELS + '/thread-members'
+    CHANNELS_THREAD_JOIN = (HTTPMethod.PUT, CHANNELS_THREAD_MEMBERS + '/@me')
+    CHANNELS_THREAD_LEAVE = (HTTPMethod.DELETE, CHANNELS_THREAD_MEMBERS + '/@me')
+    CHANNELS_THREAD_MEMBER_ADD = (HTTPMethod.PUT, CHANNELS_THREAD_MEMBERS + '/{member}')
+    CHANNELS_THREAD_MEMBER_REMOVE = (HTTPMethod.DELETE, CHANNELS_THREAD_MEMBERS + '/{member}')
+    CHANNELS_THREAD_MEMBERS_LIST = (HTTPMethod.GET, CHANNELS_THREAD_MEMBERS)
+    CHANNELS_THREADS = CHANNELS + '/threads'
+    CHANNELS_THREADS_LIST = (HTTPMethod.GET, CHANNELS_THREADS + '/active')
+    CHANNELS_THREADS_LIST_ARCHIVED_PUBLIC = (HTTPMethod.GET, CHANNELS_THREADS + '/archived/public')
+    CHANNELS_THREADS_LIST_ARCHIVED_PRIVATE = (HTTPMethod.GET, CHANNELS_THREADS + '/archived/private')
+    CHANNELS_THREADS_LIST_JOINED_PRIVATE = (HTTPMethod.GET, CHANNELS + '/users/@me/threads/archived/private')
+
+    # Stickers
+    STICKER = '/stickers'
+    STICKER_GET = (HTTPMethod.GET, STICKER + '/{sticker}')
+    STICKERS_NITRO_GET = (HTTPMethod.GET, '/sticker-packs')
 
     # Guilds
     GUILDS = '/guilds/{guild}'
@@ -126,6 +142,26 @@ class Routes(object):
     GUILDS_PREVIEW_GET = (HTTPMethod.GET, GUILDS + '/preview')
     GUILDS_AUDITLOGS_LIST = (HTTPMethod.GET, GUILDS + '/audit-logs')
     GUILDS_DISCOVERY_REQUIREMENTS = (HTTPMethod.GET, GUILDS + '/discovery-requirements')
+    GUILDS_TEMPLATES = GUILDS + '/templates'
+    GUILDS_TEMPLATE_GET = (HTTPMethod.GET, GUILDS_TEMPLATES + '/{template}')
+    GUILDS_CREATE_WITH_TEMPLATE = (HTTPMethod.POST, GUILDS_TEMPLATES + '/{template}')
+    GUILDS_TEMPLATES_GET = (HTTPMethod.GET, GUILDS_TEMPLATES)
+    GUILDS_TEMPLATE_CREATE = (HTTPMethod.POST, GUILDS_TEMPLATES)
+    GUILDS_TEMPLATE_SYNC = (HTTPMethod.PUT, GUILDS_TEMPLATES + '/{template}')
+    GUILDS_TEMPLATE_MODIFY = (HTTPMethod.PATCH, GUILDS_TEMPLATES + '/{template}')
+    GUILDS_TEMPLATE_DELETE = (HTTPMethod.DELETE, GUILDS_TEMPLATES + '/{template}')
+    GUILDS_THREADS = GUILDS + '/threads'
+    GUILDS_THREADS_ACTIVE = (HTTPMethod.GET, GUILDS_THREADS + '/active')
+    GUILDS_EVENTS = GUILDS + '/events'
+    GUILDS_EVENTS_GET = (HTTPMethod.GET, GUILDS_EVENTS)
+    GUILDS_EVENTS_MODIFY = (HTTPMethod.PATCH, GUILDS_EVENTS)
+    GUILDS_EVENTS_DELETE = (HTTPMethod.DELETE, GUILDS_EVENTS)
+    GUILDS_STICKERS = GUILDS + STICKER
+    GUILDS_STICKERS_GET = (HTTPMethod.GET, GUILDS_STICKERS)
+    GUILDS_STICKER_GET = (HTTPMethod.GET, GUILDS_STICKERS + '/{sticker}')
+    GUILDS_STICKER_CREATE = (HTTPMethod.POST, GUILDS_STICKERS)
+    GUILDS_STICKER_MODIFY = (HTTPMethod.PATCH, GUILDS_STICKERS + '/{sticker}')
+    GUILDS_STICKER_DELETE = (HTTPMethod.DELETE, GUILDS_STICKERS + '/{sticker}')
 
     # Users
     USERS = '/users'
@@ -156,29 +192,51 @@ class Routes(object):
     WEBHOOKS_TOKEN_MODIFY = (HTTPMethod.PATCH, WEBHOOKS + '/{token}')
     WEBHOOKS_TOKEN_DELETE = (HTTPMethod.DELETE, WEBHOOKS + '/{token}')
     WEBHOOKS_TOKEN_EXECUTE = (HTTPMethod.POST, WEBHOOKS + '/{token}')
+    WEBHOOKS_MESSAGE_GET = (HTTPMethod.GET, WEBHOOKS + '/token/{token}/messages/{message}')
+    WEBHOOKS_MESSAGE_MODIFY = (HTTPMethod.PATCH, WEBHOOKS + '/token/{token}/messages/{message}')
+    WEBHOOKS_MESSAGE_DELETE = (HTTPMethod.DELETE, WEBHOOKS + '/token/{token}/messages/{message}')
 
     # Applications
     APPLICATIONS = '/applications/{application}'
     APPLICATIONS_GLOBAL_COMMANDS_GET = (HTTPMethod.GET, APPLICATIONS + '/commands')
     APPLICATIONS_GLOBAL_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/commands')
+    APPLICATIONS_GLOBAL_COMMAND_GET = (HTTPMethod.GET, APPLICATIONS + '/command/{command}')
     APPLICATIONS_GLOBAL_COMMANDS_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/commands/{command}')
     APPLICATIONS_GLOBAL_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/commands/{command}')
     APPLICATIONS_GUILD_COMMANDS_GET = (HTTPMethod.GET, APPLICATIONS + '/guilds/{guild}/commands')
+    APPLICATION_GLOBAL_BATCH_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/commands')
     APPLICATIONS_GUILD_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/guilds/{guild}/commands')
+    APPLICATIONS_GUILD_COMMAND_GET = (HTTPMethod.GET, APPLICATIONS + '/guilds/{guild}/commands/{command}')
     APPLICATIONS_GUILD_COMMANDS_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/guilds/{guild}/commands/{command}')
     APPLICATIONS_GUILD_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/guilds/{guild}/commands/{command}')
+    APPLICATION_GUILD_BATCH_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/guilds/{guild}/commands')
+    APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_GET = (HTTPMethod.GET, APPLICATIONS + '/guilds/{guild}/commands/permissions')
+    APPLICATIONS_GUILD_COMMAND_PERMISSIONS_GET = (HTTPMethod.GET,
+                                                  APPLICATIONS + '/guilds/{guild}/commands/{command}/permissions')
+    APPLICATIONS_GUILD_COMMAND_PERMISSIONS_MODIFY = (HTTPMethod.PUT,
+                                                     APPLICATIONS + '/guilds/{guild}/commands/{command}/permissions')
+    APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_MODIFY = (HTTPMethod.PUT,
+                                                      APPLICATIONS + '/guilds/{guild}/commands/permissions')
 
     # Interactions
     INTERACTIONS = '/webhooks/{id}/{token}'
     INTERACTIONS_CREATE = (HTTPMethod.POST, '/interactions/{id}/{token}/callback')
+    INTERACTIONS_GET_ORIGINAL_RESPONSE = (HTTPMethod.GET, '/webhooks/{application}/{token}/messages/@original')
     INTERACTIONS_EDIT = (HTTPMethod.PATCH, INTERACTIONS + '/messages/@original')
     INTERACTIONS_DELETE = (HTTPMethod.DELETE, INTERACTIONS + '/messages/@original')
     INTERACTIONS_FOLLOWUP_CREATE = (HTTPMethod.POST, INTERACTIONS)
     INTERACTIONS_FOLLOWUP_EDIT = (HTTPMethod.PATCH, INTERACTIONS + '/messages/{message}')
     INTERACTIONS_FOLLOWUP_DELETE = (HTTPMethod.DELETE, INTERACTIONS + '/messages/{message}')
 
+    # Stages
+    STAGES = '/stage-instances'
+    STAGES_CREATE = (HTTPMethod.POST, STAGES)
+    STAGES_GET = (HTTPMethod.GET, STAGES + '/{channel}')
+    STAGES_MODIFY = (HTTPMethod.PATCH, STAGES + '/{channel}')
+    STAGES_DELETE = (HTTPMethod.DELETE, STAGES + '/{channel}')
 
-class APIResponse(object):
+
+class APIResponse:
     def __init__(self):
         self.response = None
         self.exception = None
@@ -235,7 +293,7 @@ class HTTPClient(LoggingClass):
     A simple HTTP client which wraps the requests library, adding support for
     Discords rate-limit headers, authorization, and request/response validation.
     """
-    BASE_URL = 'https://discord.com/api/v8'
+    BASE_URL = 'https://discord.com/api/v9'
     MAX_RETRIES = 5
 
     def __init__(self, token, after_request=None):
@@ -352,5 +410,10 @@ class HTTPClient(LoggingClass):
             # Catch ConnectionResetError
             backoff = random_backoff()
             self.log.warning('Request to `{}` failed with ConnectionError, retrying after {}s'.format(url, backoff))
+            gevent.sleep(backoff)
+            return self(route, args, retry_number=retry, **kwargs)
+        except requests.exceptions.Timeout:
+            backoff = random_backoff()
+            self.log.warning('Request to `{}` failed with ConnectionTimeout, retrying after {}s')
             gevent.sleep(backoff)
             return self(route, args, retry_number=retry, **kwargs)

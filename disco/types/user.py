@@ -2,11 +2,11 @@ from datetime import datetime
 
 from disco.types.base import (
     SlottedModel, Field, snowflake, text, with_equality, with_hash, enum, ListField,
-    cached_property,
+    cached_property, str_or_int,
 )
 
 
-class DefaultAvatars(object):
+class DefaultAvatars:
     BLURPLE = 0
     GREY = 1
     GREEN = 2
@@ -16,7 +16,7 @@ class DefaultAvatars(object):
     ALL = [BLURPLE, GREY, GREEN, ORANGE, RED]
 
 
-class UserFlags(object):
+class UserFlags:
     NONE = 0
     DISCORD_EMPLOYEE = 1 << 0
     DISCORD_PARTNER = 1 << 1
@@ -29,50 +29,39 @@ class UserFlags(object):
     HS_BALANCE = 1 << 8
     EARLY_SUPPORTER = 1 << 9
     TEAM_USER = 1 << 10
+    # UNDOCUMENTED = 1 << 11
     SYSTEM = 1 << 12
     UNREAD_SYS_MSG = 1 << 13
     BUG_HUNTER_LVL2 = 1 << 14
     UNDERAGE_DELETED = 1 << 15
     VERIFIED_BOT = 1 << 16
     VERIFIED_DEV = 1 << 17
+    CERTIFIED_MOD = 1 << 18
 
 
-class PremiumType(object):
+class PremiumType:
+    NONE = 0
     CLASSIC = 1
     NITRO = 2
-
-
-class UserConnection(object):
-    id = Field(str)
-    name = Field(str)
-    type = Field(str)
-    revoked = Field(bool)
-    verified = Field(bool)
-    friend_sync = Field(bool)
-    show_activity = Field(bool)
-    visibility = Field(int)
-
-
-class VisibilityType(object):
-    NONE = 0
-    EVERYONE = 1
 
 
 class User(SlottedModel, with_equality('id'), with_hash('id')):
     id = Field(snowflake)
     username = Field(text)
-    discriminator = Field(text)
+    discriminator = Field(int)
     avatar = Field(text)
     bot = Field(bool, default=False)
     system = Field(bool, default=False)
     mfa_enabled = Field(bool)
+    banner = Field(text)
+    accent_color = Field(str_or_int)
     locale = Field(text)
     verified = Field(bool)
     email = Field(text)
     flags = Field(int)
     public_flags = Field(int, default=0)
     premium_type = Field(enum(PremiumType))
-    presence = Field(None)
+    # member = Field(GuildMember)
 
     def get_avatar_url(self, still_format='webp', animated_format='gif', size=1024):
         if not self.avatar:
@@ -89,7 +78,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
 
     @property
     def default_avatar(self):
-        return DefaultAvatars.ALL[int(self.discriminator) % len(DefaultAvatars.ALL)]
+        return DefaultAvatars.ALL[self.discriminator % len(DefaultAvatars.ALL)]
 
     @property
     def avatar_url(self):
@@ -113,7 +102,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
         return '<User {} ({})>'.format(self.id, self)
 
 
-class ActivityTypes(object):
+class ActivityTypes:
     DEFAULT = 0
     STREAMING = 1
     LISTENING = 2
@@ -122,7 +111,7 @@ class ActivityTypes(object):
     COMPETING = 5
 
 
-class Status(object):
+class Status:
     ONLINE = 'ONLINE'
     IDLE = 'IDLE'
     DND = 'DND'
@@ -131,9 +120,9 @@ class Status(object):
 
 
 class ClientStatus(SlottedModel):
-    desktop = Field(str)
-    mobile = Field(str)
-    web = Field(str)
+    desktop = Field(text)
+    mobile = Field(text)
+    web = Field(text)
 
 
 class ActivityParty(SlottedModel):
@@ -167,7 +156,7 @@ class ActivityTimestamps(SlottedModel):
         return datetime.utcfromtimestamp(self.end / 1000)
 
 
-class ActivityFlags(object):
+class ActivityFlags:
     INSTANCE = 1 << 0
     JOIN = 1 << 1
     SPECTATE = 1 << 2

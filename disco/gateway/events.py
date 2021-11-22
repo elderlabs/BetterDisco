@@ -1,8 +1,8 @@
-import six
+from six import with_metaclass
 
 from disco.types.application import ApplicationCommand, Interaction
-from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, UNSET, snowflake, datetime
-from disco.types.channel import Channel, PermissionOverwrite
+from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, snowflake, datetime, text, str_or_int
+from disco.types.channel import Channel, PermissionOverwrite, ThreadMember, StageInstance
 from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration
 from disco.types.invite import Invite
 from disco.types.message import Message, MessageReactionEmoji
@@ -25,7 +25,7 @@ class GatewayEventMeta(ModelMeta):
         return obj
 
 
-class GatewayEvent(six.with_metaclass(GatewayEventMeta, Model)):
+class GatewayEvent(with_metaclass(GatewayEventMeta, Model)):
     """
     The GatewayEvent class wraps various functionality for events passed to us
     over the gateway websocket, and serves as a simple proxy to inner values for
@@ -69,7 +69,6 @@ class GatewayEvent(six.with_metaclass(GatewayEventMeta, Model)):
 
         return obj
 
-    # TODO: FIX THIS
     def __getattr__(self, name):
         try:
             _proxy = object.__getattribute__(self, '_proxy')
@@ -97,6 +96,7 @@ def debug(func=None, match=None):
 
         cls.__init__ = new_init
         return cls
+
     return deco
 
 
@@ -109,6 +109,7 @@ def wraps_model(model, alias=None):
         cls._wraps_model = (alias, model)
         cls._proxy = alias
         return cls
+
     return deco
 
 
@@ -116,6 +117,7 @@ def proxy(field):
     def deco(cls):
         cls._proxy = field
         return cls
+
     return deco
 
 
@@ -123,6 +125,7 @@ def attach(field, to=None):
     def deco(cls):
         cls._attach = (field, to)
         return cls
+
     return deco
 
 
@@ -152,8 +155,8 @@ class Ready(GatewayEvent):
     # presences = Field(...)
     private_channels = ListField(Channel)
     relationships = ListField(None)
-    session_id = Field(str)
-    shard = Field(str)
+    session_id = Field(text)
+    shard = Field(str_or_int)
     user = Field(User)
     # user_settings = Field(...)
     version = Field(int, alias='v')
@@ -187,7 +190,7 @@ class GuildCreate(GatewayEvent):
         """
         Shortcut property which is true when we actually joined the guild.
         """
-        return self.unavailable is UNSET
+        return self.unavailable is None
 
 
 @wraps_model(Guild)
@@ -222,7 +225,7 @@ class GuildDelete(GatewayEvent):
         """
         Shortcut property which is true when we actually have left the guild.
         """
-        return self.unavailable is UNSET
+        return self.unavailable is None
 
 
 @wraps_model(Channel)
@@ -367,7 +370,7 @@ class GuildMembersChunk(GatewayEvent):
     chunk_count = Field(int)
     not_found = ListField(snowflake)
     presences = ListField(Presence)
-    nonce = Field(str)
+    nonce = Field(str_or_int)
 
     @property
     def guild(self):
@@ -622,8 +625,8 @@ class VoiceServerUpdate(GatewayEvent):
     guild_id : snowflake
         The guild ID this voice server update is for.
     """
-    token = Field(str)
-    endpoint = Field(str)
+    token = Field(text)
+    endpoint = Field(text)
     guild_id = Field(snowflake)
 
 
@@ -784,7 +787,6 @@ class PresencesReplace(GatewayEvent):
     """
     Sent after a Gateway outage.
     """
-    pass
 
 
 @wraps_model(Invite)
@@ -812,6 +814,14 @@ class InviteDelete(GatewayEvent):
 
 
 @wraps_model(Integration)
+class IntegrationCreate(GatewayEvent):
+    """
+    Sent when a guild integration is created
+    """
+    guild_id = Field(snowflake)
+
+
+@wraps_model(Integration)
 class IntegrationUpdate(GatewayEvent):
     """
     Sent when a guild integration is updated
@@ -821,6 +831,15 @@ class IntegrationUpdate(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
+
+@wraps_model(Integration)
+class IntegrationDelete(GatewayEvent):
+    """
+    Sent when a guild integration is deleted
+    """
+    guild_id = Field(snowflake)
+
 
 @wraps_model(Interaction)
 class InteractionCreate(GatewayEvent):
@@ -838,6 +857,7 @@ class InteractionCreate(GatewayEvent):
     def channel(self):
         return self.client.state.channels.get(self.channel_id)
 
+
 @wraps_model(ApplicationCommand)
 class ApplicationCommandCreate(GatewayEvent):
     """
@@ -848,6 +868,7 @@ class ApplicationCommandCreate(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
 
 @wraps_model(ApplicationCommand)
 class ApplicationCommandUpdate(GatewayEvent):
@@ -860,6 +881,7 @@ class ApplicationCommandUpdate(GatewayEvent):
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
 
+
 @wraps_model(ApplicationCommand)
 class ApplicationCommandDelete(GatewayEvent):
     """
@@ -870,6 +892,7 @@ class ApplicationCommandDelete(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
 
 class GuildJoinRequestDelete(GatewayEvent):
     """
@@ -882,3 +905,132 @@ class GuildJoinRequestDelete(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
+
+class GiftCodeUpdate(GatewayEvent):
+    """
+    """
+    guild_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    code = Field(text)
+    sku_id = Field(snowflake)
+    uses = Field(int)
+
+
+@wraps_model(Channel)
+class ThreadCreate(GatewayEvent):
+    """
+    Sent when a thread is created, relevant to the current
+    user, or when the current user is added to a thread.
+    """
+    guild_id = Field(snowflake)
+    member = Field(ThreadMember)
+
+
+@wraps_model(Channel)
+class ThreadUpdate(GatewayEvent):
+    """
+    Sent when a thread is updated.
+    """
+    guild_id = Field(snowflake)
+
+
+@wraps_model(Channel)
+class ThreadDelete(GatewayEvent):
+    """
+    Sent when a thread relevant to the current user is deleted.
+    """
+    guild_id = Field(snowflake)
+
+
+class ThreadListSync(GatewayEvent):
+    """
+    Sent when the current user gains access to a channel.
+    """
+    guild_id = Field(snowflake)
+    channel_ids = ListField(snowflake)
+    threads = ListField(snowflake)
+    members = ListField(ThreadMember)
+
+
+@wraps_model(ThreadMember)
+class ThreadMemberUpdate(GatewayEvent):
+    """
+    Sent when the thread member object for the current user is updated.
+    """
+
+
+class ThreadMembersUpdate(GatewayEvent):
+    """
+    Sent when anyone is added to or removed from a thread.
+    """
+    id = Field(snowflake)
+    guild_id = Field(snowflake)
+    member_count = Field(int)
+    added_members = ListField(ThreadMember)
+    removed_member_ids = ListField(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+    @property
+    def channel(self):
+        return self.client.state.channels.get(self.id)
+
+
+@wraps_model(StageInstance)
+class StageInstanceCreate(GatewayEvent):
+    """
+    Sent when a Stage Instance is created.
+    """
+    guild_id = Field(snowflake)
+    guild_scheduled_event_id = Field(snowflake)
+    invite_code = Field(text)
+
+
+@wraps_model(StageInstance)
+class StageInstanceUpdate(GatewayEvent):
+    """
+    Sent when a Stage Instance is Updated.
+    """
+    guild_id = Field(snowflake)
+    guild_scheduled_event_id = Field(snowflake)
+    invite_code = Field(text)
+
+
+@wraps_model(StageInstance)
+class StageInstanceDelete(GatewayEvent):
+    """
+    Sent when a stage instance is deleted.
+    """
+    guild_id = Field(snowflake)
+
+
+class GuildApplicationCommandCountsUpdate(GatewayEvent):
+    """
+    I honestly haven't the foggiest
+    """
+    guild_id = Field(snowflake)
+    # application_command_counts = ???
+
+
+class ApplicationCommandPermissionsUpdate(GatewayEvent):
+    """
+    /shrug
+    """
+    guild_id = Field(snowflake)
+
+
+class GuildScheduledEventUpdate(GatewayEvent):
+    """
+    Sent when a guild schedules an event
+    """
+    guild_id = Field(snowflake)
+
+
+class GuildStickersUpdate(GatewayEvent):
+    """
+    Sent when a guild sticker is updated
+    """
+    guild_id = Field(snowflake)

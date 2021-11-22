@@ -1,4 +1,7 @@
-import re
+try:
+    import regex as re
+except:
+    import re
 import argparse
 
 from disco.bot.parser import ArgumentSet, ArgumentError
@@ -13,7 +16,7 @@ ROLE_MENTION_RE = re.compile('<@&([0-9]+)>')
 CHANNEL_MENTION_RE = re.compile('<#([0-9]+)>')
 
 
-class CommandLevels(object):
+class CommandLevels:
     DEFAULT = 0
     TRUSTED = 10
     MOD = 50
@@ -26,7 +29,7 @@ class PluginArgumentParser(argparse.ArgumentParser):
         raise CommandError(message)
 
 
-class CommandEvent(object):
+class CommandEvent:
     """
     An event which is created when a command is triggered. Contains information
     about the message, command, and parsed arguments (along with shortcuts to
@@ -109,7 +112,7 @@ class CommandError(Exception):
         self.msg = msg
 
 
-class Command(object):
+class Command:
     """
     An object which defines and handles the triggering of a function based on
     user input (aka a command).
@@ -221,7 +224,10 @@ class Command(object):
                 username, discrim = raw.split('#')
                 resolved = (username, int(discrim))
             elif reg:
-                res = reg.match(raw)
+                try:
+                    res = reg.match(raw, concurrent=True)
+                except:
+                    res = reg.match(raw)
                 if res:
                     resolved = int(res.group(1))
                 else:

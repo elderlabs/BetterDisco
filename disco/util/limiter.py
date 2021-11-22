@@ -1,7 +1,7 @@
 import gevent
 
 
-class SimpleLimiter(object):
+class SimpleLimiter:
     def __init__(self, total, per):
         self.total = total
         self.per = per

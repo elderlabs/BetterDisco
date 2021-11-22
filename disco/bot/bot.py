@@ -1,4 +1,7 @@
-import re
+try:
+    import regex as re
+except:
+    import re
 import os
 import gevent
 import inspect
@@ -73,6 +76,8 @@ class BotConfig(Config):
     http_enabled : bool
         Whether to enable the built-in Flask server which allows plugins to handle
         and route HTTP requests.
+    http_logging : bool
+        Whether to enable the built-in wsgi logging mechanism.
     http_host : str
         The host string for the HTTP Flask server (if enabled).
     http_port : int
@@ -110,6 +115,7 @@ class BotConfig(Config):
     storage_path = 'storage.json'
 
     http_enabled = False
+    http_logging = True
     http_host = '0.0.0.0'
     http_port = 7575
 
@@ -162,11 +168,11 @@ class Bot(LoggingClass):
                 from flask import Flask
             except ImportError:
                 self.log.warning('Failed to enable HTTP server, Flask is not installed')
-            else:
-                self.log.info('Starting HTTP server bound to %s:%s', self.config.http_host, self.config.http_port)
-                self.http = Flask('disco')
-                self.http_server = WSGIServer((self.config.http_host, self.config.http_port), self.http)
-                self.http_server_greenlet = gevent.spawn(self.http_server.serve_forever)
+
+            self.log.info(f'Starting HTTP server bound to {self.config.http_host}:{self.config.http_port}')
+            self.http = Flask('disco')
+            self.http_server = WSGIServer((self.config.http_host, self.config.http_port), self.http, log=self.log if self.config.http_logging else None)
+            self.http_server_greenlet = gevent.spawn(self.http_server.serve_forever)
 
         self.plugins = {}
         self.group_abbrev = {}
@@ -197,7 +203,7 @@ class Bot(LoggingClass):
         # Convert our configured mapping of entities to levels into something
         #  we can actually use. This ensures IDs are converted properly, and maps
         #  any level names (e.g. `role_id: admin`) map to their numerical values.
-        for entity_id, level in list(self.config.levels.items()):
+        for entity_id, level in tuple(self.config.levels.items()):
             del self.config.levels[entity_id]
             entity_id = int(entity_id) if str(entity_id).isdigit() else entity_id
             level = int(level) if str(level).isdigit() else get_enum_value_by_name(CommandLevels, level)
@@ -276,7 +282,7 @@ class Bot(LoggingClass):
         """
         Computes a single regex which matches all possible command combinations.
         """
-        commands = list(self.commands)
+        commands = tuple(self.commands)
         re_str = '|'.join(command.regex(grouped=False) for command in commands)
         if re_str:
             self.command_matches_re = re.compile(re_str, re.I)
@@ -315,7 +321,7 @@ class Bot(LoggingClass):
 
             mention_roles = []
             if msg.guild:
-                mention_roles = list(filter(lambda r: msg.is_mentioned(r),
+                mention_roles = tuple(filter(lambda r: msg.is_mentioned(r),
                                             msg.guild.get_member(self.client.state.me).roles))
 
             if not any((
@@ -355,12 +361,19 @@ class Bot(LoggingClass):
             if not require_mention:  # don't want to prematurely return
                 return []
 
-        if not self.command_matches_re or not self.command_matches_re.match(content):
-            return []
+        try:
+            if not self.command_matches_re or not self.command_matches_re.match(content, concurrent=True):
+                return []
+        except:
+            if not self.command_matches_re or not self.command_matches_re.match(content):
+                return []
 
         options = []
         for command in self.commands:
-            match = command.compiled_regex.match(content)
+            try:
+                match = command.compiled_regex.match(content, concurrent=True)
+            except:
+                match = command.compiled_regex.match(content)
             if match:
                 options.append((command, match))
 
@@ -410,7 +423,7 @@ class Bot(LoggingClass):
         custom_message_prefixes = (self.config.commands_prefix_getter(msg)
                                    if self.config.commands_prefix_getter else [])
 
-        commands = list(self.get_commands_for_message(
+        commands = tuple(self.get_commands_for_message(
             self.config.commands_require_mention,
             self.config.commands_mention_rules,
             custom_message_prefixes or self.config.command_prefixes,
@@ -557,6 +570,7 @@ class Bot(LoggingClass):
         if os.path.exists(path):
             with open(path, 'r') as f:
                 data.update(Serializer.loads(self.config.plugin_config_format, f.read()))
+                f.close()
 
         if hasattr(cls, 'config_cls'):
             inst = cls.config_cls()

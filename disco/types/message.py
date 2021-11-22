@@ -1,4 +1,7 @@
-import re
+try:
+    import regex as re
+except:
+    import re
 import warnings
 import functools
 import unicodedata
@@ -9,11 +12,11 @@ from disco.types.base import (
 )
 from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
-from disco.types.channel import ChannelType
+from disco.types.channel import ChannelType, Channel
 from disco.types.user import User
 
 
-class MessageType(object):
+class MessageType:
     DEFAULT = 0
     RECIPIENT_ADD = 1
     RECIPIENT_REMOVE = 2
@@ -32,12 +35,14 @@ class MessageType(object):
     GUILD_DISCOVERY_REQUALIFIED = 15
     GUILD_DISCOVERY_GRACE_PERIOD_INITIAL_WARNING = 16
     GUILD_DISCOVERY_GRACE_PERIOD_FINAL_WARNING = 17
-    # UNDOCUMENTED = 18
+    THREAD_CREATED = 18
     INLINE_REPLY = 19
     APPLICATION_COMMAND = 20
+    THREAD_STARTER_MESSAGE = 21
+    GUILD_INVITE_REMINDER = 22
 
 
-class MessageActivityType(object):
+class MessageActivityType:
     JOIN = 1
     SPECTATE = 2
     LISTEN = 3
@@ -144,6 +149,7 @@ class MessageReference(SlottedModel):
     message_id = Field(snowflake)
     channel_id = Field(snowflake)
     guild_id = Field(snowflake)
+    fail_if_not_exists = Field(bool, default=True)
 
 
 class MessageActivity(SlottedModel):
@@ -317,7 +323,7 @@ class MessageEmbed(SlottedModel):
         The fields of the embed.
     """
     title = Field(text)
-    type = Field(str, default='rich')
+    type = Field(text, default='rich')
     description = Field(text)
     url = Field(text)
     timestamp = Field(datetime)
@@ -388,11 +394,12 @@ class MessageAttachment(SlottedModel):
     width : int
         Width of the attachment.
     """
-    id = Field(str)
+    id = Field(snowflake)
     filename = Field(text)
+    content_type = Field(text)
+    size = Field(int)
     url = Field(text)
     proxy_url = Field(text)
-    size = Field(int)
     height = Field(int)
     width = Field(int)
 
@@ -404,7 +411,7 @@ class ChannelMention(SlottedModel):
     name = Field(text)
 
 
-class AllowedMentionsTypes(object):
+class AllowedMentionsTypes:
     ROLE = 'role'
     USER = 'user'
     EVERYONE = 'everyone'
@@ -423,27 +430,114 @@ class MessageFlags(BitsetMap):
     SUPPRESS_EMBEDS = 1 << 2
     SOURCE_MESSAGE_DELETED = 1 << 3
     URGENT = 1 << 4
+    HAS_THREAD = 1 << 5
+    EPHEMERAL = 1 << 6
+    LOADING = 1 << 7
 
 
 class MessageFlagValue(BitsetValue):
     map = MessageFlags
 
 
-class MessageStickerFormatTypes(object):
+class StickerTypes:
+    STANDARD = 1
+    GUILD = 2
+
+
+class StickerFormatTypes:
     PNG = 1
     APNG = 2
     LOTTIE = 3
 
 
-class MessageSticker(SlottedModel):
+class StickerItemStructure(SlottedModel):
+    id = Field(snowflake)
+    name = Field(text)
+    format_type = Field(enum(StickerFormatTypes))
+
+
+class Sticker(SlottedModel):
     id = Field(snowflake)
     pack_id = Field(snowflake)
     name = Field(text)
     description = Field(text)
     tags = Field(text)
-    asset = Field(text)
-    preview_asset = Field(text)
-    format_type = Field(enum(MessageStickerFormatTypes))
+    type = Field(enum(StickerTypes))
+    format_type = Field(enum(StickerFormatTypes))
+    available = Field(bool)
+    guild_id = Field(snowflake)
+    user = Field(User)
+    sort_value = Field(int)
+
+
+class StickerPack(SlottedModel):
+    id = Field(snowflake)
+    stickers = ListField(Sticker)
+    name = Field(text)
+    sku_id = Field(snowflake)
+    cover_sticker_id = Field(snowflake)
+    description = Field(text)
+    banner_asset_id = Field(snowflake)
+
+
+class MessageInteractionType:
+    PING = 1
+    APPLICATION_COMMAND = 2
+
+
+class MessageInteraction(SlottedModel):
+    id = Field(snowflake)
+    type = Field(enum(MessageInteractionType))
+    name = Field(text)
+    user = Field(User)
+
+
+class ButtonStyles:
+    PRIMARY = 1
+    SECONDARY = 2
+    SUCCESS = 3
+    DANGER = 4
+    LINK = 5
+
+
+class ComponentTypes:
+    ACTION_ROW = 1
+    BUTTON = 2
+    SELECT_MENU = 3
+
+
+class SelectOption(SlottedModel):
+    label = Field(text)
+    value = Field(text)
+    description = Field(text)
+    emoji = Field(Emoji)
+    default = Field(bool)
+
+
+class MessageComponent(SlottedModel):
+    type = Field(enum(ComponentTypes))
+    custom_id = Field(text)
+    disabled = Field(bool)
+    style = Field(enum(ButtonStyles))
+    label = Field(text)
+    emoji = Field(Emoji)
+    url = Field(text)
+    options = ListField(SelectOption)
+    placeholder = Field(text)
+    min_values = Field(int)
+    max_values = Field(int)
+    components = Field(bool)
+
+
+class ActionRow(SlottedModel):
+    type = Field(int, default=1)
+    components = ListField(MessageComponent)
+
+    def add_component(self, *args, **kwargs):
+        if len(args) == 1:
+            return self.components.append(*args)
+        else:
+            return self.components.append(MessageComponent(*args, **kwargs))
 
 
 class Message(SlottedModel):
@@ -497,6 +591,7 @@ class Message(SlottedModel):
     """
     id = Field(snowflake)
     channel_id = Field(snowflake)
+    guild_id = Field(snowflake)
     author = Field(User)
     content = Field(text)
     timestamp = Field(datetime)
@@ -509,15 +604,20 @@ class Message(SlottedModel):
     attachments = AutoDictField(MessageAttachment, 'id')
     embeds = ListField(MessageEmbed)
     reactions = ListField(MessageReaction)
-    nonce = Field(snowflake)
+    nonce = Field(text)
     pinned = Field(bool)
     webhook_id = Field(snowflake)
     type = Field(enum(MessageType))
     activity = Field(MessageActivity)
     application = Field(MessageApplication)
+    application_id = Field(snowflake)
     message_reference = Field(MessageReference)
     flags = Field(MessageFlagValue)
-    stickers = ListField(MessageSticker)
+    # referenced_message = Field()
+    interaction = Field(MessageInteraction)
+    thread = Field(Channel)
+    components = ListField(MessageComponent)
+    sticker_items = ListField(StickerItemStructure, default=[])
 
     def __str__(self):
         return '<Message {} ({})>'.format(self.id, self.channel_id)
@@ -550,7 +650,14 @@ class Message(SlottedModel):
         `Channel`
             The channel this message was created in.
         """
-        return self.client.state.channels.get(self.channel_id)
+        if self.guild_id:
+            if self.channel_id in self.client.state.threads:
+                return self.client.state.threads.get(self.channel_id)
+            return self.client.state.channels.get(self.channel_id)
+        else:
+            if self.channel_id in self.client.state.dms:
+                return self.client.state.dms[self.channel_id]
+            return self.client.api.channels_get(self.channel_id)
 
     def pin(self):
         """
@@ -792,7 +899,7 @@ class Message(SlottedModel):
         return content
 
 
-class MessageTable(object):
+class MessageTable:
     def __init__(self, sep=' | ', codeblock=True, header_break=True, language=None):
         self.header = []
         self.entries = []

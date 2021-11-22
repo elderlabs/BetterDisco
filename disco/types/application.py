@@ -1,9 +1,11 @@
-from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property
-from disco.types.guild import GuildMember
-from disco.types.message import MessageEmbed, AllowedMentions, MessageFlagValue
+from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property, DictField, str_or_int
+from disco.types.channel import Channel
+from disco.types.guild import GuildMember, Role
+from disco.types.message import MessageEmbed, AllowedMentions, MessageFlagValue, Message, MessageComponent, SelectOption
+from disco.types.user import User
 
 
-class ApplicationCommandOptionType(object):
+class ApplicationCommandOptionType:
     SUB_COMMAND = 1
     SUB_COMMAND_GROUP = 2
     STRING = 3
@@ -12,55 +14,116 @@ class ApplicationCommandOptionType(object):
     USER = 6
     CHANNEL = 7
     ROLE = 8
+    MENTIONABLE = 9
+    NUMBER = 10
+
+
+class ApplicationCommandTypes:
+    CHAT_INPUT = 1
+    USER = 2
+    MESSAGE = 3
 
 
 class ApplicationCommandOptionChoice(SlottedModel):
     name = Field(text)
-    value = Field(text or int)
+    value = Field(str_or_int)
 
 
-class ApplicationCommandOption(SlottedModel):
+class _ApplicationCommandOption(SlottedModel):
     type = Field(enum(ApplicationCommandOptionType))
     name = Field(text)
     description = Field(text)
-    default = Field(bool)
+    # default = Field(bool)
     required = Field(bool)
     choices = ListField(ApplicationCommandOptionChoice)
 
 
-class ApplicationCommandInteractionDataOption(SlottedModel):
+class ApplicationCommandOption(_ApplicationCommandOption):
+    options = ListField(_ApplicationCommandOption)
+
+
+class ApplicationCommandInteractionDataResolved(SlottedModel):
+    users = DictField(snowflake, User)
+    members = DictField(snowflake, GuildMember)
+    roles = DictField(snowflake, Role)
+    channels = DictField(snowflake, Channel)
+
+
+class _ApplicationCommandInteractionDataOption(SlottedModel):
     name = Field(text)
+    type = Field(int)
     value = Field(enum(ApplicationCommandOptionType))
+
+
+class ApplicationCommandInteractionDataOption(_ApplicationCommandInteractionDataOption):
+    options = ListField(_ApplicationCommandInteractionDataOption)
+
+
+class ComponentTypes:
+    ACTION_ROW = 1
+    BUTTON = 2
 
 
 class ApplicationCommandInteractionData(SlottedModel):
     id = Field(snowflake)
     name = Field(text)
+    type = Field(enum(ApplicationCommandTypes))
+    resolved = Field(ApplicationCommandInteractionDataResolved)
     options = ListField(ApplicationCommandInteractionDataOption)
+    custom_id = Field(text)
+    component_type = Field(int)
+    values = ListField(SelectOption)
+    target_id = Field(snowflake)
 
 
 class ApplicationCommand(SlottedModel):
     id = Field(snowflake)
-    guild_id = Field(snowflake)
     application_id = Field(snowflake)
     name = Field(text)
     description = Field(text)
     options = ListField(ApplicationCommandOption)
+    default_permission = Field(bool, default=True)
+    guild_id = Field(snowflake)
+    version = Field(snowflake)
 
 
-class InteractionType(object):
+class ApplicationCommandPermissionType:
+    ROLE = 1
+    USER = 2
+
+
+class ApplicationCommandPermissions(SlottedModel):
+    id = Field(snowflake)
+    type = Field(enum(ApplicationCommandPermissionType))
+    permission = Field(bool)
+
+
+class GuildApplicationCommandPermissions(SlottedModel):
+    id = Field(snowflake)
+    application_id = Field(snowflake)
+    guild_id = Field(snowflake)
+    permissions = ListField(ApplicationCommandPermissions)
+
+
+class InteractionType:
     PING = 1
     APPLICATION_COMMAND = 2
+    MESSAGE_COMPONENT = 3
+    APPLICATION_COMMAND_AUTOCOMPLETE = 4
 
 
 class Interaction(SlottedModel):
     id = Field(snowflake)
+    application_id = Field(snowflake)
     type = Field(enum(InteractionType))
     data = Field(ApplicationCommandInteractionData)
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
     member = Field(GuildMember)
+    user = Field(User)
     token = Field(text)
+    version = Field(int)
+    message = Field(Message)
 
     @cached_property
     def guild(self):
@@ -89,15 +152,17 @@ class Interaction(SlottedModel):
         return self.client.api.interactions_followup_delete(self.token)
 
 
-class InteractionResponseType(object):
+class InteractionCallbackType:
     PONG = 1
-    ACKNOWLEDGE = 2
-    CHANNEL_MESSAGE = 3
+    # ACKNOWLEDGE = 2
+    # CHANNEL_MESSAGE = 3
     CHANNEL_MESSAGE_WITH_SOURCE = 4
-    ACK_WITH_SOURCE = 5
+    DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE = 5
+    DEFERRED_UPDATE_MESSAGE = 6
+    UPDATE_MESSAGE = 7
 
 
-class InteractionResponseFlags(object):
+class InteractionResponseFlags:
     EPHEMERAL = 1 << 6
 
 
@@ -107,8 +172,9 @@ class InteractionApplicationCommandCallbackData(SlottedModel):
     embeds = ListField(MessageEmbed)
     allowed_mentions = Field(AllowedMentions)
     flags = Field(MessageFlagValue)
+    components = ListField(MessageComponent)
 
 
 class InteractionResponse(SlottedModel):
-    type = Field(InteractionResponseType)
+    type = Field(InteractionCallbackType)
     data = Field(InteractionApplicationCommandCallbackData)

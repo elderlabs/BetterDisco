@@ -1,16 +1,18 @@
-import re
+try:
+    import regex as re
+except:
+    import re
 
-from disco.util.snowflake import to_snowflake
-from disco.util.functional import one_or_many, chunks
-from disco.types.user import User
-from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, text, cached_property
+from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, cached_property, text
 from disco.types.permissions import Permissions, Permissible, PermissionValue
-
+from disco.types.user import User
+from disco.util.functional import one_or_many, chunks
+from disco.util.snowflake import to_snowflake
 
 NSFW_RE = re.compile('^nsfw(-|$)')
 
 
-class ChannelType(object):
+class ChannelType:
     GUILD_TEXT = 0
     DM = 1
     GUILD_VOICE = 2
@@ -18,9 +20,14 @@ class ChannelType(object):
     GUILD_CATEGORY = 4
     GUILD_NEWS = 5
     GUILD_STORE = 6
+    GUILD_NEWS_THREAD = 10
+    GUILD_PUBLIC_THREAD = 11
+    GUILD_PRIVATE_THREAD = 12
+    GUILD_STAGE_VOICE = 13
+    GUILD_DIRECTORY = 14
 
 
-class PermissionOverwriteType(object):
+class PermissionOverwriteType:
     ROLE = 'role'
     MEMBER = 'member'
 
@@ -89,6 +96,26 @@ class PermissionOverwrite(ChannelSubType):
         self.client.api.channels_permissions_delete(self.channel_id, self.id, **kwargs)
 
 
+class VideoQualityModes:
+    AUTO = 1
+    FULL = 2
+
+
+class ThreadMetaData(SlottedModel):
+    archived = Field(bool)
+    archiver_id = Field(snowflake)
+    auto_archive_duration = Field(int)
+    archive_timestamp = Field(datetime)
+    locked = Field(bool)
+
+
+class ThreadMember(SlottedModel):
+    id = Field(snowflake)
+    user_id = Field(snowflake)
+    join_timestamp = Field(datetime)
+    flags = Field(int)
+
+
 class Channel(SlottedModel, Permissible):
     """
     Represents a Discord Channel.
@@ -135,6 +162,13 @@ class Channel(SlottedModel, Permissible):
     lock_permissions = Field(bool)
     parent_id = Field(snowflake)
     last_pin_timestamp = Field(datetime)
+    rtc_region = Field(text)
+    video_quality_mode = Field(enum(VideoQualityModes))
+    message_count = Field(int)
+    member_count = Field(int)
+    thread_metadata = Field(ThreadMetaData)
+    member = Field(ThreadMember)
+    # permissions = Field(text)
 
     def __init__(self, *args, **kwargs):
         super(Channel, self).__init__(*args, **kwargs)
@@ -198,6 +232,23 @@ class Channel(SlottedModel, Permissible):
             ChannelType.GUILD_VOICE,
             ChannelType.GUILD_CATEGORY,
             ChannelType.GUILD_NEWS,
+            ChannelType.GUILD_STORE,
+            ChannelType.GUILD_STAGE_VOICE,
+            ChannelType.GUILD_PUBLIC_THREAD,
+            ChannelType.GUILD_PRIVATE_THREAD,
+            ChannelType.GUILD_NEWS_THREAD,
+        )
+
+    @property
+    def is_guild_text(self):
+        """
+        Whether this channel is a text channel within a guild.
+        """
+        return self.type in (
+            ChannelType.GUILD_TEXT,
+            ChannelType.GUILD_NEWS_THREAD,
+            ChannelType.GUILD_PUBLIC_THREAD,
+            ChannelType.GUILD_PRIVATE_THREAD,
         )
 
     @property
@@ -206,7 +257,7 @@ class Channel(SlottedModel, Permissible):
         Whether this channel contains news for the guild (used for verified guilds
         to produce activity feed news).
         """
-        return self.type == ChannelType.GUILD_NEWS
+        return self.type in (ChannelType.GUILD_NEWS, ChannelType.GUILD_NEWS_THREAD)
 
     @property
     def is_dm(self):
@@ -223,11 +274,29 @@ class Channel(SlottedModel, Permissible):
         return bool(self.type == ChannelType.GUILD_TEXT and (self.nsfw or NSFW_RE.match(self.name)))
 
     @property
+    def is_stage(self):
+        """
+        Whether this channel is a stage channel.
+        """
+        return self.type == ChannelType.GUILD_STAGE_VOICE
+
+    @property
+    def is_thread(self):
+        """
+        Whether this channel is a thread.
+        """
+        return self.type in (
+            ChannelType.GUILD_PUBLIC_THREAD,
+            ChannelType.GUILD_PRIVATE_THREAD,
+            ChannelType.GUILD_NEWS_THREAD,
+        )
+
+    @property
     def is_voice(self):
         """
         Whether this channel supports voice.
         """
-        return self.type in (ChannelType.GUILD_VOICE, ChannelType.GROUP_DM)
+        return self.type in (ChannelType.GUILD_VOICE, ChannelType.GROUP_DM, ChannelType.GUILD_STAGE_VOICE)
 
     @property
     def messages(self):
@@ -271,6 +340,18 @@ class Channel(SlottedModel, Permissible):
         """
         return self.client.api.channels_messages_get(self.id, to_snowflake(message))
 
+    def send_message(self, *args, **kwargs):
+        """
+        Send a message to this channel. See `APIClient.channels_messages_create`
+        for more information.
+
+        Returns
+        -------
+        `disco.types.message.Message`
+            The created message.
+        """
+        return self.client.api.channels_messages_create(self.id, *args, **kwargs)
+
     def get_invites(self):
         """
         Returns
@@ -289,7 +370,6 @@ class Channel(SlottedModel, Permissible):
         -------
         `Invite`
         """
-
         from disco.types.invite import Invite
         return Invite.create_for_channel(self, *args, **kwargs)
 
@@ -345,24 +425,24 @@ class Channel(SlottedModel, Permissible):
         """
         return self.client.api.channels_webhooks_create(self.id, *args, **kwargs)
 
-    def send_message(self, *args, **kwargs):
-        """
-        Send a message to this channel. See `APIClient.channels_messages_create`
-        for more information.
-
-        Returns
-        -------
-        `disco.types.message.Message`
-            The created message.
-        """
-        return self.client.api.channels_messages_create(self.id, *args, **kwargs)
-
     def send_typing(self):
         """
         Sends a typing event to this channel. See `APIClient.channels_typing`
         for more information.
         """
         self.client.api.channels_typing(self.id)
+
+    def connect(self, *args, **kwargs):
+        """
+        Connect to this channel over voice.
+        """
+        from disco.voice.client import VoiceClient
+        assert self.is_voice, 'Channel must support voice to connect'
+
+        server_id = self.guild_id or self.id
+        vc = self.client.state.voice_clients.get(server_id) or VoiceClient(self.client, server_id, is_dm=self.is_dm)
+
+        return vc.connect(self.id, *args, **kwargs)
 
     def create_overwrite(self, *args, **kwargs):
         """
@@ -433,7 +513,7 @@ class Channel(SlottedModel, Permissible):
             List of messages (or message ids) to delete. All messages must originate
             from this channel.
         """
-        message_ids = list(map(to_snowflake, messages))
+        message_ids = tuple(map(to_snowflake, messages))
 
         if not message_ids:
             return
@@ -464,6 +544,7 @@ class Channel(SlottedModel, Permissible):
         """
         Sets the channels topic.
         """
+        assert (self.type == ChannelType.GUILD_TEXT)
         return self.client.api.channels_modify(self.id, topic=topic, reason=reason)
 
     def set_name(self, name, reason=None):
@@ -489,21 +570,21 @@ class Channel(SlottedModel, Permissible):
         """
         Sets the channels bitrate.
         """
-        assert (self.is_voice)
+        assert (self.is_voice and self.type != ChannelType.GUILD_STAGE_VOICE)
         return self.client.api.channels_modify(self.id, bitrate=bitrate, reason=reason)
 
     def set_user_limit(self, user_limit, reason=None):
         """
         Sets the channels user limit.
         """
-        assert (self.is_voice)
+        assert (self.is_voice and self.type != ChannelType.GUILD_STAGE_VOICE)
         return self.client.api.channels_modify(self.id, user_limit=user_limit, reason=reason)
 
     def set_parent(self, parent, reason=None):
         """
         Sets the channels parent.
         """
-        assert (self.is_guild)
+        assert self.is_guild
         return self.client.api.channels_modify(
             self.id,
             parent_id=to_snowflake(parent) if parent else parent,
@@ -513,7 +594,7 @@ class Channel(SlottedModel, Permissible):
         """
         Sets the channels slowmode (rate_limit_per_user).
         """
-        assert (self.type == ChannelType.GUILD_TEXT)
+        assert self.is_guild_text
         return self.client.api.channels_modify(
             self.id,
             rate_limit_per_user=interval,
@@ -548,7 +629,7 @@ class Channel(SlottedModel, Permissible):
         )
 
 
-class MessageIterator(object):
+class MessageIterator:
     """
     An iterator which supports scanning through the messages for a channel.
 
@@ -570,7 +651,7 @@ class MessageIterator(object):
     chunk_size : int
         The number of messages to request per API call.
     """
-    class Direction(object):
+    class Direction:
         UP = 1
         DOWN = 2
 
@@ -634,3 +715,17 @@ class MessageIterator(object):
             return res
         else:
             return self._buffer.pop()
+
+
+class StageInstancePrivacyLevel:
+    PUBLIC = 1
+    GUILD_ONLY = 2
+
+
+class StageInstance(SlottedModel):
+    id = Field(snowflake)
+    guild_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    topic = Field(text)
+    privacy_level = Field(enum(StageInstancePrivacyLevel))
+    discoverable_disabled = Field(bool)

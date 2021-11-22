@@ -1,14 +1,15 @@
-import six
+import functools
 import gevent
 import inspect
-import functools
 
-from holster.enum import BaseEnumMeta, EnumAttr
 from datetime import datetime as real_datetime
+from json import JSONEncoder
+from holster.enum import BaseEnumMeta, EnumAttr
+from six import with_metaclass
 
 from disco.util.chains import Chainable
-from disco.util.hashmap import HashMap
 from disco.util.enum import get_enum_members
+from disco.util.hashmap import HashMap
 
 DATETIME_FORMATS = [
     '%Y-%m-%dT%H:%M:%S.%f',
@@ -22,7 +23,7 @@ def get_item_by_path(obj, path):
     return obj
 
 
-class Unset(object):
+class Unset:
     def __nonzero__(self):
         return False
 
@@ -45,6 +46,13 @@ def strict_cached_property(*args):
     return _cached_property
 
 
+def _json_default(self, obj):
+    return getattr(obj.__class__, "to_dict", _json_default.default)(obj)
+
+_json_default.default = JSONEncoder().default
+JSONEncoder.default = _json_default
+
+
 class ConversionError(Exception):
     def __init__(self, field, raw, e):
         super(ConversionError, self).__init__(
@@ -54,9 +62,8 @@ class ConversionError(Exception):
         self.__cause__ = e
 
 
-class Field(object):
-    def __init__(self, value_type, alias=None, default=UNSET, create=True, ignore_dump=None, cast=None, **kwargs):
-        # TODO: fix default bullshit
+class Field:
+    def __init__(self, value_type, alias=None, default=None, create=True, ignore_dump=None, cast=None, **kwargs):
         self.true_type = value_type
         self.src_name = alias
         self.dst_name = None
@@ -64,23 +71,23 @@ class Field(object):
         self.cast = cast
         self.metadata = kwargs
 
-        # Only set the default value if we where given one
-        if default is not UNSET:
+        # Only set the default value if we were given one
+        if default is not None:
             self.default = default
         # Attempt to use the instances default type (e.g. from a subclass)
         elif not hasattr(self, 'default'):
-            self.default = UNSET
+            self.default = None
 
         self.deserializer = None
 
         if value_type:
             self.deserializer = self.type_to_deserializer(value_type)
 
-            if isinstance(self.deserializer, Field) and self.default is UNSET:
+            if isinstance(self.deserializer, Field) and self.default is None:
                 self.default = self.deserializer.default
             elif (inspect.isclass(self.deserializer) and
                     issubclass(self.deserializer, Model) and
-                    self.default is UNSET and
+                    self.default is None and
                     create):
                 self.default = self.deserializer
 
@@ -97,7 +104,7 @@ class Field(object):
             self.src_name = name
 
     def has_default(self):
-        return self.default is not UNSET
+        return self.default is not None
 
     def try_convert(self, raw, client, **kwargs):
         try:
@@ -232,8 +239,18 @@ def text(obj):
     return str(obj)
 
 
+def str_or_int(obj):
+    if obj is None:
+        return None
+
+    if str(obj).isdigit():
+        return int(obj)
+
+    return str(obj)
+
+
 def with_equality(field):
-    class T(object):
+    class T:
         def __eq__(self, other):
             if isinstance(other, self.__class__):
                 return getattr(self, field) == getattr(other, field)
@@ -243,7 +260,7 @@ def with_equality(field):
 
 
 def with_hash(field):
-    class T(object):
+    class T:
         def __hash__(self):
             return hash(getattr(self, field))
     return T
@@ -307,7 +324,7 @@ class ModelMeta(type):
         return super(ModelMeta, mcs).__new__(mcs, name, parents, dct)
 
 
-class Model(six.with_metaclass(ModelMeta, Chainable)):
+class Model(with_metaclass(ModelMeta, Chainable)):
     __slots__ = ['client']
 
     def __init__(self, *args, **kwargs):
@@ -347,7 +364,7 @@ class Model(six.with_metaclass(ModelMeta, Chainable)):
                 if consume and not isinstance(raw, dict):
                     del obj[field.src_name]
             except KeyError:
-                raw = UNSET
+                raw = None
 
             # If the field is unset/none, and we have a default we need to set it
             if raw in (None, UNSET) and field.has_default():
@@ -356,7 +373,7 @@ class Model(six.with_metaclass(ModelMeta, Chainable)):
                 continue
 
             # Otherwise if the field is UNSET and has no default, skip conversion
-            if raw is UNSET:
+            if raw is None:
                 setattr(inst, field.dst_name, raw)
                 continue
 
@@ -368,7 +385,7 @@ class Model(six.with_metaclass(ModelMeta, Chainable)):
             if ignored and name in ignored:
                 continue
 
-            if hasattr(other, name) and not getattr(other, name) is UNSET:
+            if hasattr(other, name) and not getattr(other, name) is None:
                 setattr(self, name, getattr(other, name))
 
         # Clear cached properties
@@ -388,7 +405,7 @@ class Model(six.with_metaclass(ModelMeta, Chainable)):
             if field.metadata.get('private'):
                 continue
 
-            if getattr(self, name) is UNSET:
+            if getattr(self, name) is None:
                 continue
             obj[name] = field.serialize(getattr(self, name), field)
         return obj
@@ -425,7 +442,7 @@ class SlottedModel(Model):
     __slots__ = ['client']
 
 
-class BitsetMap(object):
+class BitsetMap:
     @classmethod
     def keys(cls):
         for k, v in cls.__dict__.items():
@@ -433,7 +450,7 @@ class BitsetMap(object):
                 yield k
 
 
-class BitsetValue(object):
+class BitsetValue:
     __slots__ = ['value', 'map']
 
     def __init__(self, value=0):

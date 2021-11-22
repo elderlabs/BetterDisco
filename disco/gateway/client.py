@@ -4,7 +4,7 @@ import ssl
 import time
 import zlib
 
-from websocket import ABNF, WebSocketConnectionClosedException
+from websocket import ABNF, WebSocketConnectionClosedException, WebSocketTimeoutException
 
 from disco.gateway.packets import OPCode, RECV, SEND
 from disco.gateway.events import GatewayEvent
@@ -18,7 +18,7 @@ ZLIB_SUFFIX = b'\x00\x00\xff\xff'
 
 
 class GatewayClient(LoggingClass):
-    GATEWAY_VERSION = 8
+    GATEWAY_VERSION = 9
 
     def __init__(self, client, max_reconnects=5, encoder='json', zlib_stream_enabled=True, ipc=None):
         super(GatewayClient, self).__init__()
@@ -94,7 +94,8 @@ class GatewayClient(LoggingClass):
                 self.log.warning('Received HEARTBEAT without HEARTBEAT_ACK, forcing a fresh reconnect')
                 self.last_conn_state = 'HEARTBEAT'
                 self._heartbeat_acknowledged = True
-                self.ws.close()
+                self.ws.close(status=1000)
+                self.client.gw.on_close(0, 'HEARTBEAT failure')
                 return
             self._last_heartbeat = time.perf_counter()
 
@@ -205,6 +206,8 @@ class GatewayClient(LoggingClass):
         if isinstance(error, KeyboardInterrupt):
             self.shutting_down = True
             self.ws_event.set()
+        if isinstance(error, WebSocketTimeoutException):
+            return self.log.error('Websocket connection has timed out. An upstream connection issue is likely present.')
         if not isinstance(error, WebSocketConnectionClosedException):
             raise Exception('WS received error: {}'.format(error))
 
@@ -239,14 +242,18 @@ class GatewayClient(LoggingClass):
                 },
             })
 
-    def on_close(self, code, reason):
+    def on_close(self, code=None, reason=None):
         # Make sure we cleanup any old data
         self._buffer = None
 
         # Kill heartbeater, a reconnect/resume will trigger a HELLO which will
         #  respawn it
         if self._heartbeat_task:
-            self._heartbeat_task.kill()
+            self.log.info('WS Closed: killing heartbeater')
+            try:
+                self._heartbeat_task.kill(timeout=5)
+            except TimeoutError:
+                self.log.info('Heartbeater kill timeout')
 
         # If we're quitting, just break out of here
         if self.shutting_down:
@@ -257,13 +264,14 @@ class GatewayClient(LoggingClass):
 
         # Track reconnect attempts
         self.reconnects += 1
-        self.log.info('WS Closed: [%s] %s (%s)', code, reason if reason else '', self.reconnects)
+        # self.log.info('WS Closed: [%s] %s (%s)', code, reason if reason else '', self.reconnects)
+        self.log.info('WS Closed:{}{} ({})'.format(' [{}]'.format(code) if code else '', ' {}'.format(reason) if reason else '', self.reconnects))
 
         if self.max_reconnects and self.reconnects > self.max_reconnects:
             raise Exception('Failed to reconnect after {} attempts, giving up'.format(self.max_reconnects))
 
         # Don't resume for these error codes
-        if code and 4000 < code <= 4010 or code == 1001:
+        if code and (4000 < code <= 4010 or code == 1001):
             self.session_id = None
 
         wait_time = (self.reconnects if self.reconnects > 1 else 0) * 5 if self.reconnects < 6 else 30

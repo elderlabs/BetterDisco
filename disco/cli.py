@@ -24,7 +24,7 @@ parser.add_argument('--shard-count', help='Total number of shards', default=None
 parser.add_argument('--max-reconnects', help='Maximum reconnect attempts', default=None)
 parser.add_argument('--log-level', help='log level', default=None)
 parser.add_argument('--manhole', action='store_true', help='Enable the manhole', default=None)
-parser.add_argument('--manhole-bind', help='host:port for the manhole to bind too', default=None)
+parser.add_argument('--manhole-bind', help='host:port for the manhole to bind to', default=None)
 parser.add_argument('--encoder', help='Encoder for gateway data', default=None)
 
 

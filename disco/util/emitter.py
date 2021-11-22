@@ -3,12 +3,12 @@ import gevent
 from collections import defaultdict
 from gevent.event import AsyncResult
 from gevent.queue import Queue, Full
-
+from websocket import WebSocketConnectionClosedException
 
 from disco.util.logging import LoggingClass
 
 
-class Priority(object):
+class Priority:
     # BEFORE is the most dangerous priority level. Every event that flows through
     #  the given emitter instance will be dispatched _sequentially_ to all BEFORE
     #  handlers. Until these before handlers complete execution, no other event
@@ -31,7 +31,7 @@ class Priority(object):
     ALL = {BEFORE, AFTER, SEQUENTIAL, NONE}
 
 
-class Event(object):
+class Event:
     def __init__(self, parent, data):
         self.parent = parent
         self.data = data
@@ -42,7 +42,7 @@ class Event(object):
         raise AttributeError
 
 
-class EmitterSubscription(object):
+class EmitterSubscription:
     def __init__(self, events, callback, priority=Priority.NONE, conditional=None, metadata=None, max_queue_size=8096):
         self.events = events
         self.callback = callback
@@ -133,12 +133,13 @@ class Emitter(LoggingClass):
             try:
                 listener(*args, **kwargs)
             except Exception as e:
-                self.log.warning('AFTER {} event handler `{}` raised {}: {}'.format(
-                    name,
-                    listener.callback.__name__,
-                    e.__class__.__name__,
-                    e,
-                ))
+                if not isinstance(e.__class__, WebSocketConnectionClosedException):
+                    self.log.warning('AFTER {} event handler `{}` raised {}: {}'.format(
+                        name,
+                        listener.callback.__name__,
+                        e.__class__.__name__,
+                        e,
+                    ))
 
         # Next enqueue all sequential handlers. This just puts stuff into a queue
         #  without blocking, so we don't have to worry too much
