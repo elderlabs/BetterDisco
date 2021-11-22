@@ -5,7 +5,7 @@ from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, 
 from disco.types.channel import Channel, PermissionOverwrite, ThreadMember, StageInstance
 from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration
 from disco.types.invite import Invite
-from disco.types.message import Message, MessageReactionEmoji
+from disco.types.message import Message, MessageReactionEmoji, Sticker
 from disco.types.oauth import Application
 from disco.types.user import User, Presence
 from disco.types.voice import VoiceState
@@ -1032,5 +1032,12 @@ class GuildScheduledEventUpdate(GatewayEvent):
 class GuildStickersUpdate(GatewayEvent):
     """
     Sent when a guild sticker is updated
+    """
+    guild_id = Field(snowflake)
+    stickers = ListField(Sticker)
+
+class EmbeddedActivityUpdate(GatewayEvent):
+    """
+    Sent when a user updates a built-in Activity, like watch together
     """
     guild_id = Field(snowflake)
