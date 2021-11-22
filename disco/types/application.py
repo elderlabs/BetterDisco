@@ -1,7 +1,7 @@
 from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property, DictField, str_or_int
 from disco.types.channel import Channel
 from disco.types.guild import GuildMember, Role
-from disco.types.message import MessageEmbed, AllowedMentions, MessageFlagValue, Message, MessageComponent
+from disco.types.message import MessageEmbed, AllowedMentions, MessageFlagValue, Message, MessageComponent, SelectOption
 from disco.types.user import User
 
 
@@ -16,6 +16,12 @@ class ApplicationCommandOptionType:
     ROLE = 8
     MENTIONABLE = 9
     NUMBER = 10
+
+
+class ApplicationCommandTypes:
+    CHAT_INPUT = 1
+    USER = 2
+    MESSAGE = 3
 
 
 class ApplicationCommandOptionChoice(SlottedModel):
@@ -61,10 +67,13 @@ class ComponentTypes:
 class ApplicationCommandInteractionData(SlottedModel):
     id = Field(snowflake)
     name = Field(text)
+    type = Field(enum(ApplicationCommandTypes))
     resolved = Field(ApplicationCommandInteractionDataResolved)
     options = ListField(ApplicationCommandInteractionDataOption)
     custom_id = Field(text)
     component_type = Field(int)
+    values = ListField(SelectOption)
+    target_id = Field(snowflake)
 
 
 class ApplicationCommand(SlottedModel):
@@ -99,7 +108,8 @@ class GuildApplicationCommandPermissions(SlottedModel):
 class InteractionType:
     PING = 1
     APPLICATION_COMMAND = 2
-    MessageComponent = 3
+    MESSAGE_COMPONENT = 3
+    APPLICATION_COMMAND_AUTOCOMPLETE = 4
 
 
 class Interaction(SlottedModel):
