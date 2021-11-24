@@ -215,16 +215,12 @@ class State:
             event.guild.request_guild_members()
 
     def on_guild_update(self, event):
-        self.guilds[event.guild.id].inplace_update(event.guild, ignored=[
-            'channels',
-            'emojis',
-            'members',
-            'stickers',
-            'threads',
-            'voice_states',
-            'presences',
-        ])
+        ignored = ['channels', 'emojis', 'members', 'stickers', 'threads', 'voice_states', 'presences']
+        if not hasattr(event.guild, 'widget_enabled'):
+            ignored.append('widget_enabled')
+        self.guilds[event.guild.id].inplace_update(event.guild, ignored=ignored)
 
+    # TODO: commands
     def on_guild_delete(self, event):
         if hasattr(event, 'guild'):
             if event.unavailable:
@@ -433,7 +429,7 @@ class State:
         for guild in self.guilds.values():
             self.emojis.update(guild.emojis)
 
-    # TODO: default stickers
+    # TODO: default Discord stickers
     def on_guild_stickers_update(self, event):
         if event.guild_id not in self.guilds or not hasattr(event, 'stickers'):
             return
