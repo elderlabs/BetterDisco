@@ -63,18 +63,27 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     premium_type = Field(enum(PremiumType))
     # member = Field(GuildMember)
 
-    def get_avatar_url(self, still_format='webp', animated_format='gif', size=1024):
+    def get_avatar_url(self, fmt=None, size=1024):
         if not self.avatar:
             return 'https://cdn.discordapp.com/embed/avatars/{}.png'.format(self.default_avatar)
 
-        if self.avatar.startswith('a_'):
-            return 'https://cdn.discordapp.com/avatars/{}/{}.{}?size={}'.format(
-                self.id, self.avatar, animated_format, size
-            )
-        else:
-            return 'https://cdn.discordapp.com/avatars/{}/{}.{}?size={}'.format(
-                self.id, self.avatar, still_format, size
-            )
+        if not fmt:
+            fmt = 'gif' if self.avatar.startswith('a_') else 'webp'
+        elif fmt == 'gif' and not self.avatar.startswith('a_'):
+            fmt = 'webp'
+
+        return 'https://cdn.discordapp.com/avatars/{}/{}.{}?size={}'.format(self.id, self.avatar, fmt, size)
+
+    def get_banner_url(self, fmt=None, size=1024):
+        if not self.banner:
+            return ''
+
+        if not fmt:
+            fmt = 'gif' if self.banner.startswith('a_') else 'webp'
+        elif fmt == 'gif' and not self.banner.startswith('a_'):
+            fmt = 'webp'
+
+        return 'https://cdn.discordapp.com/banners/{}/{}.{}?size={}'.format(self.id, self.avatar, fmt, size)
 
     @property
     def default_avatar(self):

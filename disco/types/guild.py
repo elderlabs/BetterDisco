@@ -257,12 +257,12 @@ class GuildMember(SlottedModel):
     """
     user = Field(User)
     nick = Field(text)
+    avatar = Field(text)
     roles = ListField(snowflake)
     joined_at = Field(datetime)
     premium_since = Field(datetime)
     deaf = Field(bool)
     mute = Field(bool)
-    is_pending = Field(bool, default=False)
     pending = Field(bool, default=False)
     permissions = Field(text)
     guild_id = Field(snowflake)
@@ -276,6 +276,17 @@ class GuildMember(SlottedModel):
         The nickname of this user if set, otherwise their username
         """
         return self.nick or self.user.username
+
+    def get_avatar_url(self, fmt=None, size=1024):
+        if not self.avatar:
+            return self.user.get_avatar_url(fmt, size)
+
+        if not fmt:
+            fmt = 'gif' if self.avatar.startswith('a_') else 'webp'
+        elif fmt == 'gif' and not self.avatar.startswith('a_'):
+            fmt = 'webp'
+
+        return 'https://cdn.discordapp.com/guilds/{}/users/{}/avatars/{}.{}?size={}'.format(self.guild_id, self.id, self.avatar, fmt, size)
 
     def get_voice_state(self):
         """
@@ -398,7 +409,7 @@ class Guild(SlottedModel, Permissible):
     banner : str
         Guild's banner image hash
     region : str
-        Voice region.
+        [DEPRECATED] Voice region.
     afk_timeout : int
         Delay after which users are automatically moved to the afk channel.
     widget_enabled : bool
@@ -444,7 +455,7 @@ class Guild(SlottedModel, Permissible):
     owner = Field(bool)
     owner_id = Field(snowflake)
     permissions = Field(PermissionValue, cast=int)
-    region = Field(text)
+    region = Field(text)  # deprecated
     afk_channel_id = Field(snowflake)
     afk_timeout = Field(int)
     verification_level = Field(enum(VerificationLevel))
