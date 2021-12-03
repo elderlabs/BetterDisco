@@ -265,6 +265,7 @@ class GuildMember(SlottedModel):
     mute = Field(bool)
     pending = Field(bool, default=False)
     permissions = Field(text)
+    communication_disabled_until = Field(datetime)
     guild_id = Field(snowflake)
 
     def __str__(self):
@@ -320,6 +321,18 @@ class GuildMember(SlottedModel):
         Unbans the member from the guild.
         """
         self.guild.delete_ban(self, **kwargs)
+
+    def timeout(self, duration=None, **kwargs):
+        """
+        Times out the user for the specified duration (or clears it if None)
+
+        Parameters
+        ----------
+        duration : Optional[str]
+            The ISO8601 timestamp when the mute should expire. Max 28 days.
+        """
+        return self.client.api.guilds_members_modify(self.guild.id, self.user.id,
+                                                     communication_disabled_until=duration, **kwargs)
 
     def set_nickname(self, nickname=None, **kwargs):
         """
