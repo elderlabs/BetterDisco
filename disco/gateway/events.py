@@ -1036,8 +1036,16 @@ class GuildStickersUpdate(GatewayEvent):
     guild_id = Field(snowflake)
     stickers = ListField(Sticker)
 
+
 class EmbeddedActivityUpdate(GatewayEvent):
     """
     Sent when a user updates a built-in Activity, like watch together
+    """
+    guild_id = Field(snowflake)
+
+
+class GuildJoinRequestUpdate(GatewayEvent):
+    """
+    Sent when a guild join request is approved or denied
     """
     guild_id = Field(snowflake)
