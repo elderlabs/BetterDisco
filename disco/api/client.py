@@ -759,8 +759,9 @@ class APIClient(LoggingClass):
 
     def applications_global_commands_delete(self, command):
         return self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_DELETE, dict(application=self.client.state.me.id, command=command))
+
     # TODO:
-    def applications_global_commands_bulk_modify(self, commands):
+    def applications_global_commands_bulk_overwrite(self, commands):
         pass
 
     def applications_guild_commands_get(self, guild):
@@ -782,25 +783,24 @@ class APIClient(LoggingClass):
     def applications_guild_commands_delete(self, guild, command):
         return self.http(Routes.APPLICATIONS_GUILD_COMMANDS_DELETE, dict(application=self.client.state.me.id, guild=guild, command=command))
 
-    # TODO:
-    def applications_guild_commands_batch_modify(self, guild, commands):
-        pass
+    def applications_guild_commands_bulk_overwrite(self, guild, commands):
+        r = self.http(Routes.APPLICATION_GUILD_BULK_OVERWRITE, dict(application=self.client.state.me.id, guild=guild), json=commands)
+        return ApplicationCommand.create_map(self.client, r.json())
 
     def applications_guild_commands_permissions_get(self, guild):
-        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_GET, dict(guild=guild))
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_GET, dict(application=self.client.state.me.id, guild=guild))
         return GuildApplicationCommandPermissions.create_map(self.client, r.json())
 
     def applications_guild_command_permissions_get(self, guild, command):
-        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_GET, dict(guild=guild, command=command))
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_GET, dict(application=self.client.state.me.id, guild=guild, command=command))
         return GuildApplicationCommandPermissions.create(self.client, r.json())
 
     def applications_guild_command_permissions_modify(self, guild, command, permissions):
-        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_GET, dict(guild=guild, command=command), json=optional(permissions=permissions))
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_GET, dict(application=self.client.state.me.id, guild=guild, command=command), json=permissions)
         return GuildApplicationCommandPermissions.create_map(self.client, r.json())
 
-    # TODO: Improve
-    def applications_guilds_commands_permissions_batch_modify(self, guild, *data):
-        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_MODIFY, dict(guild=guild), json=data)
+    def applications_guilds_commands_permissions_bulk_modify(self, guild, data):
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_MODIFY, dict(application=self.client.state.me.id, guild=guild), json=data)
         return GuildApplicationCommandPermissions.create_map(self.client, r.json())
 
     def interactions_create(self, interaction, token, type, data=None):

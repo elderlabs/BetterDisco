@@ -1,5 +1,5 @@
 from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property, DictField, str_or_int
-from disco.types.channel import Channel
+from disco.types.channel import Channel, ChannelType
 from disco.types.guild import GuildMember, Role
 from disco.types.message import MessageEmbed, AllowedMentions, MessageFlagValue, Message, MessageComponent, SelectOption
 from disco.types.user import User
@@ -33,9 +33,12 @@ class _ApplicationCommandOption(SlottedModel):
     type = Field(enum(ApplicationCommandOptionType))
     name = Field(text)
     description = Field(text)
-    # default = Field(bool)
     required = Field(bool)
     choices = ListField(ApplicationCommandOptionChoice)
+    channel_types = ListField(ChannelType)
+    min_value = Field(int)
+    max_value = Field(int)
+    autocomplete = Field(bool)
 
 
 class ApplicationCommandOption(_ApplicationCommandOption):
@@ -52,7 +55,9 @@ class ApplicationCommandInteractionDataResolved(SlottedModel):
 class _ApplicationCommandInteractionDataOption(SlottedModel):
     name = Field(text)
     type = Field(int)
-    value = Field(enum(ApplicationCommandOptionType))
+    # value = Field(enum(ApplicationCommandOptionType))
+    value = Field(str_or_int)
+    focused = Field(bool)
 
 
 class ApplicationCommandInteractionDataOption(_ApplicationCommandInteractionDataOption):
@@ -78,12 +83,13 @@ class ApplicationCommandInteractionData(SlottedModel):
 
 class ApplicationCommand(SlottedModel):
     id = Field(snowflake)
+    type = Field(enum(ApplicationCommandTypes))
     application_id = Field(snowflake)
+    guild_id = Field(snowflake)
     name = Field(text)
     description = Field(text)
     options = ListField(ApplicationCommandOption)
     default_permission = Field(bool, default=True)
-    guild_id = Field(snowflake)
     version = Field(snowflake)
 
 
@@ -160,6 +166,8 @@ class InteractionCallbackType:
     DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE = 5
     DEFERRED_UPDATE_MESSAGE = 6
     UPDATE_MESSAGE = 7
+    APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8
+    # UNKNOWN = 9
 
 
 class InteractionResponseFlags:
