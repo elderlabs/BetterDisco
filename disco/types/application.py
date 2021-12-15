@@ -1,7 +1,7 @@
-from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property, DictField, str_or_int
+from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property, DictField, str_or_int, BitsetMap, BitsetValue
 from disco.types.channel import Channel, ChannelType
 from disco.types.guild import GuildMember, Role
-from disco.types.message import MessageEmbed, AllowedMentions, MessageFlagValue, Message, MessageComponent, SelectOption
+from disco.types.message import MessageEmbed, AllowedMentions, Message, MessageComponent, SelectOption
 from disco.types.user import User
 
 
@@ -45,14 +45,14 @@ class ApplicationCommandOption(_ApplicationCommandOption):
     options = ListField(_ApplicationCommandOption)
 
 
-class ApplicationCommandInteractionDataResolved(SlottedModel):
+class InteractionDataResolved(SlottedModel):
     users = DictField(snowflake, User)
     members = DictField(snowflake, GuildMember)
     roles = DictField(snowflake, Role)
     channels = DictField(snowflake, Channel)
 
 
-class _ApplicationCommandInteractionDataOption(SlottedModel):
+class _InteractionDataOption(SlottedModel):
     name = Field(text)
     type = Field(int)
     # value = Field(enum(ApplicationCommandOptionType))
@@ -60,8 +60,8 @@ class _ApplicationCommandInteractionDataOption(SlottedModel):
     focused = Field(bool)
 
 
-class ApplicationCommandInteractionDataOption(_ApplicationCommandInteractionDataOption):
-    options = ListField(_ApplicationCommandInteractionDataOption)
+class InteractionDataOption(_InteractionDataOption):
+    options = ListField(_InteractionDataOption)
 
 
 class ComponentTypes:
@@ -69,15 +69,15 @@ class ComponentTypes:
     BUTTON = 2
 
 
-class ApplicationCommandInteractionData(SlottedModel):
+class InteractionData(SlottedModel):
     id = Field(snowflake)
     name = Field(text)
     type = Field(enum(ApplicationCommandTypes))
-    resolved = Field(ApplicationCommandInteractionDataResolved)
-    options = ListField(ApplicationCommandInteractionDataOption)
+    resolved = Field(InteractionDataResolved, create=False)
+    options = ListField(InteractionDataOption, create=False)
     custom_id = Field(text)
     component_type = Field(int)
-    values = ListField(SelectOption)
+    values = ListField(SelectOption, create=False)
     target_id = Field(snowflake)
 
 
@@ -89,7 +89,7 @@ class ApplicationCommand(SlottedModel):
     name = Field(text)
     description = Field(text)
     options = ListField(ApplicationCommandOption)
-    default_permission = Field(bool, default=True)
+    default_permission = Field(bool)
     version = Field(snowflake)
 
 
@@ -122,46 +122,53 @@ class Interaction(SlottedModel):
     id = Field(snowflake)
     application_id = Field(snowflake)
     type = Field(enum(InteractionType))
-    data = Field(ApplicationCommandInteractionData)
+    data = Field(InteractionData)
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
-    member = Field(GuildMember)
-    user = Field(User)
+    member = Field(GuildMember, create=False)
+    user = Field(User, create=False)
     token = Field(text)
     version = Field(int)
-    message = Field(Message)
+    message = Field(Message, create=False)
 
-    @cached_property
-    def guild(self):
-        return self.client.state.guilds.get(self.guild_id)
+    def __str__(self):
+        return '<Interaction {} ({})>'.format(self.id, self.channel_id)
 
     @cached_property
     def channel(self):
-        return self.client.state.channels.get(self.channel_id)
+        if self.guild_id:
+            if self.channel_id in self.client.state.threads:
+                return self.client.state.threads.get(self.channel_id)
+            return self.client.state.channels.get(self.channel_id)
+        else:
+            if self.channel_id in self.client.state.dms:
+                return self.client.state.dms[self.channel_id]
+            return self.client.api.channels_get(self.channel_id)
 
-    def send_acknowledgement(self, type, data=None):
-        return self.client.api.interactions_create(self.id, self.token, type, data)
+    @cached_property
+    def guild(self):
+        return self.channel.guild
 
-    def edit_acknowledgement(self, data):
-        return self.client.api.interactions_edit(self.id, self.token, data)
+    def pin(self):
+        return self.channel.create_pin(self)
 
-    def delete_acknowledgement(self):
-        return self.client.api.interactions_delete(self.id, self.token)
+    def unpin(self):
+        return self.channel.delete_pin(self)
 
-    def reply(self, data):
-        return self.client.api.interactions_followup_create(self.token, data)
+    def reply(self, *args, **kwargs):
+        return self.client.api.interactions_create_reply(self.id, self.token, *args, **kwargs)
 
-    def edit(self, data):
-        return self.client.api.interactions_followup_edit(self.token, data)
+    def edit(self, *args, **kwargs):
+        return self.client.api.interactions_edit_reply(self.client.state.me.id, self.token, *args, **kwargs)
 
     def delete(self):
-        return self.client.api.interactions_followup_delete(self.token)
+        return self.client.api.interactions_delete_reply(self.client.state.me.id, self.token)
 
 
 class InteractionCallbackType:
     PONG = 1
-    # ACKNOWLEDGE = 2
-    # CHANNEL_MESSAGE = 3
+    # ACKNOWLEDGE = 2  # DEPRECATED
+    # CHANNEL_MESSAGE = 3  # DEPRECATED
     CHANNEL_MESSAGE_WITH_SOURCE = 4
     DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE = 5
     DEFERRED_UPDATE_MESSAGE = 6
@@ -170,19 +177,26 @@ class InteractionCallbackType:
     # UNKNOWN = 9
 
 
-class InteractionResponseFlags:
+class InteractionResponseFlags(BitsetMap):
     EPHEMERAL = 1 << 6
 
 
-class InteractionApplicationCommandCallbackData(SlottedModel):
+class InteractionResponseFlagsValue(BitsetValue):
+    map = InteractionResponseFlags
+
+
+class InteractionCallbackData(SlottedModel):
     tts = Field(bool)
     content = Field(text)
     embeds = ListField(MessageEmbed)
     allowed_mentions = Field(AllowedMentions)
-    flags = Field(MessageFlagValue)
+    flags = Field(InteractionResponseFlagsValue)
     components = ListField(MessageComponent)
 
 
-class InteractionResponse(SlottedModel):
-    type = Field(InteractionCallbackType)
-    data = Field(InteractionApplicationCommandCallbackData)
+class InteractionResponse(Interaction):
+    type = Field(enum(InteractionCallbackType))
+    data = Field(InteractionCallbackData)
+
+    def __str__(self):
+        return '<InteractionResponse {} ({})>'.format(self.id, self.channel_id)

@@ -289,7 +289,7 @@ class Bot(LoggingClass):
         else:
             self.command_matches_re = None
 
-    def get_commands_for_message(self, require_mention, mention_rules, prefixes, msg):
+    def get_commands_for_message(self, require_mention, mention_rules, prefixes, msg=None, interaction=None, content=None):
         """
         Generator of all commands that a given message object triggers, based on
         the bots plugins and configuration.
@@ -305,6 +305,10 @@ class Bot(LoggingClass):
             A list of prefixes to check the message starts with.
         msg : :class:`disco.types.message.Message`
             The message object to parse and find matching commands for.
+        interaction : :class:`disco.types.something` /shrug
+            The interaction object.
+        content : str
+            The content a message would contain if we were providing a command from one.
 
         Yields
         -------
@@ -313,9 +317,9 @@ class Bot(LoggingClass):
         """
         # somebody better figure out what this yields...
 
-        content = msg.content
+        content = msg.content if msg else content
 
-        if require_mention:
+        if require_mention and msg:
             mention_direct = msg.is_mentioned(self.client.state.me)
             mention_everyone = msg.mention_everyone
 
@@ -399,7 +403,7 @@ class Bot(LoggingClass):
         if not command.level:
             return True
 
-        level = self.get_level(msg.author if not msg.guild else msg.guild.get_member(msg.author))
+        level = self.get_level(msg.member if not msg.guild else msg.guild.get_member(msg.member))
 
         if level >= command.level:
             return True
@@ -442,7 +446,7 @@ class Bot(LoggingClass):
         return False
 
     def on_message_create(self, event):
-        if event.message.author.id == self.client.state.me.id:
+        if event.message.member.id == self.client.state.me.id:
             return
 
         result = self.handle_message(event.message)

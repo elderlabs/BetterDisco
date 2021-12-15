@@ -37,9 +37,9 @@ class GuildNSFWLevel:
 
 
 class ExplicitContentFilterLevel:
-    NONE = 0
-    WITHOUT_ROLES = 1
-    ALL = 2
+    DISABLED = 0
+    MEMBERS_WITHOUT_ROLES = 1
+    ALL_MEMBERS = 2
 
 
 class DefaultMessageNotificationsLevel:
@@ -458,7 +458,7 @@ class Guild(SlottedModel, Permissible):
     premium_tier : int
         Guild's premium tier.
     premium_subscription_count : int
-        The amount of users using their Nitro boost on this guild.
+        The amount of users using their Nitro boosts on this guild.
     """
     id = Field(snowflake)
     name = Field(text)
@@ -546,9 +546,7 @@ class Guild(SlottedModel, Permissible):
         return self.client.api.applications_guild_commands_delete(self.id, command_id)
 
     def delete_commands_all(self):
-        commands = self.get_commands()
-        for cmd in commands:
-            self.delete_command(cmd.id)
+            return self.client.api.applications_guild_commands_bulk_overwrite(self.id, [])
 
     def get_permissions(self, member):
         """

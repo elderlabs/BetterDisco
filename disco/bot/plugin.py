@@ -349,7 +349,11 @@ class Plugin(LoggingClass, PluginDeco):
         try:
             return event.command.execute(event)
         except CommandError as e:
-            event.msg.reply(e.msg)
+            self.log.error(f'Error in disco.bot.plugin.execute(): {e.msg}')
+            if hasattr(event, 'msg') and event.msg:
+                event.msg.reply(e.msg)
+            else:
+                event.interaction.reply(e.msg)
             return False
         finally:
             self.ctx.drop()

@@ -39,8 +39,8 @@ class CommandEvent:
     ----------
     command : :class:`Command`
         The command this event was created for (aka the triggered command).
-    msg : :class:`disco.types.message.Message`
-        The message object which triggered this command.
+    event : :class:'Event'
+        The event that triggered the command. Can be a message or interaction event.
     match : :class:`re.MatchObject`
         The regex match object for the command.
     name : str
@@ -49,9 +49,10 @@ class CommandEvent:
         Arguments passed to the command.
     """
 
-    def __init__(self, command, msg, match):
+    def __init__(self, command, event, match):
         self.command = command
-        self.msg = msg
+        self.interaction = event.interaction
+        self.msg = event.message
         self.match = match
         self.name = self.match.group(1).strip()
         self.args = []
@@ -61,6 +62,8 @@ class CommandEvent:
 
     @property
     def codeblock(self):
+        if not self.msg:
+            return
         if '`' not in self.msg.content:
             return ' '.join(self.args)
 
@@ -86,6 +89,8 @@ class CommandEvent:
         """
         Channel the message was created in.
         """
+        if not self.msg:
+            return self.interaction.channel
         return self.msg.channel
 
     @simple_cached_property
@@ -93,6 +98,8 @@ class CommandEvent:
         """
         Guild (if relevant) the message was created in.
         """
+        if not self.msg:
+            return self.interaction.guild
         return self.msg.guild
 
     @simple_cached_property
@@ -100,7 +107,18 @@ class CommandEvent:
         """
         Author of the message.
         """
+        if not self.msg:
+            return self.interaction.member
         return self.msg.author
+
+    def reply(self, *args, **kwargs):
+        """
+        A convenient method to call the respective events' reply methods.
+        """
+        if self.msg:
+            return self.msg.reply(*args, **kwargs)
+        elif self.interaction:
+            return self.interaction.reply(*args, **kwargs)
 
 
 class CommandError(Exception):
@@ -108,8 +126,9 @@ class CommandError(Exception):
     An exception which is thrown when the arguments for a command are invalid,
     or don't match the command's specifications.
     """
-    def __init__(self, msg):
-        self.msg = msg
+    def __init__(self, event):
+        self.msg = (event.message or event.msg) if (event.message or event.msg) else None
+        self.interaction = event.interaction if event.interaction else None
 
 
 class Command:
@@ -175,10 +194,16 @@ class Command:
             **kwargs):
         self.triggers += aliases or []
 
+    # TODO: should these methods be staggered like this, or is it a typo?
         def resolve_role(ctx, rid):
+            if not ctx.msg:
+                return ctx.guild.roles.get(rid)
             return ctx.msg.guild.roles.get(rid)
 
         def resolve_user(ctx, uid):
+            # TODO: I mean it should work, right?
+            if not ctx.msg:
+                return ctx.interaction.data.resolved.users.get(uid)
             if isinstance(uid, int):
                 if uid in ctx.msg.mentions:
                     return ctx.msg.mentions.get(uid)
@@ -188,12 +213,16 @@ class Command:
                 return ctx.msg.client.state.users.select_one(username=uid[0], discriminator=uid[1])
 
         def resolve_channel(ctx, cid):
+            if not ctx.msg:
+                return ctx.interaction.data.resolved.channels.get(cid)
             if isinstance(cid, int):
                 return ctx.msg.guild.channels.get(cid)
             else:
                 return ctx.msg.guild.channels.select_one(name=cid)
 
         def resolve_guild(ctx, gid):
+            if not ctx.msg:
+                return ctx.interaction.client.state.guilds.get(gid)
             return ctx.msg.client.state.guilds.get(gid)
 
         if args:
@@ -286,6 +315,7 @@ class Command:
 
         if self.args:
             if len(event.args) < self.args.required_length:
+                print(f'Error in disco.bot.command.execute() - malformated command: {event.name}')
                 raise CommandError('Command {} requires {} argument(s) (`{}`) passed {}'.format(
                     event.name,
                     self.args.required_length,

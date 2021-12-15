@@ -149,7 +149,7 @@ class MessageReference(SlottedModel):
     message_id = Field(snowflake)
     channel_id = Field(snowflake)
     guild_id = Field(snowflake)
-    fail_if_not_exists = Field(bool, default=True)
+    fail_if_not_exists = Field(bool)
 
 
 class MessageActivity(SlottedModel):
@@ -514,7 +514,7 @@ class SelectOption(SlottedModel):
     default = Field(bool)
 
 
-class MessageComponent(SlottedModel):
+class _MessageComponent(SlottedModel):
     type = Field(enum(ComponentTypes))
     custom_id = Field(text)
     disabled = Field(bool)
@@ -526,7 +526,10 @@ class MessageComponent(SlottedModel):
     placeholder = Field(text)
     min_values = Field(int)
     max_values = Field(int)
-    components = Field(bool)
+
+
+class MessageComponent(_MessageComponent):
+    components = ListField(_MessageComponent)
 
 
 class ActionRow(SlottedModel):
@@ -540,7 +543,7 @@ class ActionRow(SlottedModel):
             return self.components.append(MessageComponent(*args, **kwargs))
 
 
-class Message(SlottedModel):
+class _Message(SlottedModel):
     """
     Represents a Message created within a Channel on Discord.
 
@@ -592,7 +595,7 @@ class Message(SlottedModel):
     id = Field(snowflake)
     channel_id = Field(snowflake)
     guild_id = Field(snowflake)
-    author = Field(User)
+    author = Field(User)  # use Message.member() instead
     content = Field(text)
     timestamp = Field(datetime)
     edited_timestamp = Field(datetime)
@@ -613,14 +616,30 @@ class Message(SlottedModel):
     application_id = Field(snowflake)
     message_reference = Field(MessageReference)
     flags = Field(MessageFlagValue)
-    # referenced_message = Field()
-    interaction = Field(MessageInteraction)
-    thread = Field(Channel)
+    interaction = Field(MessageInteraction, create=False)
+    thread = Field(Channel, create=False)
     components = ListField(MessageComponent)
-    sticker_items = ListField(StickerItemStructure, default=[])
+    sticker_items = ListField(StickerItemStructure)
 
     def __str__(self):
         return '<Message {} ({})>'.format(self.id, self.channel_id)
+
+    @cached_property
+    def channel(self):
+        """
+        Returns
+        -------
+        `Channel`
+            The channel this message was created in.
+        """
+        if self.guild_id:
+            if self.channel_id in self.client.state.threads:
+                return self.client.state.threads.get(self.channel_id)
+            return self.client.state.channels.get(self.channel_id)
+        else:
+            if self.channel_id in self.client.state.dms:
+                return self.client.state.dms[self.channel_id]
+            return self.client.api.channels_get(self.channel_id)
 
     @cached_property
     def guild(self):
@@ -641,23 +660,6 @@ class Message(SlottedModel):
             The guild member (if applicable) that sent this message.
         """
         return self.channel.guild.get_member(self.author)
-
-    @cached_property
-    def channel(self):
-        """
-        Returns
-        -------
-        `Channel`
-            The channel this message was created in.
-        """
-        if self.guild_id:
-            if self.channel_id in self.client.state.threads:
-                return self.client.state.threads.get(self.channel_id)
-            return self.client.state.channels.get(self.channel_id)
-        else:
-            if self.channel_id in self.client.state.dms:
-                return self.client.state.dms[self.channel_id]
-            return self.client.api.channels_get(self.channel_id)
 
     def pin(self):
         """
@@ -897,6 +899,10 @@ class Message(SlottedModel):
             content = re.sub('(<#([0-9]+)>)', replace_channel, content)
 
         return content
+
+
+class Message(_Message):
+    referenced_message = Field(_Message, create=False)
 
 
 class MessageTable:

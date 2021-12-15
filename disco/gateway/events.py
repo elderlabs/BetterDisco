@@ -847,15 +847,6 @@ class InteractionCreate(GatewayEvent):
     Sent whenever a /command is sent to your application.
     """
     guild_id = Field(snowflake)
-    channel_id = Field(snowflake)
-
-    @property
-    def guild(self):
-        return self.client.state.guilds.get(self.guild_id)
-
-    @property
-    def channel(self):
-        return self.client.state.channels.get(self.channel_id)
 
 
 @wraps_model(ApplicationCommand)

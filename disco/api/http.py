@@ -221,7 +221,7 @@ class Routes:
     # Interactions
     INTERACTIONS = '/webhooks/{id}/{token}'
     INTERACTIONS_CREATE = (HTTPMethod.POST, '/interactions/{id}/{token}/callback')
-    INTERACTIONS_GET_ORIGINAL_RESPONSE = (HTTPMethod.GET, '/webhooks/{application}/{token}/messages/@original')
+    INTERACTIONS_GET_ORIGINAL_RESPONSE = (HTTPMethod.GET, INTERACTIONS + '/messages/@original')
     INTERACTIONS_EDIT = (HTTPMethod.PATCH, INTERACTIONS + '/messages/@original')
     INTERACTIONS_DELETE = (HTTPMethod.DELETE, INTERACTIONS + '/messages/@original')
     INTERACTIONS_FOLLOWUP_CREATE = (HTTPMethod.POST, INTERACTIONS)

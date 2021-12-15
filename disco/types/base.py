@@ -246,7 +246,10 @@ def str_or_int(obj):
     if str(obj).isdigit():
         return int(obj)
 
-    return str(obj)
+    try:
+        return float(obj)
+    except:
+        return str(obj)
 
 
 def with_equality(field):
