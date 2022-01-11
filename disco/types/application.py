@@ -130,6 +130,8 @@ class Interaction(SlottedModel):
     token = Field(text)
     version = Field(int)
     message = Field(Message, create=False)
+    locale = Field(str)
+    guild_locale = Field(str)
 
     def __str__(self):
         return '<Interaction {} ({})>'.format(self.id, self.channel_id)
