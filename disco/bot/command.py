@@ -126,9 +126,8 @@ class CommandError(Exception):
     An exception which is thrown when the arguments for a command are invalid,
     or don't match the command's specifications.
     """
-    def __init__(self, event):
-        self.msg = (event.message or event.msg) if (event.message or event.msg) else None
-        self.interaction = event.interaction if event.interaction else None
+    def __init__(self, msg):
+        self.msg = msg
 
 
 class Command:
@@ -316,11 +315,12 @@ class Command:
         if self.args:
             if len(event.args) < self.args.required_length:
                 print(f'Error in disco.bot.command.execute() - malformated command: {event.name}')
-                raise CommandError('Command {} requires {} argument(s) (`{}`) passed {}'.format(
+                raise CommandError('Command {} requires {} argument{} (`{}`), passed {}'.format(
                     event.name,
                     self.args.required_length,
+                    's' if self.args.required_length != 1 else '',
                     self.raw_args,
-                    len(event.args),
+                    len(event.args)
                 ))
 
             try:
