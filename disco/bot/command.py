@@ -1,6 +1,6 @@
 try:
     import regex as re
-except:
+except ImportError:
     import re
 import argparse
 
@@ -39,7 +39,7 @@ class CommandEvent:
     ----------
     command : :class:`Command`
         The command this event was created for (aka the triggered command).
-    event : :class:'Event'
+    _event : :class:'Event'
         The event that triggered the command. Can be a message or interaction event.
     match : :class:`re.MatchObject`
         The regex match object for the command.
@@ -51,8 +51,9 @@ class CommandEvent:
 
     def __init__(self, command, event, match):
         self.command = command
-        self.interaction = event.interaction
+        self._event = event
         self.msg = event.message
+        self.interaction = event.interaction
         self.match = match
         self.name = self.match.group(1).strip()
         self.args = []
@@ -82,33 +83,30 @@ class CommandEvent:
         """
         Guild member (if relevant) for the user that created the message.
         """
-        return self.guild.get_member(self.author)
+        # return self.guild.get_member(self.author)
+        return self._event.member
 
     @simple_cached_property
     def channel(self):
         """
         Channel the message was created in.
         """
-        if not self.msg:
-            return self.interaction.channel
-        return self.msg.channel
+        return self._event.channel
 
     @simple_cached_property
     def guild(self):
         """
         Guild (if relevant) the message was created in.
         """
-        if not self.msg:
-            return self.interaction.guild
-        return self.msg.guild
+        return self._event.guild
 
     @simple_cached_property
     def author(self):
         """
         Author of the message.
         """
-        if not self.msg:
-            return self.interaction.member
+        if self.interaction:
+            return self.interaction.member.user if self.interaction.member else self.interaction.user
         return self.msg.author
 
     def reply(self, *args, **kwargs):
@@ -314,7 +312,7 @@ class Command:
 
         if self.args:
             if len(event.args) < self.args.required_length:
-                print(f'Error in disco.bot.command.execute() - malformated command: {event.name}')
+                event.command.plugin.log.warn(f'Error in disco.bot.command.execute() - malformated command: {event.name}')
                 raise CommandError('Command {} requires {} argument{} (`{}`), passed {}'.format(
                     event.name,
                     self.args.required_length,

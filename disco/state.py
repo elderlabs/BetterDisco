@@ -152,9 +152,16 @@ class State:
         self.me.inplace_update(event.user)
 
     def on_message_create(self, event):
+        if event.author.id not in self.users:
+            self.users[event.author.id] = event.author
+
+        # if self.config.sync_guild_members:
+        #     if event.guild and event.author.id not in self.guilds[event.message.guild_id].members:
+        #         self.guilds[event.message.guild_id].members[event.author.id] = event.message.member
+
         if self.config.track_messages:
             self.messages[event.message.channel_id].append(
-                StackMessage(event.message.id, event.message.channel_id, event.message.author.id))
+                StackMessage(event.message.id, event.message.channel_id, event.author.id))
 
         if event.message.channel_id in self.channels:
             self.channels[event.message.channel_id].last_message_id = event.message.id
@@ -185,7 +192,7 @@ class State:
                 self.messages[event.channel_id].remove(sm)
 
     def on_guild_create(self, event):
-        if not event.unavailable:
+        if not event.unavailable and not self.ready.is_set():
             self.guilds_waiting_sync -= 1
             if self.guilds_waiting_sync <= 0:
                 self.ready.set()
@@ -211,7 +218,7 @@ class State:
                 self.users[presence.user.id].presence = presence
 
         # TODO: better performance on large guild sync
-        if self.config.sync_guild_members:
+        if self.config.sync_guild_members and len(self.guilds[event.guild.id].members) < event.guild.member_count:
             event.guild.request_guild_members()
 
     def on_guild_update(self, event):
@@ -335,27 +342,27 @@ class State:
             return
 
         # Avoid adding duplicate events to member_count.
-        if event.member.id not in self.guilds[event.guild_id].members:
+        if event.member.user.id not in self.guilds[event.guild_id].members:
             self.guilds[event.guild_id].member_count += 1
 
-        self.guilds[event.guild_id].members[event.member.id] = event.member
+        self.guilds[event.guild_id].members[event.member.user.id] = event.member
 
     def on_guild_member_update(self, event):
         if event.guild_id not in self.guilds:
             return
 
-        if event.member.id not in self.guilds[event.guild_id].members:
+        if event.member.user.id not in self.guilds[event.guild_id].members:
             return
 
-        self.guilds[event.guild_id].members[event.member.id].inplace_update(event.member)
+        self.guilds[event.guild_id].members[event.member.user.id].inplace_update(event.member)
 
-        if not event.user.id in self.users:
-            self.users[event.user.id] = event.user
+        if not event.member.user.id in self.users:
+            self.users[event.member.user.id] = event.member.user
 
-        if event.roles and event.guild_id in self.guilds:
-            self.guilds[event.guild_id].members[event.user.id].roles = event.roles
+        if event.member.roles and event.guild_id in self.guilds:
+            self.guilds[event.guild_id].members[event.member.user.id].roles = event.member.roles
 
-        self.users[event.user.id].inplace_update(event.user)
+        self.users[event.member.user.id].inplace_update(event.member.user)
 
     def on_guild_member_remove(self, event):
         if event.guild_id not in self.guilds:

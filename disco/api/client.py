@@ -1,4 +1,7 @@
-import json
+try:
+    import ujson as json
+except ImportError:
+    import json
 import warnings
 
 from contextlib import contextmanager

@@ -1,6 +1,6 @@
 try:
     import regex as re
-except:
+except ImportError:
     import re
 import copy
 from disco.util.sanitize import S

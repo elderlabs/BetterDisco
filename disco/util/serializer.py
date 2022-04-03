@@ -11,22 +11,29 @@ class Serializer:
     @classmethod
     def check_format(cls, fmt):
         if fmt not in cls.FORMATS:
-            raise Exception('Unsupported serialization format: {}'.format(fmt))
+            raise Exception(f'Unsupported serialization format: {fmt}')
 
     @staticmethod
     def json():
-        from json import loads, dumps
-        return (loads, dumps)
+        try:
+            from ujson import loads, dumps
+        except ImportError:
+            from json import loads, dumps
+        return loads, dumps
 
     @staticmethod
     def yaml():
+        try:
+            import pylibyaml
+        except ImportError:
+            pass
         from yaml import full_load, dump
-        return (full_load, dump)
+        return full_load, dump
 
     @staticmethod
     def pickle():
         from pickle import loads, dumps
-        return (loads, dumps)
+        return loads, dumps
 
     @classmethod
     def loads(cls, fmt, raw):

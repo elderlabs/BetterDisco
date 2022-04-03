@@ -5,7 +5,8 @@ from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, 
 from disco.types.channel import Channel, PermissionOverwrite, ThreadMember, StageInstance
 from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration
 from disco.types.invite import Invite
-from disco.types.message import Message, MessageReactionEmoji, Sticker
+from disco.types.reactions import MessageReactionEmoji, Sticker
+from disco.types.message import Message
 from disco.types.oauth import Application
 from disco.types.user import User, Presence
 from disco.types.voice import VoiceState
@@ -477,7 +478,6 @@ class GuildRoleDelete(GatewayEvent):
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
 
-
 @wraps_model(Message)
 class MessageCreate(GatewayEvent):
     """
@@ -491,6 +491,7 @@ class MessageCreate(GatewayEvent):
         The ID of the guild this message comes from.
     """
     guild_id = Field(snowflake)
+    m = Field(GuildMember, alias='member')
 
 
 @wraps_model(Message)
@@ -847,6 +848,7 @@ class InteractionCreate(GatewayEvent):
     Sent whenever a /command is sent to your application.
     """
     guild_id = Field(snowflake)
+    m = Field(GuildMember, alias='member')
 
 
 @wraps_model(ApplicationCommand)
@@ -1039,4 +1041,8 @@ class GuildJoinRequestUpdate(GatewayEvent):
     """
     Sent when a guild join request is approved or denied
     """
+    guild_id = Field(snowflake)
+
+
+class GuildScheduledEventUserAdd(GatewayEvent):
     guild_id = Field(snowflake)

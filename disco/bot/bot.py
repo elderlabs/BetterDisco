@@ -1,6 +1,6 @@
 try:
     import regex as re
-except:
+except ImportError:
     import re
 import os
 import gevent
@@ -9,15 +9,15 @@ import importlib
 
 from gevent.pywsgi import WSGIServer
 
-from disco.types.guild import GuildMember
 from disco.bot.plugin import find_loadable_plugins
 from disco.bot.command import CommandEvent, CommandLevels
 from disco.bot.storage import Storage
+from disco.types.guild import GuildMember
 from disco.util.config import Config
+from disco.util.enum import get_enum_value_by_name
 from disco.util.logging import LoggingClass
 from disco.util.serializer import Serializer
 from disco.util.threadlocal import ThreadLocal
-from disco.util.enum import get_enum_value_by_name
 
 
 class BotConfig(Config):
@@ -101,7 +101,7 @@ class BotConfig(Config):
     commands_prefix = ''  # now deprecated
     command_prefixes = []
     commands_prefix_getter = None
-    commands_allow_edit = True
+    commands_allow_edit = False
     commands_level_getter = None
     commands_group_abbrev = True
 
@@ -109,7 +109,7 @@ class BotConfig(Config):
     plugin_config_format = 'json'
     plugin_config_dir = 'config'
 
-    storage_enabled = True
+    storage_enabled = False
     storage_fsync = True
     storage_serializer = 'json'
     storage_path = 'storage.json'
@@ -178,13 +178,13 @@ class Bot(LoggingClass):
         self.group_abbrev = {}
 
         # Only bind event listeners if we're going to parse commands
-        if self.config.commands_enabled:
+        if self.config.commands_enabled and (self.config.commands_require_mention or len(self.config.command_prefixes)):
             self.client.events.on('MessageCreate', self.on_message_create)
 
             if self.config.commands_allow_edit:
                 self.client.events.on('MessageUpdate', self.on_message_update)
 
-        # If we have a level getter and its a string, try to load it
+        # If we have a level getter, and it is a string, try to load it
         if isinstance(self.config.commands_level_getter, str):
             mod, func = self.config.commands_level_getter.rsplit('.', 1)
             mod = importlib.import_module(mod)
@@ -212,7 +212,7 @@ class Bot(LoggingClass):
     @classmethod
     def from_cli(cls, *plugins):
         """
-        Creates a new instance of the bot using the utilities inside of the
+        Creates a new instance of the bot using the utilities inside the
         :mod:`disco.cli` module. Allows passing in a set of uninitialized
         plugin classes to load.
 
@@ -232,7 +232,7 @@ class Bot(LoggingClass):
     @property
     def commands(self):
         """
-        Generator of all commands this bots plugins have defined.
+        Generator of all commands the bots plugins have defined.
         """
         for plugin in self.plugins.values():
             for command in plugin.commands:
@@ -289,7 +289,7 @@ class Bot(LoggingClass):
         else:
             self.command_matches_re = None
 
-    def get_commands_for_message(self, require_mention, mention_rules, prefixes, msg=None, interaction=None, content=None):
+    def get_commands_for_message(self, require_mention, mention_rules, prefixes, msg=None, content=None):
         """
         Generator of all commands that a given message object triggers, based on
         the bots plugins and configuration.
@@ -305,8 +305,6 @@ class Bot(LoggingClass):
             A list of prefixes to check the message starts with.
         msg : :class:`disco.types.message.Message`
             The message object to parse and find matching commands for.
-        interaction : :class:`disco.types.something` /shrug
-            The interaction object.
         content : str
             The content a message would contain if we were providing a command from one.
 
@@ -315,7 +313,8 @@ class Bot(LoggingClass):
         tuple(:class:`disco.bot.command.Command`, `re.MatchObject`)
             All commands the message triggers.
         """
-        # somebody better figure out what this yields...
+        if not (require_mention or len(prefixes)):
+            return []
 
         content = msg.content if msg else content
 
@@ -328,41 +327,43 @@ class Bot(LoggingClass):
                 mention_roles = tuple(filter(lambda r: msg.is_mentioned(r),
                                             msg.guild.get_member(self.client.state.me).roles))
 
-            if not any((
+            if any((
                 mention_rules.get('user', True) and mention_direct,
                 mention_rules.get('everyone', False) and mention_everyone,
                 mention_rules.get('role', False) and any(mention_roles),
                 msg.channel.is_dm,
             )):
-                return []
-
-            if mention_direct:
-                if msg.guild:
-                    member = msg.guild.get_member(self.client.state.me)
-                    if member:
-                        # Filter both the normal and nick mentions
-                        content = content.replace(member.user.mention, '', 1)
-                        content = content.replace(member.user.mention_nickname, '', 1)
+                if mention_direct:
+                    if msg.guild:
+                        member = msg.guild.get_member(self.client.state.me)
+                        if member:
+                            # Filter both the normal and nick mentions
+                            content = content.replace(member.user.mention, '', 1)
+                            content = content.replace(member.user.mention_nickname, '', 1)
+                    else:
+                        content = content.replace(self.client.state.me.mention, '', 1)
+                elif mention_everyone:
+                    content = content.replace('@everyone', '', 1)
+                elif mention_roles:
+                    for role in mention_roles:
+                        content = content.replace('<@{}>'.format(role), '', 1)
                 else:
-                    content = content.replace(self.client.state.me.mention, '', 1)
-            elif mention_everyone:
-                content = content.replace('@everyone', '', 1)
-            else:
-                for role in mention_roles:
-                    content = content.replace('<@{}>'.format(role), '', 1)
+                    return []
 
             content = content.lstrip()
+        if len(prefixes):
+            # Scan through the prefixes to find the first one that matches.
+            # This may lead to unexpected results, but said unexpectedness
+            # should be easy to avoid. An example of the unexpected results
+            # that may occur would be if one prefix was `!` and one was `!a`.
+            proceed = False
+            for prefix in prefixes:
+                if prefix and content.startswith(prefix):
+                    content = content[len(prefix):]
+                    proceed = True
+                    break
 
-        # Scan through the prefixes to find the first one that matches.
-        # This may lead to unexpected results, but said unexpectedness
-        # should be easy to avoid. An example of the unexpected results
-        # that may occur would be if one prefix was `!` and one was `!a`.
-        for prefix in prefixes:
-            if prefix and content.startswith(prefix):
-                content = content[len(prefix):]
-                break
-        else:
-            if not require_mention:  # don't want to prematurely return
+            if not proceed:
                 return []
 
         try:
@@ -399,57 +400,70 @@ class Bot(LoggingClass):
 
         return level
 
-    def check_command_permissions(self, command, msg):
+    def check_command_permissions(self, command, event):
         if not command.level:
             return True
 
-        level = self.get_level(msg.member if not msg.guild else msg.guild.get_member(msg.member))
+        if event.message:
+            level = self.get_level(event.author if not event.guild else event.member)
+        elif event.interaction:
+            level = self.get_level(event.interaction.user if not event.interaction.member else event.interaction.member)
 
         if level >= command.level:
             return True
         return False
 
-    def handle_message(self, msg):
+    def handle_command_event(self, event, content=None):
         """
-        Attempts to handle a newly created or edited message in the context of
+        Attempts to handle a newly created or edited command events in the context of
         command parsing/triggering. Calls all relevant commands the message triggers.
 
         Parameters
         ---------
-        msg : :class:`disco.types.message.Message`
-            The newly created or updated message object to parse/handle.
+        event : :class:'Event'
+            The newly created or updated event object to parse/handle.
+        content : :class:'Message'
+            Used for on_message_update below
 
         Returns
         -------
         bool
             Whether any commands where successfully triggered by the message.
         """
-        custom_message_prefixes = (self.config.commands_prefix_getter(msg)
-                                   if self.config.commands_prefix_getter else [])
+        if self.config.commands_enabled:
+            commands = []
+            custom_message_prefixes = None
+            if event.message:
+                if self.config.commands_prefix_getter:
+                    custom_message_prefixes = (self.config.commands_prefix_getter(event.message))
 
-        commands = tuple(self.get_commands_for_message(
-            self.config.commands_require_mention,
-            self.config.commands_mention_rules,
-            custom_message_prefixes or self.config.command_prefixes,
-            msg,
-        ))
+                commands = self.get_commands_for_message(
+                    self.config.commands_require_mention,
+                    self.config.commands_mention_rules,
+                    custom_message_prefixes or self.config.command_prefixes,
+                    event.message,
+                )
 
-        if not len(commands):
+            elif content:
+                commands = self.get_commands_for_message(False, {}, ['/'], content=content)
+
+            if not len(commands):
+                return False
+
+            for command, match in commands:
+                if not self.check_command_permissions(command, event):
+                    continue
+
+                if command.plugin.execute(CommandEvent(command, event, match)):
+                    return True
             return False
-
-        for command, match in commands:
-            if not self.check_command_permissions(command, msg):
-                continue
-
-            if command.plugin.execute(CommandEvent(command, msg, match)):
-                return True
-        return False
+        return
 
     def on_message_create(self, event):
-        if event.message.member.id == self.client.state.me.id:
+        if event.author.id == self.client.state.me.id:
             return
 
-        result = self.handle_message(event.message)
+        result = self.handle_command_event(event)
 
         if self.config.commands_allow_edit:
             self.last_message_cache[event.message.channel_id] = (event.message, result)
@@ -544,7 +558,7 @@ class Bot(LoggingClass):
         """
         Adds and loads a plugin, based on its module path.
         """
-        self.log.info('Adding plugin module at path "%s"', path)
+        self.log.info(f'Adding plugin module at path "{path}"')
         mod = importlib.import_module(path)
         loaded = False
 
@@ -554,7 +568,7 @@ class Bot(LoggingClass):
             self.add_plugin(plugin, config)
 
         if not loaded:
-            raise Exception('Could not find any plugins to load within module {}'.format(path))
+            raise Exception(f'Could not find any plugins to load within module {path}')
 
     def load_plugin_config(self, cls):
         name = cls.__name__.lower()

@@ -1,6 +1,6 @@
 try:
     import regex as re
-except:
+except ImportError:
     import re
 import warnings
 import functools
@@ -13,8 +13,10 @@ from disco.types.base import (
 from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
 from disco.types.channel import ChannelType, Channel
+from disco.types.reactions import Emoji, MessageReaction, StickerItemStructure
 from disco.types.user import User
 
+from disco.types.guild import GuildMember
 
 class MessageType:
     DEFAULT = 0
@@ -83,7 +85,7 @@ class Emoji(SlottedModel):
 
 class MessageReactionEmoji(Emoji):
     """
-    Represents a emoji which was used as a reaction on a message.
+    Represents an emoji which was used as a reaction on a message.
 
     Attributes
     ----------
@@ -315,11 +317,11 @@ class MessageEmbed(SlottedModel):
         The thumbnail of the embed.
     video : `MessageEmbedVideo`
         The video of the embed.
-    provider : "MessageEmbedProvider'
+    provider : `MessageEmbedProvider`
         The provider of the embed.
     author : `MessageEmbedAuthor`
         The author of the embed.
-    fields : list[`MessageEmbedField]`
+    fields : list[`MessageEmbedField`]
         The fields of the embed.
     """
     title = Field(text)
@@ -439,47 +441,6 @@ class MessageFlagValue(BitsetValue):
     map = MessageFlags
 
 
-class StickerTypes:
-    STANDARD = 1
-    GUILD = 2
-
-
-class StickerFormatTypes:
-    PNG = 1
-    APNG = 2
-    LOTTIE = 3
-
-
-class StickerItemStructure(SlottedModel):
-    id = Field(snowflake)
-    name = Field(text)
-    format_type = Field(enum(StickerFormatTypes))
-
-
-class Sticker(SlottedModel):
-    id = Field(snowflake)
-    pack_id = Field(snowflake)
-    name = Field(text)
-    description = Field(text)
-    tags = Field(text)
-    type = Field(enum(StickerTypes))
-    format_type = Field(enum(StickerFormatTypes))
-    available = Field(bool)
-    guild_id = Field(snowflake)
-    user = Field(User)
-    sort_value = Field(int)
-
-
-class StickerPack(SlottedModel):
-    id = Field(snowflake)
-    stickers = ListField(Sticker)
-    name = Field(text)
-    sku_id = Field(snowflake)
-    cover_sticker_id = Field(snowflake)
-    description = Field(text)
-    banner_asset_id = Field(snowflake)
-
-
 class MessageInteractionType:
     PING = 1
     APPLICATION_COMMAND = 2
@@ -595,13 +556,14 @@ class _Message(SlottedModel):
     id = Field(snowflake)
     channel_id = Field(snowflake)
     guild_id = Field(snowflake)
-    author = Field(User)  # use Message.member() instead
+    author = Field(User)
+    m = Field(GuildMember, alias='member', create=False)
     content = Field(text)
     timestamp = Field(datetime)
     edited_timestamp = Field(datetime)
     tts = Field(bool)
     mention_everyone = Field(bool)
-    mentions = AutoDictField(User, 'id')
+    mentions = AutoDictField(User, 'id', create=False)
     mention_roles = ListField(snowflake)
     mention_channels = ListField(ChannelMention)
     attachments = AutoDictField(MessageAttachment, 'id')
@@ -611,10 +573,10 @@ class _Message(SlottedModel):
     pinned = Field(bool)
     webhook_id = Field(snowflake)
     type = Field(enum(MessageType))
-    activity = Field(MessageActivity)
-    application = Field(MessageApplication)
+    activity = Field(MessageActivity, create=False)
+    application = Field(MessageApplication, create=False)
     application_id = Field(snowflake)
-    message_reference = Field(MessageReference)
+    message_reference = Field(MessageReference, create=False)
     flags = Field(MessageFlagValue)
     interaction = Field(MessageInteraction, create=False)
     thread = Field(Channel, create=False)

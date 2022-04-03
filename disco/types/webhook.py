@@ -1,6 +1,6 @@
 try:
     import regex as re
-except:
+except ImportError:
     import re
 
 from disco.types.base import SlottedModel, Field, snowflake, cached_property, enum, DictField, text

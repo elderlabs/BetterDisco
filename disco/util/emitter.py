@@ -133,7 +133,7 @@ class Emitter(LoggingClass):
             try:
                 listener(*args, **kwargs)
             except Exception as e:
-                if not isinstance(e.__class__, WebSocketConnectionClosedException):
+                if not e.__class__.__name__ == 'WebSocketConnectionClosedException':
                     self.log.warning('AFTER {} event handler `{}` raised {}: {}'.format(
                         name,
                         listener.callback.__name__,

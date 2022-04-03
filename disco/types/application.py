@@ -1,7 +1,7 @@
 from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property, DictField, str_or_int, BitsetMap, BitsetValue
 from disco.types.channel import Channel, ChannelType
 from disco.types.guild import GuildMember, Role
-from disco.types.message import MessageEmbed, AllowedMentions, Message, MessageComponent, SelectOption
+from disco.types.message import MessageEmbed, AllowedMentions, Message, MessageComponent, SelectOption, MessageAttachment
 from disco.types.user import User
 
 
@@ -50,6 +50,8 @@ class InteractionDataResolved(SlottedModel):
     members = DictField(snowflake, GuildMember)
     roles = DictField(snowflake, Role)
     channels = DictField(snowflake, Channel)
+    messages = DictField(snowflake, Message)
+    attachments = DictField(snowflake, MessageAttachment)
 
 
 class _InteractionDataOption(SlottedModel):
@@ -125,7 +127,7 @@ class Interaction(SlottedModel):
     data = Field(InteractionData)
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
-    member = Field(GuildMember, create=False)
+    m = Field(GuildMember, alias='member', create=False)
     user = Field(User, create=False)
     token = Field(text)
     version = Field(int)
@@ -149,7 +151,17 @@ class Interaction(SlottedModel):
 
     @cached_property
     def guild(self):
-        return self.channel.guild
+        return self.client.state.guilds.get(self.guild_id)
+
+    @cached_property
+    def member(self):
+        """
+        Returns
+        -------
+        `GuildMember`
+            The guild member (if applicable) that sent this message.
+        """
+        return self.channel.guild.get_member(self.m or self.user)
 
     def pin(self):
         return self.channel.create_pin(self)

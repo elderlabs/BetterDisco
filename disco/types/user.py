@@ -1,8 +1,7 @@
 from datetime import datetime
 
 from disco.types.base import (
-    SlottedModel, Field, snowflake, text, with_equality, with_hash, enum, ListField,
-    cached_property, str_or_int,
+    SlottedModel, Field, snowflake, text, with_equality, with_hash, enum, ListField, cached_property, str_or_int
 )
 
 
@@ -13,7 +12,7 @@ class DefaultAvatars:
     ORANGE = 3
     RED = 4
 
-    ALL = [BLURPLE, GREY, GREEN, ORANGE, RED]
+    ALL = ['BLURPLE', 'GREY', 'GREEN', 'ORANGE', 'RED']
 
 
 class UserFlags:
@@ -136,7 +135,7 @@ class ClientStatus(SlottedModel):
 
 class ActivityParty(SlottedModel):
     id = Field(text)
-    size = ListField(int)
+    # size = ListField(int)
 
 
 class ActivityAssets(SlottedModel):

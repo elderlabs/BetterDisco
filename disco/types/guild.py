@@ -12,7 +12,7 @@ from disco.types.base import (
 from disco.types.user import User
 from disco.types.voice import VoiceState
 from disco.types.channel import Channel, ChannelType, StageInstance, PermissionOverwrite, StageInstancePrivacyLevel
-from disco.types.message import Emoji, Sticker, StickerFormatTypes
+from disco.types.reactions import Emoji, Sticker, StickerFormatTypes
 from disco.types.permissions import PermissionValue, Permissions, Permissible
 
 
@@ -259,6 +259,7 @@ class GuildMember(SlottedModel):
     nick = Field(text)
     avatar = Field(text)
     roles = ListField(snowflake)
+    hoisted_role = Field(snowflake)
     joined_at = Field(datetime)
     premium_since = Field(datetime)
     deaf = Field(bool)
@@ -639,18 +640,11 @@ class Guild(SlottedModel, Permissible):
 
         return self.client.api.guilds_roles_modify(self.id, to_snowflake(role), **kwargs)
 
-    def request_guild_members(self, query=None, limit=0, presences=False):
+    def request_guild_members(self, query=None, limit=0, presences=True):
         self.client.gw.request_guild_members(self.id, query, limit, presences)
 
-    def request_guild_members_by_id(self, user_id_or_ids, limit=0, presences=False):
-        self.client.gw.request_guild_members_by_id(self.id, user_id_or_ids, limit, presences)
-
-    def sync(self):
-        warnings.warn(
-            'Guild.sync has been deprecated in place of Guild.request_guild_members',
-            DeprecationWarning)
-
-        self.request_guild_members()
+    def request_guild_members_by_id(self, user_id, limit=0, presences=True):
+        self.client.gw.request_guild_members_by_id(self.id, user_id, limit, presences)
 
     def get_bans(self):
         return self.client.api.guilds_bans_list(self.id)

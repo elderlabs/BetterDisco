@@ -64,7 +64,7 @@ class AutoSharder:
         self.config = config
         self.client = APIClient(config.token)
         self.shards = {}
-        self.config.shard_count = self.client.gateway_bot_get()['shards']
+        self.config.shard_count = self.client.gateway_bot_get()['shards'] if not hasattr(config, 'shard_count') else config.shard_count
 
     def run_on(self, sid, raw):
         func = load_function(raw)
@@ -102,5 +102,5 @@ class AutoSharder:
 
     def start_shard(self, sid):
         cpipe, ppipe = gipc.pipe(duplex=True, encoder=self.dumps, decoder=self.loads)
-        gipc.start_process(run_shard, (self.config, sid, cpipe))
+        gipc.start_process(run_shard, (self.config, sid, cpipe), name=f'shard{sid}')
         self.shards[sid] = GIPCProxy(self, ppipe)

@@ -11,17 +11,18 @@ with open('README.md') as f:
     f.close()
 
 extras_require = {
-    'voice': ['telecom-py==0.0.4'],
-    'http': ['flask>=1.1.2'],
+    'voice': ['pynacl>=1.5.0'],
+    'http': ['flask>=2.1.1'],
     'yaml': ['pyyaml>=5.3.1'],
-    'music': ['yt-dlp>=2021.10.10'],
+    'music': ['yt-dlp>=2022.3.8.2'],
     'performance': [
         'earl-etf>=2.1.2',
-        'regex>=2021.4.4',
-        'ujson>=3.2.0',
+        'regex>=2022.3.15',
+        'pylibyaml>=0.1.0',
+        'ujson>=5.2.0',
         'wsaccel>=0.6.3',
     ],
-    'sharding': ['gipc>=1.3.0'],
+    'sharding': ['gipc>=1.4.0'],
 }
 
 setup(

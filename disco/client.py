@@ -43,7 +43,7 @@ class ClientConfig(Config):
     token = ''
     shard_id = 0
     shard_count = 1
-    intents = 513
+    intents = 37379
     max_reconnects = 5
     log_level = 'info'
 
