@@ -181,6 +181,9 @@ class Channel(SlottedModel, Permissible):
     def __str__(self):
         return '#{}'.format(self.name) if self.name else str(self.id)
 
+    def __int__(self):
+        return self.id
+
     def __repr__(self):
         return '<Channel {} ({})>'.format(self.id, self)
 

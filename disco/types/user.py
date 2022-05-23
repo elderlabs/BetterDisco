@@ -106,6 +106,9 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     def __str__(self):
         return '{}#{}'.format(self.username, str(self.discriminator).zfill(4))
 
+    def __int__(self):
+        return self.id
+
     def __repr__(self):
         return '<User {} ({})>'.format(self.id, self)
 

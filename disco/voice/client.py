@@ -85,8 +85,7 @@ class VoiceClient(LoggingClass):
         self.packets.on(VoiceOPCode.RESUMED, self.on_voice_resumed)
         self.packets.on(VoiceOPCode.CLIENT_CONNECT, self.on_voice_client_connect)
         self.packets.on(VoiceOPCode.CLIENT_DISCONNECT, self.on_voice_client_disconnect)
-        # TODO: is this still a thing?
-        self.packets.on(VoiceOPCode.CODECS, self.on_voice_codecs)
+        # self.packets.on(VoiceOPCode.CODECS, self.on_voice_codecs)
 
         # State + state change emitter
         self.state = VoiceState.DISCONNECTED

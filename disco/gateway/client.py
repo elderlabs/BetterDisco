@@ -1,6 +1,5 @@
 import gevent
 import platform
-import ssl
 import time
 import zlib
 
@@ -35,7 +34,7 @@ class GatewayClient(LoggingClass):
             self.shards = ipc.get_shards()
             self.ipc = ipc
 
-        # Its actually 60, 120 but lets give ourselves a buffer
+        # Is actually 60, but 120 allows a buffer
         self.limiter = SimpleLimiter(60, 130)
 
         # Create emitter and bind to gateway payloads
@@ -105,7 +104,7 @@ class GatewayClient(LoggingClass):
 
     def handle_dispatch(self, packet):
         obj = GatewayEvent.from_dispatch(self.client, packet)
-        self.log.debug('GatewayClient.handle_dispatch %s', obj.__class__.__name__)
+        self.log.debug(f'GatewayClient.handle_dispatch {obj.__class__.__name__}')
         self.client.events.emit(obj.__class__.__name__, obj)
         if self.replaying:
             self.replayed_events += 1
@@ -140,7 +139,7 @@ class GatewayClient(LoggingClass):
         self.reconnects = 0
 
     def on_resumed(self, _):
-        self.log.info('RESUME completed, replayed %s events', self.replayed_events)
+        self.log.info(f'RESUME completed, replayed {self.replayed_events} events')
         self.reconnects = 0
         self.replaying = False
 
@@ -151,19 +150,19 @@ class GatewayClient(LoggingClass):
 
             gateway_url = self._cached_gateway_url
 
-        gateway_url += '?v={}&encoding={}'.format(self.GATEWAY_VERSION, self.encoder.TYPE)
+        gateway_url += f'?v={self.GATEWAY_VERSION}&encoding={self.encoder.TYPE}'
 
         if self.zlib_stream_enabled:
             gateway_url += '&compress=zlib-stream'
 
-        self.log.info('Opening websocket connection to URL `%s`', gateway_url)
+        self.log.info(f'Opening websocket connection to `{gateway_url}`')
         self.ws = Websocket(gateway_url)
         self.ws.emitter.on('on_open', self.on_open)
         self.ws.emitter.on('on_error', self.on_error)
         self.ws.emitter.on('on_close', self.on_close)
         self.ws.emitter.on('on_message', self.on_message)
 
-        self.ws.run_forever(sslopt={'cert_reqs': ssl.CERT_NONE})
+        self.ws.run_forever()
 
     def on_message(self, msg):
         if self.zlib_stream_enabled:
@@ -179,12 +178,12 @@ class GatewayClient(LoggingClass):
                 return
 
             msg = self._zlib.decompress(self._buffer)
-            # If this encoder is text based, we want to decode the data as utf8
+            # If encoder is text based, decode the data as utf-8
             if self.encoder.OPCODE == ABNF.OPCODE_TEXT:
                 msg = str(msg, 'utf=8')
             self._buffer = None
         else:
-            # Detect zlib and decompress
+            # Detect zlib, decompress
             is_erlpack = (msg[0] == 131)
             if msg[0] != '{' and not is_erlpack:
                 msg = str(zlib.decompress(msg, 15, TEN_MEGABYTES), 'utf=8')
@@ -209,14 +208,14 @@ class GatewayClient(LoggingClass):
         if isinstance(error, WebSocketTimeoutException):
             return self.log.error('Websocket connection has timed out. An upstream connection issue is likely present.')
         if not isinstance(error, WebSocketConnectionClosedException):
-            raise Exception('WS received error: {}'.format(error))
+            return self.log.error(f'WS received error: {error}')
 
     def on_open(self):
         if self.zlib_stream_enabled:
             self._zlib = zlib.decompressobj()
 
         if self.seq and self.session_id:
-            self.log.info('WS Opened: attempting resume w/ SID: %s SEQ: %s', self.session_id, self.seq)
+            self.log.info(f'WS Opened: attempting resume with SID: {self.session_id} SEQ: {self.seq}')
             self.replaying = True
             self.send(OPCode.RESUME, {
                 'token': self.client.config.token,
@@ -238,12 +237,11 @@ class GatewayClient(LoggingClass):
                     '$os': platform.system(),
                     '$browser': 'disco',
                     '$device': 'disco',
-                    '$referrer': '',
                 },
             })
 
     def on_close(self, code=None, reason=None):
-        # Make sure we cleanup any old data
+        # Make sure we clean up any old data
         self._buffer = None
 
         # Kill heartbeater, a reconnect/resume will trigger a HELLO which will
@@ -264,18 +262,35 @@ class GatewayClient(LoggingClass):
 
         # Track reconnect attempts
         self.reconnects += 1
-        # self.log.info('WS Closed: [%s] %s (%s)', code, reason if reason else '', self.reconnects)
-        self.log.info('WS Closed:{}{} ({})'.format(' [{}]'.format(code) if code else '', ' {}'.format(reason) if reason else '', self.reconnects))
+        self.log.info('WS Closed:{}{} ({})'.format(f' [{code}]' if code else '', f' {reason if reason else ""}', self.reconnects))
 
         if self.max_reconnects and self.reconnects > self.max_reconnects:
-            raise Exception('Failed to reconnect after {} attempts, giving up'.format(self.max_reconnects))
+            return self.log.error(f'Failed to reconnect after {self.max_reconnects} attempts, giving up')
 
         # Don't resume for these error codes
-        if code and (4000 < code <= 4010 or code == 1001):
+        if code and (4000 < code <= 4010 or code in (1000, 1001)):
             self.session_id = None
+        # 4004 and all codes above 4009 are not resumable
+        if code and (code == 4004 or code >= 4010):
+            reason = 'Unknown.'
+            if code == 4004:
+                reason = 'Invalid token.'
+            if code == 4010:
+                reason = 'Invalid shard ID.'
+            if code == 4011:
+                reason = 'Sharding required.' if self.client.config.shard_count == 1 else 'Further sharding required.'
+            if code == 4012:
+                reason = 'Invalid API version.'
+            if code == 4013:
+                reason = 'Invalid intents.'
+            if code == 4014:
+                reason = 'Unauthorized intents. (check the Discord Developer dashboard settings)'
+            self.log.error(f'Unable to continue, shutting down. Reason: {reason}')
+            import sys
+            return sys.exit(1)
 
-        wait_time = (self.reconnects if self.reconnects > 1 else 0) * 5 if self.reconnects < 6 else 30
-        self.log.info('Will attempt to %s after %s seconds', 'resume' if self.session_id else 'reconnect', wait_time)
+        wait_time = (self.reconnects - 1 if self.session_id else self.reconnects) * 5 if self.reconnects < 6 else 30
+        self.log.info(f'Will attempt to {"resume" if self.session_id else "reconnect"} after {wait_time} seconds')
         gevent.sleep(wait_time)
 
         # Reconnect

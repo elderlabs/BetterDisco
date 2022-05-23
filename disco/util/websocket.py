@@ -26,13 +26,6 @@ class Websocket(LoggingClass, websocket.WebSocketApp):
 
             setattr(self, var, var)
 
-    def _get_close_args(self, data):
-        if data and len(data) >= 2:
-            code = 256 * data[0:1][0] + data[1:2][0]
-            reason = str(data[2:], 'utf=8')
-            return [code, reason]
-        return [None, None]
-
     def _callback(self, callback, *args):
         if not callback:
             return

@@ -586,6 +586,9 @@ class _Message(SlottedModel):
     def __str__(self):
         return '<Message {} ({})>'.format(self.id, self.channel_id)
 
+    def __int__(self):
+        return self.id
+
     @cached_property
     def channel(self):
         """

@@ -225,7 +225,7 @@ class APIClient(LoggingClass):
         if r:
             return Message.create(self.client, r.json())
         else:
-            return self.log.error('Request failed with code {}'.format(r.status_code))
+            return self.log.error(f'Failed to send message in channel {channel}')
 
     def channels_messages_modify(self, channel, message, content=None, embed=None, embeds=[], flags=None, sanitize=False):
         payload = optional(flags=flags)

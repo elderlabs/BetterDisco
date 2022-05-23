@@ -214,3 +214,6 @@ class InteractionResponse(Interaction):
 
     def __str__(self):
         return '<InteractionResponse {} ({})>'.format(self.id, self.channel_id)
+
+    def __int__(self):
+        return self.id

@@ -132,6 +132,9 @@ class GuildEmoji(Emoji):
     def __str__(self):
         return '<{}:{}:{}>'.format('a' if self.animated else '', self.name, self.id)
 
+    def __int__(self):
+        return self.id
+
     def update(self, **kwargs):
         return self.client.api.guilds_emojis_modify(self.guild_id, self.id, **kwargs)
 
@@ -191,6 +194,9 @@ class Role(SlottedModel):
 
     def __str__(self):
         return self.name
+
+    def __int__(self):
+        return self.id
 
     def delete(self, **kwargs):
         self.guild.delete_role(self, **kwargs)
@@ -271,6 +277,9 @@ class GuildMember(SlottedModel):
 
     def __str__(self):
         return self.user.__str__()
+
+    def __int__(self):
+        return self.user.__int__()
 
     @property
     def name(self):
