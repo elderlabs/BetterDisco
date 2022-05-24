@@ -81,6 +81,7 @@ class InteractionData(SlottedModel):
     component_type = Field(int)
     values = ListField(SelectOption, create=False)
     target_id = Field(snowflake)
+    components = ListField(MessageComponent)
 
 
 class ApplicationCommand(SlottedModel):
@@ -118,6 +119,7 @@ class InteractionType:
     APPLICATION_COMMAND = 2
     MESSAGE_COMPONENT = 3
     APPLICATION_COMMAND_AUTOCOMPLETE = 4
+    MODAL_SUBMIT = 5
 
 
 class Interaction(SlottedModel):
@@ -172,6 +174,12 @@ class Interaction(SlottedModel):
     def reply(self, *args, **kwargs):
         return self.client.api.interactions_create_reply(self.id, self.token, *args, **kwargs)
 
+    def reply_modal(self, modal):
+        if isinstance(modal, dict):
+            return self.client.api.interactions_create(self.id, self.token, 9, data=modal)
+        else:
+            return self.client.api.interactions_create(self.id, self.token, 9, data=modal.to_dict())
+
     def edit(self, *args, **kwargs):
         return self.client.api.interactions_edit_reply(self.client.state.me.id, self.token, *args, **kwargs)
 
@@ -188,7 +196,7 @@ class InteractionCallbackType:
     DEFERRED_UPDATE_MESSAGE = 6
     UPDATE_MESSAGE = 7
     APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8
-    # UNKNOWN = 9
+    MODAL = 9
 
 
 class InteractionResponseFlags(BitsetMap):

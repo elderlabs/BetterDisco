@@ -18,6 +18,7 @@ from disco.types.user import User
 
 from disco.types.guild import GuildMember
 
+
 class MessageType:
     DEFAULT = 0
     RECIPIENT_ADD = 1
@@ -461,10 +462,16 @@ class ButtonStyles:
     LINK = 5
 
 
+class TextInputStyles:
+    SHORT = 1
+    PARAGRAPH = 2
+
+
 class ComponentTypes:
     ACTION_ROW = 1
     BUTTON = 2
     SELECT_MENU = 3
+    TEXT_INPUT = 4
 
 
 class SelectOption(SlottedModel):
@@ -479,7 +486,7 @@ class _MessageComponent(SlottedModel):
     type = Field(enum(ComponentTypes))
     custom_id = Field(text)
     disabled = Field(bool)
-    style = Field(enum(ButtonStyles))
+    style = Field(int)
     label = Field(text)
     emoji = Field(Emoji)
     url = Field(text)
@@ -487,6 +494,9 @@ class _MessageComponent(SlottedModel):
     placeholder = Field(text)
     min_values = Field(int)
     max_values = Field(int)
+    min_length = Field(int)
+    max_length = Field(int)
+    required = Field(bool)
 
 
 class MessageComponent(_MessageComponent):
@@ -502,6 +512,18 @@ class ActionRow(SlottedModel):
             return self.components.append(*args)
         else:
             return self.components.append(MessageComponent(*args, **kwargs))
+
+
+class MessageModal(SlottedModel):
+    title = Field(text)
+    custom_id = Field(text)
+    components = ListField(ActionRow)
+
+    def add_component(self, *args, **kwargs):
+        if len(args) == 1:
+            return self.components.append(*args)
+        else:
+            return self.components.append(ActionRow(*args, **kwargs))
 
 
 class _Message(SlottedModel):
@@ -811,6 +833,7 @@ class _Message(SlottedModel):
         str
             The message with mentions replaced w/ their proper form.
         """
+
         def replace_user(u):
             return '@' + str(u)
 
@@ -840,6 +863,7 @@ class _Message(SlottedModel):
         str
             The message contents with all valid mentions replaced.
         """
+
         def replace(getter, func, match):
             oid = int(match.group(2))
             obj = getter(oid)
