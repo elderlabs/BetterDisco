@@ -3,7 +3,7 @@ try:
 except ImportError:
     import re
 
-from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, cached_property, text
+from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, cached_property, text, BitsetMap, BitsetValue
 from disco.types.permissions import Permissions, Permissible, PermissionValue
 from disco.types.user import User
 from disco.util.functional import one_or_many, chunks
@@ -25,11 +25,25 @@ class ChannelType:
     GUILD_PRIVATE_THREAD = 12
     GUILD_STAGE_VOICE = 13
     GUILD_DIRECTORY = 14
+    GUILD_FORUM = 15
 
 
-class PermissionOverwriteType:
-    ROLE = 'role'
-    MEMBER = 'member'
+class VideoQualityModes:
+    AUTO = 1
+    FULL = 2
+
+
+class ChannelFlags(BitsetMap):
+    PINNED = 1 << 1
+
+
+class ChannelFlagsValue(BitsetValue):
+    map = ChannelFlags
+
+
+class FollowedChannel(SlottedModel):
+    channel_id = Field(snowflake)
+    webhook_id = Field(snowflake)
 
 
 class ChannelSubType(SlottedModel):
@@ -38,6 +52,11 @@ class ChannelSubType(SlottedModel):
     @cached_property
     def channel(self):
         return self.client.state.channels.get(self.channel_id)
+
+
+class PermissionOverwriteType:
+    ROLE = 'role'
+    MEMBER = 'member'
 
 
 class PermissionOverwrite(ChannelSubType):
@@ -96,17 +115,13 @@ class PermissionOverwrite(ChannelSubType):
         self.client.api.channels_permissions_delete(self.channel_id, self.id, **kwargs)
 
 
-class VideoQualityModes:
-    AUTO = 1
-    FULL = 2
-
-
-class ThreadMetaData(SlottedModel):
+class ThreadMetadata(SlottedModel):
     archived = Field(bool)
-    archiver_id = Field(snowflake)
     auto_archive_duration = Field(int)
     archive_timestamp = Field(datetime)
     locked = Field(bool)
+    invitable = Field(bool)
+    create_timestamp = Field(datetime)
 
 
 class ThreadMember(SlottedModel):
@@ -114,6 +129,13 @@ class ThreadMember(SlottedModel):
     user_id = Field(snowflake)
     join_timestamp = Field(datetime)
     flags = Field(int)
+
+
+class ChannelMention(SlottedModel):
+    id = Field(snowflake)
+    guild_id = Field(snowflake)
+    type = Field(enum(ChannelType))
+    name = Field(text)
 
 
 class Channel(SlottedModel, Permissible):
@@ -159,16 +181,21 @@ class Channel(SlottedModel, Permissible):
     icon = Field(text)
     owner_id = Field(snowflake)
     application_id = Field(snowflake)
-    lock_permissions = Field(bool)
     parent_id = Field(snowflake)
     last_pin_timestamp = Field(datetime)
     rtc_region = Field(text)
     video_quality_mode = Field(enum(VideoQualityModes))
     message_count = Field(int)
     member_count = Field(int)
-    thread_metadata = Field(ThreadMetaData)
+    thread_metadata = Field(ThreadMetadata)
     member = Field(ThreadMember)
+    default_auto_archive_duration = Field(int)
     # permissions = Field(text)
+    flags = Field(ChannelFlagsValue)
+    archived = Field(bool)
+    auto_archive_duration = Field(int)
+    locked = Field(bool)
+    invitable = Field(bool)
 
     def __init__(self, *args, **kwargs):
         super(Channel, self).__init__(*args, **kwargs)
@@ -249,6 +276,7 @@ class Channel(SlottedModel, Permissible):
         """
         return self.type in (
             ChannelType.GUILD_TEXT,
+            ChannelType.GUILD_VOICE,
             ChannelType.GUILD_NEWS_THREAD,
             ChannelType.GUILD_PUBLIC_THREAD,
             ChannelType.GUILD_PRIVATE_THREAD,
@@ -274,7 +302,7 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel is an NSFW channel.
         """
-        return bool(self.type == ChannelType.GUILD_TEXT and (self.nsfw or NSFW_RE.match(self.name)))
+        return self.nsfw
 
     @property
     def is_stage(self):
@@ -299,7 +327,7 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel supports voice.
         """
-        return self.type in (ChannelType.GUILD_VOICE, ChannelType.GROUP_DM, ChannelType.GUILD_STAGE_VOICE)
+        return self.type in (ChannelType.GUILD_VOICE, ChannelType.DM, ChannelType.GROUP_DM, ChannelType.GUILD_STAGE_VOICE)
 
     @property
     def messages(self):
@@ -658,11 +686,12 @@ class MessageIterator:
         UP = 1
         DOWN = 2
 
-    def __init__(self, client, channel, direction=Direction.UP, bulk=False, before=None, after=None, chunk_size=100):
+    def __init__(self, client, channel, direction=Direction.UP, bulk=False, around=None, before=None, after=None, chunk_size=100):
         self.client = client
         self.channel = channel
         self.direction = direction
         self.bulk = bulk
+        self.around = around
         self.before = before
         self.after = after
         self.chunk_size = chunk_size
@@ -683,6 +712,7 @@ class MessageIterator:
             self.channel.id,
             before=self.before,
             after=self.after,
+            around=self.around,
             limit=self.chunk_size)
 
         if not len(self._buffer):

@@ -23,6 +23,11 @@ class Team(SlottedModel):
     owner_user_id = Field(snowflake)
 
 
+class ApplicationInstallParams(SlottedModel):
+    scopes = ListField(str)
+    permissions = Field(str)
+
+
 class ApplicationFlags:
     NONE = 0
     GATEWAY_PRESENCE = 1 << 12
@@ -31,6 +36,8 @@ class ApplicationFlags:
     GATEWAY_GUILD_MEMBERS_LIMITED = 1 << 15
     VERIFICATION_PENDING_GUILD_LIMIT = 1 << 16
     EMBEDDED = 1 << 17
+    GATEWAY_MESSAGE_CONTENT = 1 << 18
+    GATEWAY_MESSAGE_CONTENT_LIMITED = 1 << 19
 
 
 class Application(SlottedModel):
@@ -44,7 +51,6 @@ class Application(SlottedModel):
     terms_of_service_url = Field(text)
     privacy_policy_url = Field(text)
     owner = Field(User)
-    summary = Field(text)
     verify_key = Field(text)
     team = Field(Team)
     guild_id = Field(snowflake)
@@ -52,6 +58,9 @@ class Application(SlottedModel):
     slug = Field(text)
     cover_image = Field(text)
     flags = Field(int)
+    tags = ListField(str)
+    install_params = Field(ApplicationInstallParams)
+    custom_install_url = Field(str)
 
     def user_is_owner(self, user):
         user_id = to_snowflake(user)

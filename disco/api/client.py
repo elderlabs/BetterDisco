@@ -824,8 +824,6 @@ class APIClient(LoggingClass):
 
     def interactions_create(self, interaction, token, type, data=None, files=None):
         r = self.http(Routes.INTERACTIONS_CREATE, dict(id=interaction, token=token), json=dict(type=type, data=data), files=files)
-        if type == 9:
-            return
         if r.status_code == 204:
             rr = self.http(Routes.INTERACTIONS_GET_ORIGINAL_RESPONSE, dict(id=self.client.state.me.id, token=token))
             return InteractionResponse.create(self.client, dict(token=token, type=type, data=data, message=rr.json()))

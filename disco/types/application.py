@@ -16,6 +16,7 @@ class ApplicationCommandOptionType:
     ROLE = 8
     MENTIONABLE = 9
     NUMBER = 10
+    ATTACHMENT = 11
 
 
 class ApplicationCommandTypes:
@@ -26,13 +27,16 @@ class ApplicationCommandTypes:
 
 class ApplicationCommandOptionChoice(SlottedModel):
     name = Field(text)
+    name_localizations = DictField(str, str)
     value = Field(str_or_int)
 
 
 class _ApplicationCommandOption(SlottedModel):
     type = Field(enum(ApplicationCommandOptionType))
     name = Field(text)
+    name_localizations = DictField(str, str)
     description = Field(text)
+    description_localizations = DictField(str, str)
     required = Field(bool)
     choices = ListField(ApplicationCommandOptionChoice)
     channel_types = ListField(ChannelType)
@@ -57,18 +61,12 @@ class InteractionDataResolved(SlottedModel):
 class _InteractionDataOption(SlottedModel):
     name = Field(text)
     type = Field(int)
-    # value = Field(enum(ApplicationCommandOptionType))
     value = Field(str_or_int)
     focused = Field(bool)
 
 
 class InteractionDataOption(_InteractionDataOption):
     options = ListField(_InteractionDataOption)
-
-
-class ComponentTypes:
-    ACTION_ROW = 1
-    BUTTON = 2
 
 
 class InteractionData(SlottedModel):
@@ -90,8 +88,12 @@ class ApplicationCommand(SlottedModel):
     application_id = Field(snowflake)
     guild_id = Field(snowflake)
     name = Field(text)
+    name_localizations = DictField(str, str)
     description = Field(text)
+    description_localizations = DictField(str, str)
     options = ListField(ApplicationCommandOption)
+    default_member_permissions = Field(text)
+    dm_permissions = Field(bool)
     default_permission = Field(bool)
     version = Field(snowflake)
 
@@ -99,6 +101,7 @@ class ApplicationCommand(SlottedModel):
 class ApplicationCommandPermissionType:
     ROLE = 1
     USER = 2
+    CHANNEL = 3
 
 
 class ApplicationCommandPermissions(SlottedModel):
@@ -140,6 +143,9 @@ class Interaction(SlottedModel):
     def __str__(self):
         return '<Interaction {} ({})>'.format(self.id, self.channel_id)
 
+    def __int__(self):
+        return self.id
+
     @cached_property
     def channel(self):
         if self.guild_id:
@@ -173,12 +179,6 @@ class Interaction(SlottedModel):
 
     def reply(self, *args, **kwargs):
         return self.client.api.interactions_create_reply(self.id, self.token, *args, **kwargs)
-
-    def reply_modal(self, modal):
-        if isinstance(modal, dict):
-            return self.client.api.interactions_create(self.id, self.token, 9, data=modal)
-        else:
-            return self.client.api.interactions_create(self.id, self.token, 9, data=modal.to_dict())
 
     def edit(self, *args, **kwargs):
         return self.client.api.interactions_edit_reply(self.client.state.me.id, self.token, *args, **kwargs)

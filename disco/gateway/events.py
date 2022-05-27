@@ -1046,3 +1046,19 @@ class GuildJoinRequestUpdate(GatewayEvent):
 
 class GuildScheduledEventUserAdd(GatewayEvent):
     guild_id = Field(snowflake)
+
+
+class GuildScheduledEventUserRemove(GatewayEvent):
+    guild_id = Field(snowflake)
+
+
+class GuildScheduledEventCreate(GatewayEvent):
+    guild_id = Field(snowflake)
+
+
+class GuildScheduledEventDelete(GatewayEvent):
+    guild_id = Field(snowflake)
+
+
+class GuildApplicationCommandIndexUpdate(GatewayEvent):
+    guild_id = Field(snowflake)

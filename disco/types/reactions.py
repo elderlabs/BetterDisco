@@ -69,9 +69,9 @@ class MessageReaction(SlottedModel):
     me : bool
         Whether the current user reacted with this emoji.
     """
-    emoji = Field(MessageReactionEmoji)
     count = Field(int)
     me = Field(bool)
+    emoji = Field(MessageReactionEmoji)
 
 
 class StickerTypes:

@@ -10,13 +10,14 @@ from disco.types.base import (
     BitsetMap, BitsetValue, SlottedModel, Field, ListField, AutoDictField,
     snowflake, text, datetime, enum, cached_property,
 )
-from disco.util.paginator import Paginator
-from disco.util.snowflake import to_snowflake
-from disco.types.channel import ChannelType, Channel
+# from disco.types.application import InteractionType
+from disco.types.channel import Channel, ChannelMention
+from disco.types.guild import GuildMember
+from disco.types.oauth import Application
 from disco.types.reactions import Emoji, MessageReaction, StickerItemStructure
 from disco.types.user import User
-
-from disco.types.guild import GuildMember
+from disco.util.paginator import Paginator
+from disco.util.snowflake import to_snowflake
 
 
 class MessageType:
@@ -43,6 +44,7 @@ class MessageType:
     APPLICATION_COMMAND = 20
     THREAD_STARTER_MESSAGE = 21
     GUILD_INVITE_REMINDER = 22
+    CONTEXT_MENU_COMMAND = 23
 
 
 class MessageActivityType:
@@ -50,109 +52,6 @@ class MessageActivityType:
     SPECTATE = 2
     LISTEN = 3
     JOIN_REQUEST = 5
-
-
-class Emoji(SlottedModel):
-    """
-    Represents either a standard or custom Discord emoji.
-
-    Attributes
-    ----------
-    id : snowflake?
-        The emoji ID (will be none if this is not a custom emoji).
-    name : str
-        The name of this emoji.
-    animated : bool
-        Whether this emoji is animated.
-    """
-    id = Field(snowflake)
-    name = Field(text)
-    animated = Field(bool)
-
-    @cached_property
-    def custom(self):
-        return bool(self.id)
-
-    def __eq__(self, other):
-        if isinstance(other, Emoji):
-            return self.id == other.id and self.name == other.name
-        raise NotImplementedError
-
-    def to_string(self):
-        if self.id:
-            return '{}:{}'.format(self.name, self.id)
-        return self.name
-
-
-class MessageReactionEmoji(Emoji):
-    """
-    Represents an emoji which was used as a reaction on a message.
-
-    Attributes
-    ----------
-    count : int
-        The number of users who reacted with this emoji.
-    me : bool
-        Whether the current user reacted with this emoji.
-    emoji : `MessageReactionEmoji`
-        The emoji which was reacted.
-    """
-    id = Field(snowflake)
-    name = Field(text)
-    roles = ListField(snowflake)
-    user = Field(User)
-    require_colons = Field(bool)
-    managed = Field(bool)
-    animated = Field(bool)
-
-
-class MessageReaction(SlottedModel):
-    """
-    A reaction of one emoji (multiple users) to a message.
-
-    Attributes
-    ----------
-    emoji : `MessageReactionEmoji`
-        The emoji which was reacted.
-    count : int
-        The number of users who reacted with this emoji.
-    me : bool
-        Whether the current user reacted with this emoji.
-    """
-    emoji = Field(MessageReactionEmoji)
-    count = Field(int)
-    me = Field(bool)
-
-
-class MessageApplication(SlottedModel):
-    """
-    The application of a Rich Presence-related chat embed.
-
-    Attributes
-    ----------
-    id : snowflake
-        The id of the application.
-    cover_image : str
-        The id of the embed's image asset.
-    description : str
-        The application's description.
-    icon : str
-        The id of the application's icon.
-    name : str
-        The name of the application.
-    """
-    id = Field(snowflake)
-    cover_image = Field(text)
-    description = Field(text)
-    icon = Field(text)
-    name = Field(text)
-
-
-class MessageReference(SlottedModel):
-    message_id = Field(snowflake)
-    channel_id = Field(snowflake)
-    guild_id = Field(snowflake)
-    fail_if_not_exists = Field(bool)
 
 
 class MessageActivity(SlottedModel):
@@ -170,43 +69,36 @@ class MessageActivity(SlottedModel):
     party_id = Field(text)
 
 
-class MessageEmbedFooter(SlottedModel):
-    """
-    A footer for the `MessageEmbed`.
-
-    Attributes
-    ----------
-    text : str
-        The contents of the footer.
-    icon_url : str
-        The URL for the footer icon.
-    proxy_icon_url : str
-        A proxy URL for the footer icon, set by Discord.
-    """
-    text = Field(text)
-    icon_url = Field(text)
-    proxy_icon_url = Field(text)
+class MessageFlags(BitsetMap):
+    CROSSPOSTED = 1 << 0
+    IS_CROSSPOST = 1 << 1
+    SUPPRESS_EMBEDS = 1 << 2
+    SOURCE_MESSAGE_DELETED = 1 << 3
+    URGENT = 1 << 4
+    HAS_THREAD = 1 << 5
+    EPHEMERAL = 1 << 6
+    LOADING = 1 << 7
+    FAILED_TO_MENTION_SOME_ROLES_IN_THREAD = 1 << 8
 
 
-class MessageEmbedImage(SlottedModel):
-    """
-    An image for the `MessageEmbed`.
+class MessageFlagValue(BitsetValue):
+    map = MessageFlags
 
-    Attributes
-    ----------
-    url : str
-        The URL for the image.
-    proxy_url : str
-        A proxy URL for the image, set by Discord.
-    width : int
-        The width of the image, set by Discord.
-    height : int
-        The height of the image, set by Discord.
-    """
-    url = Field(text)
-    proxy_url = Field(text)
-    width = Field(int)
-    height = Field(int)
+
+class MessageReference(SlottedModel):
+    message_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    guild_id = Field(snowflake)
+    fail_if_not_exists = Field(bool)
+
+
+class MessageEmbedType:
+    rich = 'rich'
+    image = 'image'
+    video = 'video'
+    gifv = 'gifv'
+    article = 'article'
+    link = 'link'
 
 
 class MessageEmbedThumbnail(SlottedModel):
@@ -244,8 +136,30 @@ class MessageEmbedVideo(SlottedModel):
         The height of the video, set by Discord.
     """
     url = Field(text)
+    proxy_url = Field(text)
     height = Field(int)
     width = Field(int)
+
+
+class MessageEmbedImage(SlottedModel):
+    """
+    An image for the `MessageEmbed`.
+
+    Attributes
+    ----------
+    url : str
+        The URL for the image.
+    proxy_url : str
+        A proxy URL for the image, set by Discord.
+    width : int
+        The width of the image, set by Discord.
+    height : int
+        The height of the image, set by Discord.
+    """
+    url = Field(text)
+    proxy_url = Field(text)
+    width = Field(int)
+    height = Field(int)
 
 
 class MessageEmbedProvider(SlottedModel):
@@ -270,6 +184,24 @@ class MessageEmbedAuthor(SlottedModel):
     """
     name = Field(text)
     url = Field(text)
+    icon_url = Field(text)
+    proxy_icon_url = Field(text)
+
+
+class MessageEmbedFooter(SlottedModel):
+    """
+    A footer for the `MessageEmbed`.
+
+    Attributes
+    ----------
+    text : str
+        The contents of the footer.
+    icon_url : str
+        The URL for the footer icon.
+    proxy_icon_url : str
+        A proxy URL for the footer icon, set by Discord.
+    """
+    text = Field(text)
     icon_url = Field(text)
     proxy_icon_url = Field(text)
 
@@ -326,7 +258,7 @@ class MessageEmbed(SlottedModel):
         The fields of the embed.
     """
     title = Field(text)
-    type = Field(text, default='rich')
+    type = Field(text)
     description = Field(text)
     url = Field(text)
     timestamp = Field(datetime)
@@ -399,24 +331,19 @@ class MessageAttachment(SlottedModel):
     """
     id = Field(snowflake)
     filename = Field(text)
+    description = Field(text)
     content_type = Field(text)
     size = Field(int)
     url = Field(text)
     proxy_url = Field(text)
     height = Field(int)
     width = Field(int)
-
-
-class ChannelMention(SlottedModel):
-    id = Field(snowflake)
-    guild_id = Field(snowflake)
-    type = Field(enum(ChannelType))
-    name = Field(text)
+    ephemeral = Field(bool)
 
 
 class AllowedMentionsTypes:
-    ROLE = 'role'
-    USER = 'user'
+    ROLE = 'roles'
+    USER = 'users'
     EVERYONE = 'everyone'
 
 
@@ -427,31 +354,11 @@ class AllowedMentions(SlottedModel):
     replied_user = Field(bool)
 
 
-class MessageFlags(BitsetMap):
-    CROSSPOSTED = 1 << 0
-    IS_CROSSPOST = 1 << 1
-    SUPPRESS_EMBEDS = 1 << 2
-    SOURCE_MESSAGE_DELETED = 1 << 3
-    URGENT = 1 << 4
-    HAS_THREAD = 1 << 5
-    EPHEMERAL = 1 << 6
-    LOADING = 1 << 7
-
-
-class MessageFlagValue(BitsetValue):
-    map = MessageFlags
-
-
-class MessageInteractionType:
-    PING = 1
-    APPLICATION_COMMAND = 2
-
-
-class MessageInteraction(SlottedModel):
-    id = Field(snowflake)
-    type = Field(enum(MessageInteractionType))
-    name = Field(text)
-    user = Field(User)
+class ComponentTypes:
+    ACTION_ROW = 1
+    BUTTON = 2
+    SELECT_MENU = 3
+    TEXT_INPUT = 4
 
 
 class ButtonStyles:
@@ -465,13 +372,6 @@ class ButtonStyles:
 class TextInputStyles:
     SHORT = 1
     PARAGRAPH = 2
-
-
-class ComponentTypes:
-    ACTION_ROW = 1
-    BUTTON = 2
-    SELECT_MENU = 3
-    TEXT_INPUT = 4
 
 
 class SelectOption(SlottedModel):
@@ -494,8 +394,6 @@ class _MessageComponent(SlottedModel):
     placeholder = Field(text)
     min_values = Field(int)
     max_values = Field(int)
-    min_length = Field(int)
-    max_length = Field(int)
     required = Field(bool)
 
 
@@ -524,6 +422,23 @@ class MessageModal(SlottedModel):
             return self.components.append(*args)
         else:
             return self.components.append(ActionRow(*args, **kwargs))
+
+
+# TODO: remove after circular import fix
+class _InteractionType:
+    PING = 1
+    APPLICATION_COMMAND = 2
+    MESSAGE_COMPONENT = 3
+    APPLICATION_COMMAND_AUTOCOMPLETE = 4
+    MODAL_SUBMIT = 5
+
+
+class MessageInteraction(SlottedModel):
+    id = Field(snowflake)
+    type = Field(enum(_InteractionType))
+    name = Field(text)
+    user = Field(User)
+    member = Field(GuildMember)
 
 
 class _Message(SlottedModel):
@@ -596,7 +511,7 @@ class _Message(SlottedModel):
     webhook_id = Field(snowflake)
     type = Field(enum(MessageType))
     activity = Field(MessageActivity, create=False)
-    application = Field(MessageApplication, create=False)
+    application = Field(Application, create=False)
     application_id = Field(snowflake)
     message_reference = Field(MessageReference, create=False)
     flags = Field(MessageFlagValue)
@@ -636,7 +551,8 @@ class _Message(SlottedModel):
         `Guild`
             The guild (if applicable) this message was created in.
         """
-        return self.channel.guild
+        if self.guild_id:
+            return self.client.state.guilds.get(self.guild_id)
 
     @cached_property
     def member(self):
@@ -646,7 +562,8 @@ class _Message(SlottedModel):
         `GuildMember`
             The guild member (if applicable) that sent this message.
         """
-        return self.channel.guild.get_member(self.author)
+        if self.guild_id:
+            return self.guild.get_member(self.author)
 
     def pin(self):
         """
@@ -833,7 +750,6 @@ class _Message(SlottedModel):
         str
             The message with mentions replaced w/ their proper form.
         """
-
         def replace_user(u):
             return '@' + str(u)
 
@@ -863,7 +779,6 @@ class _Message(SlottedModel):
         str
             The message contents with all valid mentions replaced.
         """
-
         def replace(getter, func, match):
             oid = int(match.group(2))
             obj = getter(oid)

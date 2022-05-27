@@ -20,6 +20,7 @@ class Player(LoggingClass):
     def __init__(self, client, queue=None):
         super(Player, self).__init__()
         self.client = client
+        self.client.media = self
 
         # Queue contains playable items
         self.queue = queue or PlayableQueue()

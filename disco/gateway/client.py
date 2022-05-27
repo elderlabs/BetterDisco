@@ -261,6 +261,8 @@ class GatewayClient(LoggingClass):
         self.replaying = False
 
         # Track reconnect attempts
+        if reason:
+            self.last_conn_state = reason
         self.reconnects += 1
         self.log.info('WS Closed:{}{} ({})'.format(f' [{code}]' if code else '', f' {reason if reason else ""}', self.reconnects))
 

@@ -1,3 +1,4 @@
+from disco.types.application import Interaction
 from disco.types.channel import Channel  # noqa: F401
 from disco.types.user import User  # noqa: F401
 from disco.types.message import Message  # noqa: F401
@@ -10,6 +11,7 @@ __all__ = {
     'Guild',
     'Role',
     'User',
+    'Interaction',
     'Message',
     'VoiceState',
     'GuildMember',

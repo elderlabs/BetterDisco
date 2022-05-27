@@ -70,6 +70,7 @@ class VoiceClient(LoggingClass):
         self.encoder = encoder or JSONEncoder
         self.max_reconnects = max_reconnects
         self.video_enabled = False
+        self.media = None
 
         # Set the VoiceClient in the state's voice clients
         self.client.state.voice_clients[self.server_id] = self
@@ -224,7 +225,7 @@ class VoiceClient(LoggingClass):
         })
 
     def set_voice_state(self, channel_id, mute=False, deaf=False, video=False):
-        self.client.gw.send(OPCode.VOICE_STATE_UPDATE, {
+        return self.client.gw.send(OPCode.VOICE_STATE_UPDATE, {
             'self_mute': bool(mute),
             'self_deaf': bool(deaf),
             'self_video': bool(video),
@@ -451,26 +452,27 @@ class VoiceClient(LoggingClass):
         if self.state == VoiceState.DISCONNECTED:
             return
 
-        self.log.debug('[{}] disconnect called'.format(self))
         self.set_state(VoiceState.DISCONNECTED)
-
-        del self.client.state.voice_clients[self.server_id]
-
-        if self._heartbeat_task:
-            self._heartbeat_task.kill()
-            self._heartbeat_task = None
 
         if self.ws and self.ws.sock and self.ws.sock.connected:
             self.ws.close()
             self.ws = None
 
-        if self.udp and self.udp.connected:
+        try:
+            self.set_voice_state(None)
+        except:
+            pass
+
+        if self.udp:
             self.udp.disconnect()
 
-        if self.channel_id:
-            self.set_voice_state(None)
+        try:
+            self.media.now_playing.source.proc.kill()
+        except:
+            pass
 
-        self.client.gw.events.emit('VoiceDisconnect', self)
+        del self.client.state.voice_clients[self.server_id]
+        return self.client.gw.events.emit('VoiceDisconnect', self)
 
     def send_frame(self, *args, **kwargs):
         self.udp.send_frame(*args, **kwargs)

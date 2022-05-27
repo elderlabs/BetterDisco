@@ -354,15 +354,16 @@ class GuildMember(SlottedModel):
             The nickname (or none to reset) to set.
         """
         if self.client.state.me.id == self.user.id:
-            self.client.api.guilds_members_me_nick(self.guild.id, nick=nickname or '', **kwargs)
-        else:
-            self.client.api.guilds_members_modify(self.guild.id, self.user.id, nick=nickname or '', **kwargs)
+            return self.client.api.guilds_members_me_nick(self.guild.id, nick=nickname or '', **kwargs)
+        return self.client.api.guilds_members_modify(self.guild.id, self.user.id, nick=nickname or '', **kwargs)
 
     def disconnect(self):
         """
         Disconnects the member from voice (if they are connected).
         """
-        self.modify(channel_id=None)
+        if self.client.state.me.id == self.user.id:
+            return self.client.state.voice_clients.get(self.guild.id).disconnect()
+        return self.modify(channel_id=None)
 
     def modify(self, **kwargs):
         self.client.api.guilds_members_modify(self.guild.id, self.user.id, **kwargs)

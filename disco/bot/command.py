@@ -312,7 +312,7 @@ class Command:
 
         if self.args:
             if len(event.args) < self.args.required_length:
-                event.command.plugin.log.warn(f'Error in disco.bot.command.execute() - malformated command: {event.name}')
+                event.command.plugin.log.warning(f'Error in disco.bot.command.execute() - malformated command: {event.name}')
                 raise CommandError('Command {} requires {} argument{} (`{}`), passed {}'.format(
                     event.name,
                     self.args.required_length,
