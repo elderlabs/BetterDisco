@@ -256,6 +256,10 @@ class Plugin(LoggingClass, PluginDeco):
 
     @property
     def name(self):
+        return self.__class__.__name__.replace('Plugin', '').lower()
+
+    @property
+    def __name__(self):
         return self.__class__.__name__
 
     def bind_all(self):

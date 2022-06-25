@@ -77,7 +77,7 @@ class InteractionData(SlottedModel):
     options = ListField(InteractionDataOption, create=False)
     custom_id = Field(text)
     component_type = Field(int)
-    values = ListField(SelectOption, create=False)
+    values = ListField(text, create=False)
     target_id = Field(snowflake)
     components = ListField(MessageComponent)
 
@@ -179,6 +179,12 @@ class Interaction(SlottedModel):
 
     def reply(self, *args, **kwargs):
         return self.client.api.interactions_create_reply(self.id, self.token, *args, **kwargs)
+
+    def reply_modal(self, modal):
+        if isinstance(modal, dict):
+            return self.client.api.interactions_create(self.id, self.token, 9, data=modal)
+        else:
+            return self.client.api.interactions_create(self.id, self.token, 9, data=modal.to_dict())
 
     def edit(self, *args, **kwargs):
         return self.client.api.interactions_edit_reply(self.client.state.me.id, self.token, *args, **kwargs)
