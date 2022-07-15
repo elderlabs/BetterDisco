@@ -395,6 +395,7 @@ class _MessageComponent(SlottedModel):
     min_values = Field(int)
     max_values = Field(int)
     required = Field(bool)
+    value = Field(text)
 
 
 class MessageComponent(_MessageComponent):
