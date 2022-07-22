@@ -520,7 +520,7 @@ class _Message(SlottedModel):
     components = ListField(MessageComponent)
     sticker_items = ListField(StickerItemStructure)
 
-    def __str__(self):
+    def __repr__(self):
         return '<Message id={} channel_id={}>'.format(self.id, self.channel_id)
 
     def __int__(self):
