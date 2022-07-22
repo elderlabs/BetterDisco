@@ -521,7 +521,7 @@ class _Message(SlottedModel):
     sticker_items = ListField(StickerItemStructure)
 
     def __str__(self):
-        return '<Message {} ({})>'.format(self.id, self.channel_id)
+        return '<Message id={} channel_id={}>'.format(self.id, self.channel_id)
 
     def __int__(self):
         return self.id
