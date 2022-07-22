@@ -110,7 +110,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
         return self.id
 
     def __repr__(self):
-        return '<User id={} username={} discriminator={}>'.format(self.id, self.username, str(self.discriminator).zfill(4))
+        return '<User id={} user={}>'.format(self.id, self)
 
 
 class ActivityTypes:
