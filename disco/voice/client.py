@@ -121,7 +121,7 @@ class VoiceClient(LoggingClass):
         self.audio_ssrcs = {}
 
     def __repr__(self):
-        return '<VoiceClient server_id={}>'.format(self.server_id)
+        return '<VoiceClient guild_id={}>'.format(self.server_id)
 
     @cached_property
     def guild(self):
