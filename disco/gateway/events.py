@@ -161,6 +161,7 @@ class Ready(GatewayEvent):
     user = Field(User)
     # user_settings = Field(...)
     version = Field(int, alias='v')
+    resume_gateway_url = Field(text)
 
 
 class Resumed(GatewayEvent):

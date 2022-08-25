@@ -306,13 +306,25 @@ class APIClient(LoggingClass):
         r = self.http(Routes.CHANNELS_INVITES_LIST, dict(channel=channel))
         return Invite.create_map(self.client, r.json())
 
-    def channels_invites_create(self, channel, max_age=86400, max_uses=0, temporary=False, unique=False, reason=None):
-        r = self.http(Routes.CHANNELS_INVITES_CREATE, dict(channel=channel), json={
+    def channels_invites_create(self, channel, max_age=86400, max_uses=0, temporary=False, unique=False,
+                                target_type=None, target_user_id=None, target_application_id=None, reason=None):
+
+        payload = {
             'max_age': max_age,
             'max_uses': max_uses,
             'temporary': temporary,
             'unique': unique,
-        }, headers=_reason_header(reason))
+        }
+
+        if target_type:
+            payload['target_type'] = target_type
+        if target_application_id:
+            payload['target_application_id'] = target_application_id
+        if target_user_id:
+            payload['target_user_id'] = target_user_id
+
+        r = self.http(Routes.CHANNELS_INVITES_CREATE, dict(channel=channel), json=payload,
+                      headers=_reason_header(reason))
         return Invite.create(self.client, r.json())
 
     def channels_pins_list(self, channel):

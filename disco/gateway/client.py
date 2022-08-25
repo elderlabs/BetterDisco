@@ -136,6 +136,7 @@ class GatewayClient(LoggingClass):
     def on_ready(self, ready):
         self.log.info('Received READY')
         self.session_id = ready.session_id
+        self._cached_gateway_url = ready.resume_gateway_url
         self.reconnects = 0
 
     def on_resumed(self, _):

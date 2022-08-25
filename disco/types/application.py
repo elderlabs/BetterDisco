@@ -186,6 +186,17 @@ class Interaction(SlottedModel):
         else:
             return self.client.api.interactions_create(self.id, self.token, 9, data=modal.to_dict())
 
+    def reply_autocomplete(self, choices):
+
+        parsed = []
+        for choice in choices:
+            if isinstance(choice, dict):
+                parsed.append(choice)
+            else:
+                parsed.append(choice.to_dict())
+
+        return self.client.api.interactions_create(self.id, self.token, 8, data=parsed)
+
     def edit(self, *args, **kwargs):
         return self.client.api.interactions_edit_reply(self.client.state.me.id, self.token, *args, **kwargs)
 
