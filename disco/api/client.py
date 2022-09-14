@@ -18,7 +18,7 @@ from disco.types.user import User
 from disco.types.message import Message
 from disco.types.oauth import Application
 from disco.types.guild import Guild, GuildMember, GuildBan, GuildEmbed, PruneCount, Role, GuildEmoji, AuditLogEntry, Integration, DiscoveryRequirements, GuildPreview
-from disco.types.channel import Channel
+from disco.types.channel import Channel, ThreadMember
 from disco.types.invite import Invite
 from disco.types.voice import VoiceRegion
 from disco.types.webhook import Webhook
@@ -347,6 +347,86 @@ class APIClient(LoggingClass):
     def channels_webhooks_list(self, channel):
         r = self.http(Routes.CHANNELS_WEBHOOKS_LIST, dict(channel=channel))
         return Webhook.create_map(self.client, r.json())
+
+    def channels_forums_threads_create(self, channel, name, message, auto_archive_duration=None,
+                                       rate_limit_per_user=None, applied_tags=None, reason=None):
+
+        if isinstance(message, Message):
+            message = message.to_dict()
+
+        payload = {
+            'name': name,
+            'message': message
+        }
+
+        payload.update(optional(
+            auto_archive_duration=auto_archive_duration,
+            rate_limit_per_user=rate_limit_per_user,
+            applied_tags=applied_tags,
+        ))
+
+        r = self.http(Routes.CHANNELS_THREAD_START, dict(channel=channel), json=payload, headers=_reason_header(reason))
+        return Channel.create(self.client, r.json())
+
+    def channels_threads_create(self, channel, name, message=None, auto_archive_duration=None,
+                                invitable=None, rate_limit_per_user=None, thread_type=None, reason=None):
+
+        if message and isinstance(message, Message):
+            message = message.id
+
+        payload = {
+            'name': name,
+        }
+
+        payload.update(optional(
+            message=message,
+            auto_archive_duration=auto_archive_duration,
+            rate_limit_per_user=rate_limit_per_user,
+            thread_type=thread_type,
+            invitable=invitable,
+        ))
+
+        r = self.http(Routes.CHANNELS_THREAD_START, dict(channel=channel), json=payload, headers=_reason_header(reason))
+        return Channel.create(self.client, r.json())
+
+    def channels_threads_list_archived(self, channel, before=None, limit=50, public=True):
+        """
+        List all the archived threads in a channel. Use the "public" kwarg to denote public/private threads.
+        public: bool - True: Public threads | False: Private threads.
+
+        Returns: A tuple containing threads, thread members, and if there are more threads that can be listed.
+        """
+        if public:
+            route = Routes.CHANNELS_THREADS_LIST_ARCHIVED_PUBLIC
+        else:
+            route = Routes.CHANNELS_THREADS_LIST_ARCHIVED_PRIVATE
+
+        r = self.http(route, dict(channel=channel), params=optional(
+            before=before,
+            limit=limit,
+        ))
+
+        return Channel.create_map(self.client, r.json()['threads']), ThreadMember.create_map(self.client, r.json()['members']), r.json()['has_more']
+
+    def channels_threads_join(self, channel):
+        self.http(Routes.CHANNELS_THREAD_JOIN, dict(channel=channel))
+
+    def channels_threads_leave(self, channel):
+        self.http(Routes.CHANNELS_THREAD_LEAVE, dict(channel=channel))
+
+    def channels_threads_member_add(self, channel, member):
+        self.http(Routes.CHANNELS_THREAD_MEMBER_ADD, dict(channel=channel, member=member))
+
+    def channels_threads_member_remove(self, channel, member):
+        self.http(Routes.CHANNELS_THREAD_MEMBER_REMOVE, dict(channel=channel, member=member))
+
+    def channels_threads_member_get(self, channel, member):
+        r = self.http(Routes.CHANNELS_THREAD_MEMBER_GET, dict(channel=channel, member=member))
+        return ThreadMember.create(self.client, r.json())
+
+    def channels_threads_members_list(self, channel):
+        r = self.http(Routes.CHANNELS_THREAD_MEMBERS_LIST, dict(channel=channel))
+        return ThreadMember.create_map(self.client, r.json())
 
     def guilds_get(self, guild):
         r = self.http(Routes.GUILDS_GET, dict(guild=guild))

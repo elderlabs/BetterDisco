@@ -3,7 +3,8 @@ try:
 except ImportError:
     import re
 
-from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, cached_property, text, BitsetMap, BitsetValue
+from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, cached_property, text, \
+    BitsetMap, BitsetValue, ListField
 from disco.types.permissions import Permissions, Permissible, PermissionValue
 from disco.types.user import User
 from disco.util.functional import one_or_many, chunks
@@ -35,6 +36,7 @@ class VideoQualityModes:
 
 class ChannelFlags(BitsetMap):
     PINNED = 1 << 1
+    REQUIRE_TAG = 1 << 4
 
 
 class ChannelFlagsValue(BitsetValue):
@@ -115,6 +117,19 @@ class PermissionOverwrite(ChannelSubType):
         self.client.api.channels_permissions_delete(self.channel_id, self.id, **kwargs)
 
 
+class ForumTag(SlottedModel):
+    id = Field(snowflake)
+    name = Field(text)
+    moderated = Field(bool)
+    emoji_id = Field(snowflake)
+    emoji_name = Field(text)
+
+
+class DefaultReaction(SlottedModel):
+    emoji_id = Field(snowflake)
+    emoji_name = Field(text)
+
+
 class ThreadMetadata(SlottedModel):
     archived = Field(bool)
     auto_archive_duration = Field(int)
@@ -192,10 +207,11 @@ class Channel(SlottedModel, Permissible):
     default_auto_archive_duration = Field(int)
     # permissions = Field(text)
     flags = Field(ChannelFlagsValue)
-    archived = Field(bool)
-    auto_archive_duration = Field(int)
-    locked = Field(bool)
-    invitable = Field(bool)
+    total_message_sent = Field(int)
+    available_tags = ListField(ForumTag)
+    applied_tags = ListField(snowflake)
+    default_reaction_emoji = ListField(DefaultReaction)
+    default_thread_rate_limit_per_user = Field(int)
 
     def __init__(self, *args, **kwargs):
         super(Channel, self).__init__(*args, **kwargs)
@@ -321,6 +337,13 @@ class Channel(SlottedModel, Permissible):
             ChannelType.GUILD_PRIVATE_THREAD,
             ChannelType.GUILD_NEWS_THREAD,
         )
+
+    @property
+    def is_forum(self):
+        """
+        Whether this channel is a forum.
+        """
+        return self.type == ChannelType.GUILD_FORUM
 
     @property
     def is_voice(self):
@@ -658,6 +681,109 @@ class Channel(SlottedModel, Permissible):
             *args,
             **kwargs
         )
+
+    def start_thread(self, *args, **kwargs):
+        """
+        Start a thread, whether it be attached to a message, or not.
+
+        Parameters
+        ----------
+        name : str
+            The name of the thread.
+        auto_archive_duration : int
+            Duration in minutes to automatically archive the thread after recent activity, can be set to:
+            60, 1440, 4320, 10080.
+        type : int
+            The type of thread
+        invitable : bool
+            Whether non-moderators can add other non-moderators to a thread; only available when creating a private thread
+        rate_limit_per_user : int
+            Amount of seconds a user has to wait before sending another message (0-21600)
+        message : Message | snowflake
+
+        Returns a Thread Channel
+        -------
+
+        """
+
+        return self.client.api.channels_threads_create(self.id, *args, **kwargs)
+
+    def start_forum_thread(self, *args, **kwargs):
+        """
+        Start a thread within a forum channel
+
+        Parameters
+        ----------
+        name : str
+            The name of the thread.
+        auto_archive_duration : int
+            Duration in minutes to automatically archive the thread after recent activity, can be set to:
+            60, 1440, 4320, 10080.
+        rate_limit_per_user : int
+            Amount of seconds a user has to wait before sending another message (0-21600)
+        message : Message
+            The initial message to send.
+        applied_tags : list(snowflake)
+            The IDs of the set of tags to apply to a new forum thread.
+
+        Returns : The channel for the thread
+        -------
+
+        """
+        assert self.is_forum
+        return self.client.api.channels_forums_threads_create(self.id, *args, **kwargs)
+
+
+    def join(self):
+        """
+        Joins a thread
+        """
+        assert self.is_thread
+        self.client.api.channels_threads_join(self.id)
+
+    def leave(self):
+        """
+        Leaves a thread
+        """
+        assert self.is_thread
+        self.client.api.channels_threads_leave(self.id)
+
+    def add_member(self, member):
+        """
+        Adds a member to a thread
+        """
+        assert self.is_thread
+        if not isinstance(member, int):
+            member = member.id
+
+        self.client.api.channels_threads_member_add(self.id, member)
+
+    def remove_member(self, member):
+        """
+        Removes a member of a thread
+        """
+        assert self.is_thread
+        if not isinstance(member, int):
+            member = member.id
+
+        self.client.api.channels_threads_member_remove(self.id, member)
+
+    def get_member(self, member):
+        """
+        Gets a member of a thread
+        """
+        assert self.is_thread
+        if not isinstance(member, int):
+            member = member.id
+
+        return self.client.api.channels_threads_member_get(self.id, member)
+
+    def list_members(self):
+        """
+        Get all the members of a thread.
+        """
+        assert self.is_thread
+        return self.client.api.channels_threads_members_list(self.id)
 
 
 class MessageIterator:

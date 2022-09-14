@@ -177,25 +177,34 @@ class Interaction(SlottedModel):
     def unpin(self):
         return self.channel.delete_pin(self)
 
-    def reply(self, *args, **kwargs):
-        return self.client.api.interactions_create_reply(self.id, self.token, *args, **kwargs)
+    def reply(self, type=4, choices=None, modal=None, *args, **kwargs):
+        if type is 9:
+            if not modal:
+                raise Exception("Modal not passed to method.")
+            if isinstance(modal, dict):
+                return self.client.api.interactions_create(self.id, self.token, type, data=modal)
+            else:
+                return self.client.api.interactions_create(self.id, self.token, type, data=modal.to_dict())
+        elif type is 8:
+
+            if not choices:
+                raise Exception("Choices not passed to method.")
+            parsed = []
+            for choice in choices:
+                if isinstance(choice, dict):
+                    parsed.append(choice)
+                else:
+                    parsed.append(choice.to_dict())
+
+            return self.client.api.interactions_create(self.id, self.token, 8, data={"choices": parsed})
+        else:
+            return self.client.api.interactions_create_reply(self.id, self.token, type=type, *args, **kwargs)
 
     def reply_modal(self, modal):
-        if isinstance(modal, dict):
-            return self.client.api.interactions_create(self.id, self.token, 9, data=modal)
-        else:
-            return self.client.api.interactions_create(self.id, self.token, 9, data=modal.to_dict())
+        raise Exception("Deprecated: Please use event.reply(type=InteractionCallbackType.MODAL, modal=MODAL)")
 
     def reply_autocomplete(self, choices):
-
-        parsed = []
-        for choice in choices:
-            if isinstance(choice, dict):
-                parsed.append(choice)
-            else:
-                parsed.append(choice.to_dict())
-
-        return self.client.api.interactions_create(self.id, self.token, 8, data=parsed)
+        raise Exception("Deprecated: Please use event.reply(type=InteractionCallbackType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT, choices=[CHOICES])")
 
     def edit(self, *args, **kwargs):
         return self.client.api.interactions_edit_reply(self.client.state.me.id, self.token, *args, **kwargs)
