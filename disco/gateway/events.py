@@ -1,9 +1,11 @@
 from six import with_metaclass
 
 from disco.types.application import ApplicationCommand, Interaction
-from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, snowflake, datetime, text, str_or_int
+from disco.types.automoderation import AutoModerationRule, AutoModerationAction, TriggerTypes
+from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, snowflake, datetime, text, str_or_int, \
+    enum
 from disco.types.channel import Channel, PermissionOverwrite, ThreadMember, StageInstance
-from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration
+from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration, GuildScheduledEvent
 from disco.types.invite import Invite
 from disco.types.reactions import MessageReactionEmoji, Sticker
 from disco.types.message import Message
@@ -478,6 +480,7 @@ class GuildRoleDelete(GatewayEvent):
     @property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
+
 
 @wraps_model(Message)
 class MessageCreate(GatewayEvent):
@@ -1047,19 +1050,87 @@ class GuildJoinRequestUpdate(GatewayEvent):
 
 class GuildScheduledEventUserAdd(GatewayEvent):
     guild_id = Field(snowflake)
+    user_id = Field(snowflake)
+    guild_scheduled_event_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+    @property
+    def user(self):
+        return self.client.state.channels.get(self.user_id)
 
 
 class GuildScheduledEventUserRemove(GatewayEvent):
     guild_id = Field(snowflake)
+    user_id = Field(snowflake)
+    guild_scheduled_event_id = Field(snowflake)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+    @property
+    def user(self):
+        return self.client.state.channels.get(self.user_id)
 
 
+@wraps_model(GuildScheduledEvent)
 class GuildScheduledEventCreate(GatewayEvent):
     guild_id = Field(snowflake)
 
 
+@wraps_model(GuildScheduledEvent)
 class GuildScheduledEventDelete(GatewayEvent):
+    guild_id = Field(snowflake)
+
+
+@wraps_model(GuildScheduledEvent)
+class GuildScheduledEventUpdate(GatewayEvent):
     guild_id = Field(snowflake)
 
 
 class GuildApplicationCommandIndexUpdate(GatewayEvent):
     guild_id = Field(snowflake)
+
+
+@wraps_model(AutoModerationRule)
+class AutoModerationRuleCreate(GatewayEvent):
+    guild_id = Field(snowflake)
+
+
+@wraps_model(AutoModerationRule)
+class AutoModerationRuleUpdate(GatewayEvent):
+    guild_id = Field(snowflake)
+
+
+@wraps_model(AutoModerationRule)
+class AutoModerationRuleDelete(GatewayEvent):
+    guild_id = Field(snowflake)
+
+
+class AutoModerationActionExecution(GatewayEvent):
+    guild_id = Field(snowflake)
+    action = Field(AutoModerationAction)
+    rule_id = Field(snowflake)
+    rule_trigger_type = Field(enum(TriggerTypes))
+    user_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    message_id = Field(snowflake)
+    alert_system_message_id = Field(snowflake)
+    content = Field(text)
+    matched_keyword = Field(text)
+    matched_content = Field(text)
+
+    @property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+    @property
+    def channel(self):
+        return self.client.state.channels.get(self.channel_id)
+
+    @property
+    def user(self):
+        return self.client.state.channels.get(self.user_id)

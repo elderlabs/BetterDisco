@@ -14,10 +14,12 @@ from disco.util.functional import optional
 from disco.util.logging import LoggingClass
 from disco.util.sanitize import S
 from disco.types.application import InteractionCallbackData, ApplicationCommand, GuildApplicationCommandPermissions, Interaction, InteractionResponse
+from disco.types.automoderation import AutoModerationRule
 from disco.types.user import User
 from disco.types.message import Message
 from disco.types.oauth import Application
-from disco.types.guild import Guild, GuildMember, GuildBan, GuildEmbed, PruneCount, Role, GuildEmoji, AuditLogEntry, Integration, DiscoveryRequirements, GuildPreview
+from disco.types.guild import Guild, GuildMember, GuildBan, GuildEmbed, PruneCount, Role, GuildEmoji, AuditLogEntry, \
+    Integration, DiscoveryRequirements, GuildPreview, GuildScheduledEvent, GuildScheduledEventUserObject
 from disco.types.channel import Channel, ThreadMember
 from disco.types.invite import Invite
 from disco.types.voice import VoiceRegion
@@ -762,6 +764,106 @@ class APIClient(LoggingClass):
     def guilds_discovery_requirements(self, guild):
         r = self.http(Routes.GUILDS_DISCOVERY_REQUIREMENTS, dict(guild=guild))
         return DiscoveryRequirements.create(self.client, r.json())
+
+    def guilds_scheduled_events_get(self, guild, with_user_count=False):
+        r = self.http(Routes.GUILDS_EVENTS_GET, dict(guild=guild), params=optional(
+            with_user_count=with_user_count
+        ))
+        return GuildScheduledEvent.create_map(self.client, r.json())
+
+    def guilds_scheduled_event_get(self, guild, event, with_user_count=False):
+        r = self.http(Routes.GUILDS_EVENTS_GET, dict(guild=guild, event=event), params=optional(
+            with_user_count=with_user_count
+        ))
+        return GuildScheduledEvent.create(self.client, r.json())
+
+    def guilds_scheduled_event_create(self, guild, name, privacy_level, scheduled_start_time, entity_type, channel=None,
+                                      entity_metadata=None, scheduled_end_time=None, description=None, image=None, reason=None):
+        r = self.http(Routes.GUILDS_EVENTS_CREATE, dict(guild=guild), json=optional(
+            channel=channel,
+            entity_metadata=entity_metadata,
+            name=name,
+            privacy_level=privacy_level,
+            scheduled_start_time=scheduled_start_time,
+            scheduled_end_time=scheduled_end_time,
+            description=description,
+            entity_type=entity_type,
+            image=image
+        ), headers=_reason_header(reason))
+        GuildScheduledEvent.create(self.client, r.json())
+
+    def guilds_scheduled_event_modify(self, guild, event, channel=None, entity_metadata=None,
+                                      name=None, privacy_level=None, scheduled_start_time=None, scheduled_end_time=None,
+                                      description=None, entity_type=None, image=None, status=None, reason=None):
+
+        payload = {}
+
+        payload.update(optional(
+            channel=channel,
+            entity_metadata=entity_metadata,
+            name=name,
+            privacy_level=privacy_level,
+            scheduled_start_time=scheduled_start_time,
+            scheduled_end_time=scheduled_end_time,
+            description=description,
+            entity_type=entity_type,
+            image=image,
+            status=status,
+        ))
+
+        r = self.http(Routes.GUILDS_EVENTS_MODIFY, dict(guild=guild, event=event), json=payload, headers=_reason_header(reason))
+        GuildScheduledEvent.create(self.client, r.json())
+
+    def guilds_scheduled_event_users_get(self, guild, event, limit=100, with_member=False, before=None, after=None):
+        r = self.http(Routes.GUILDS_EVENT_USERS_GET, dict(guild=guild, event=event), params=optional(
+            limit=limit,
+            with_member=with_member,
+            before=before,
+            after=after,
+        ))
+        return GuildScheduledEventUserObject.create_map(self.client, r.json())
+
+    def guilds_scheduled_event_delete(self, guild, event):
+        return self.http(Routes.GUILDS_EVENTS_DELETE, dict(guild=guild, event=event))
+
+    def guilds_automoderation_rules_get(self, guild):
+        r = self.http(Routes.GUILDS_AUTOMODERATION_RULES_GET, dict(guild=guild))
+        return AutoModerationRule.create_map(self.client, r.json())
+
+    def guilds_automoderation_rule_get(self, guild, rule):
+        r = self.http(Routes.GUILDS_AUTOMODERATION_RULE_GET, dict(guild=guild, rule=rule))
+        return AutoModerationRule.create(self.client, r.json())
+
+    def guilds_automoderation_rule_create(self, guild, name, event_type, trigger_type, trigger_metadata, actions,
+                                          exempt_roles=None, exempt_channels=None, enabled=False, reason=None):
+        r = self.http(Routes.GUILDS_AUTOMODERATION_RULES_CREATE, dict(guild=guild), json=optional(
+            name=name,
+            event_type=event_type,
+            trigger_type=trigger_type,
+            trigger_metadata=trigger_metadata,
+            actions=actions,
+            exempt_roles=exempt_roles,
+            exempt_channels=exempt_channels,
+            enabled=enabled,
+        ), headers=_reason_header(reason))
+        return AutoModerationRule.create(self.client, r.json())
+
+    def guilds_automoderation_rules_modify(self, guild, rule, name=None, event_type=None, trigger_type=None,
+                                           trigger_metadata=None, actions=None, exempt_roles=None, exempt_channels=None, enabled=False, reason=None):
+        r = self.http(Routes.GUILDS_AUTOMODERATION_RULES_MODIFY, dict(guild=guild, rule=rule), json=optional(
+            name=name,
+            event_type=event_type,
+            trigger_type=trigger_type,
+            trigger_metadata=trigger_metadata,
+            actions=actions,
+            exempt_roles=exempt_roles,
+            exempt_channels=exempt_channels,
+            enabled=enabled,
+        ), headers=_reason_header(reason))
+        return AutoModerationRule.create(self.client, r.json())
+
+    def guilds_automoderation_rules_delete(self, guild, rule, reason=None):
+        return self.http(Routes.GUILDS_AUTOMODERATION_RULES_DELETE, dict(guild=guild, rule=rule), headers=_reason_header(reason))
 
     def users_get(self, user):
         r = self.http(Routes.USERS_GET, dict(user=user))

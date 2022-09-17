@@ -400,6 +400,62 @@ class GuildMember(SlottedModel):
         return self.guild.get_permissions(self)
 
 
+class GuildScheduledEventUserObject(SlottedModel):
+    guild_scheduled_event_id = Field(snowflake)
+    user = Field(User)
+    member = Field(GuildMember)
+
+
+class GuildScheduledEventPrivacyLevel(SlottedModel):
+    GUILD_ONLY = 2
+
+
+class GuildScheduledEventStatus(SlottedModel):
+    SCHEDULED = 1
+    ACTIVE = 2
+    COMPLETED = 3
+    CANCELED = 4
+
+
+class GuildScheduledEventEntityTypes(SlottedModel):
+    STAGE_INSTANCE = 1
+    VOICE = 2
+    EXTERNAL = 3
+
+
+class GuildScheduledEventEntityMetadata(SlottedModel):
+    location = Field(text)
+
+
+class GuildScheduledEvent(SlottedModel):
+    id = Field(snowflake)
+    guild_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    creator_id = Field(snowflake)
+    name = Field(text)
+    description = Field(text)
+    scheduled_start_time = Field(datetime)
+    scheduled_end_time = Field(datetime)
+    privacy_level = Field(enum(GuildScheduledEventPrivacyLevel))
+    status = Field(enum(GuildScheduledEventStatus))
+    entity_type = Field(enum(GuildScheduledEventEntityTypes))
+    entity_id = Field(snowflake)
+    entity_metadata = Field(GuildScheduledEventEntityMetadata)
+    creator = Field(User)
+    user_count = Field(int)
+    image = Field(text)
+
+    @cached_property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+    def image_url(self, format="webp"):
+        if self.image:
+            return f"https://cdn.discordapp.com/guild-events/{self.id}/{self.image}.{format}"
+        else:
+            return None
+
+
 class Guild(SlottedModel, Permissible):
     """
     A guild object.
@@ -842,6 +898,23 @@ class AuditLogActionTypes:
     INTEGRATION_CREATE = 80
     INTEGRATION_UPDATE = 81
     INTEGRATION_DELETE = 82
+    STAGE_INSTANCE_CREATE = 83
+    STAGE_INSTANCE_UPDATE = 84
+    STAGE_INSTANCE_DELETE = 85
+    STICKER_CREATE = 90
+    STICKER_UPDATE = 91
+    STICKER_DELETE = 92
+    GUILD_SCHEDULED_EVENT_CREATE = 100
+    GUILD_SCHEDULED_EVENT_UPDATE = 101
+    GUILD_SCHEDULED_EVENT_DELETE = 102
+    THREAD_CREATE = 110
+    THREAD_UPDATE = 111
+    THREAD_DELETE = 112
+    APPLICATION_COMMAND_PERMISSION_UPDATE = 121
+    AUTO_MODERATION_RULE_CREATE = 140
+    AUTO_MODERATION_RULE_UPDATE = 141
+    AUTO_MODERATION_RULE_DELETE = 142
+    AUTO_MODERATION_BLOCK_MESSAGE = 143
 
 
 GUILD_ACTIONS = (
