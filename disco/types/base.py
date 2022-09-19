@@ -3,7 +3,6 @@ import gevent
 import inspect
 
 from datetime import datetime as real_datetime
-from holster.enum import BaseEnumMeta, EnumAttr
 from six import with_metaclass
 
 from disco.util.chains import Chainable
@@ -108,10 +107,6 @@ class Field:
     def type_to_deserializer(typ):
         if isinstance(typ, Field) or inspect.isclass(typ) and issubclass(typ, Model):
             return typ
-        elif isinstance(typ, BaseEnumMeta):
-            def _f(raw, client, **kwargs):
-                return typ.get(raw)
-            return _f
         elif typ is None:
             def _f(*args, **kwargs):
                 return None
@@ -122,8 +117,6 @@ class Field:
 
     @staticmethod
     def serialize(value, inst=None):
-        if isinstance(value, EnumAttr):
-            return value.value
         if isinstance(value, real_datetime):
             return value.isoformat()
         elif isinstance(value, Model):

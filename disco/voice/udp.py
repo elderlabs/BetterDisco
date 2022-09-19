@@ -11,23 +11,23 @@ try:
 except ImportError:
     warnings.warn('nacl is not installed, voice support is disabled')
 
-from holster.enum import Enum
-
 from disco.util.logging import LoggingClass
 
 AudioCodecs = ('opus',)
 
-RTPPayloadTypes = Enum(OPUS=0x78)
+RTPPayloadTypes = {
+    "opus": 0x78
+}
 
-RTCPPayloadTypes = Enum(
-    SENDER_REPORT=200,
-    RECEIVER_REPORT=201,
-    SOURCE_DESCRIPTION=202,
-    BYE=203,
-    APP=204,
-    RTPFB=205,
-    PSFB=206,
-)
+RTCPPayloadTypes = {
+    200: 'SENDER_REPORT',
+    201: 'RECEIVER_REPORT',
+    202: 'SOURCE_DESCRIPTION',
+    203: 'BYE',
+    204: 'APP',
+    205: 'RTPFB',
+    206: 'PSFB',
+}
 
 MAX_UINT32 = 4294967295
 MAX_SEQUENCE = 65535
@@ -104,8 +104,8 @@ class UDPVoiceClient(LoggingClass):
             raise Exception('Unsupported audio codec received, {}'.format(codec))
 
         ptype = RTPPayloadTypes.get(codec)
-        self._rtp_audio_header[1] = ptype.value
-        self.log.debug('[{}] Set UDP\'s Audio Codec to {}, RTP payload type {}'.format(self.vc, ptype.name, ptype.value))
+        self._rtp_audio_header[1] = ptype
+        self.log.debug('[{}] Set UDP\'s Audio Codec to {}, RTP payload type {}'.format(self.vc, codec, ptype))
 
     def increment_timestamp(self, by):
         self.timestamp += by
@@ -199,7 +199,7 @@ class UDPVoiceClient(LoggingClass):
                 payload = RTCPData(
                     client=self.vc,
                     user_id=user_id,
-                    payload_type=payload_type.name,
+                    payload_type=second,
                     header=rtcp,
                     data=data[8:],
                 )
@@ -298,7 +298,7 @@ class UDPVoiceClient(LoggingClass):
                 payload = VoiceData(
                     client=self.vc,
                     user_id=self.vc.audio_ssrcs.get(rtp.ssrc, None),
-                    payload_type=payload_type.name,
+                    payload_type=second,
                     rtp=rtp,
                     nonce=nonce,
                     data=data,
