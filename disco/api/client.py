@@ -229,7 +229,8 @@ class APIClient(LoggingClass):
         else:
             return self.log.error(f'Failed to send message in channel {channel}')
 
-    def channels_messages_modify(self, channel, message, content=None, embed=None, embeds=[], flags=None, sanitize=False):
+    def channels_messages_modify(self, channel, message, content=None, embed=None, embeds=[], components=[], flags=None,
+                                 sanitize=False):
         payload = optional(flags=flags)
 
         if content is not None:
@@ -250,6 +251,13 @@ class APIClient(LoggingClass):
             for e in embeds:
                 embed_list.append(e.to_dict())
             payload['embeds'] = embed_list
+
+        if components:
+            component_list = []
+            for c in components:
+                if type(c) != dict:
+                    component_list.append(c.to_dict())
+            payload['components'] = component_list
 
         r = self.http(Routes.CHANNELS_MESSAGES_MODIFY,
                       dict(channel=channel, message=message),
