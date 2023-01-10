@@ -358,25 +358,149 @@ class APIClient(LoggingClass):
         r = self.http(Routes.CHANNELS_WEBHOOKS_LIST, dict(channel=channel))
         return Webhook.create_map(self.client, r.json())
 
-    def channels_forums_threads_create(self, channel, name, message, auto_archive_duration=None,
-                                       rate_limit_per_user=None, applied_tags=None, reason=None):
-
-        if isinstance(message, Message):
-            message = message.to_dict()
+    def channels_forums_threads_create(
+            self,
+            channel,
+            name,
+            auto_archive_duration=None,
+            rate_limit_per_user=None,
+            applied_tags=None,
+            content=None,
+            nonce=None,
+            tts=False,
+            attachment=None,
+            attachments=[],
+            embed=None,
+            embeds=[],
+            allowed_mentions={},
+            message_reference={},
+            components={},
+            sticker_ids={},
+            sanitize=False,
+            reason=None):
 
         payload = {
             'name': name,
-            'message': message
+            'message': {
+                'nonce': nonce,
+                'tts': tts,
+                'allowed_mentions': {
+                    'parse': [],
+                    'users': [],
+                    'roles': [],
+                },
+            }
         }
 
         payload.update(optional(
-            auto_archive_duration=auto_archive_duration,
-            rate_limit_per_user=rate_limit_per_user,
-            applied_tags=applied_tags,
-        ))
+                auto_archive_duration=auto_archive_duration,
+                rate_limit_per_user=rate_limit_per_user,
+                applied_tags=applied_tags,
+            ))
 
-        r = self.http(Routes.CHANNELS_THREAD_START, dict(channel=channel), json=payload, headers=_reason_header(reason))
-        return Channel.create(self.client, r.json())
+        if attachment:
+            attachments = [attachment]
+            warnings.warn(
+                'attachment kwarg has been deprecated, switch to using attachments with a list',
+                DeprecationWarning)
+
+        if content is not None:
+            if self.token in content:
+                content = 'The bot\'s token would have been exposed in this message and has been removed for safety.'
+            if sanitize:
+                content = S(content)
+            payload['message']['content'] = content
+        else:
+            payload['message']['content'] = None
+
+        if embed:
+            warnings.warn(
+                'embed kwarg has been deprecated, switch to using embeds with a list',
+                DeprecationWarning)
+            payload['message']['embeds'] = [embed.to_dict()]
+
+        if embeds:
+            embed_list = []
+            for e in embeds:
+                embed_list.append(e.to_dict())
+            payload['message']['embeds'] = embed_list
+
+        if allowed_mentions:
+            payload['message']['allowed_mentions'] = allowed_mentions
+
+        if message_reference:
+            payload['message']['message_reference'] = message_reference
+
+        if components:
+            payload['message']['components'] = components
+
+        if sticker_ids:
+            payload['message']['sticker_ids'] = sticker_ids
+
+        if attachments:
+            if len(attachments) > 1:
+                files = {
+                    'file{}'.format(idx): tuple(i) for idx, i in enumerate(attachments)
+                }
+            else:
+                files = {
+                    'file': tuple(attachments[0]),
+                }
+
+            r = self.http(
+                Routes.CHANNELS_THREAD_START,
+                dict(channel=channel),
+                data={'payload_json': json.dumps(payload)},
+                files=files,
+                headers=_reason_header(reason)
+            )
+        else:
+            r = self.http(Routes.CHANNELS_THREAD_START, dict(channel=channel), json=payload, headers=_reason_header(reason))
+
+        # Catch API failures
+        # TODO: long-term solution at higher level
+        if r:
+            return Channel.create(self.client, r.json())
+        else:
+            return self.log.error(f'Failed to create forum thread in channel {channel}')
+
+    # def channels_forums_threads_create(self, channel, name, message, auto_archive_duration=None,
+    #                                    rate_limit_per_user=None, applied_tags=None, reason=None):
+    #
+    #     if isinstance(message, Message):
+    #         message = message.to_dict()
+    #
+    #     payload = {
+    #         'name': name,
+    #         'message': message
+    #     }
+    #
+    #     payload.update(optional(
+    #         auto_archive_duration=auto_archive_duration,
+    #         rate_limit_per_user=rate_limit_per_user,
+    #         applied_tags=applied_tags,
+    #     ))
+    #
+    #     if message['attachments']:
+    #         if len(message['attachments']) > 1:
+    #             files = {
+    #                 'file{}'.format(idx): tuple(i) for idx, i in enumerate(message['attachments'])
+    #             }
+    #         else:
+    #             files = {
+    #                 'file': tuple(message['attachments'][0]),
+    #             }
+    #
+    #         r = self.http(
+    #             Routes.CHANNELS_MESSAGES_CREATE,
+    #             dict(channel=channel),
+    #             data={'payload_json': json.dumps(payload)},
+    #             files=files,
+    #         )
+    #         return Channel.create(self.client, r.json())
+    #
+    #     r = self.http(Routes.CHANNELS_THREAD_START, dict(channel=channel), json=payload, headers=_reason_header(reason))
+    #     return Channel.create(self.client, r.json())
 
     def channels_threads_create(self, channel, name, message=None, auto_archive_duration=None,
                                 invitable=None, rate_limit_per_user=None, thread_type=None, reason=None):
