@@ -103,7 +103,13 @@ class GatewayClient(LoggingClass):
             gevent.sleep(interval / 1000)
 
     def handle_dispatch(self, packet):
-        obj = GatewayEvent.from_dispatch(self.client, packet)
+        try:
+            obj = GatewayEvent.from_dispatch(self.client, packet)
+        except Exception as e:
+            if self.client.config.log_unknown_events:
+                return self.log.warning(e)  # this probably isn't perfect
+            return
+
         self.log.debug(f'GatewayClient.handle_dispatch {obj.__class__.__name__}')
         self.client.events.emit(obj.__class__.__name__, obj)
         if self.replaying:
@@ -234,9 +240,9 @@ class GatewayClient(LoggingClass):
                     int(self.client.config.shard_count),
                 ],
                 'properties': {
-                    '$os': platform.system(),
-                    '$browser': 'disco',
-                    '$device': 'disco',
+                    'os': platform.system(),
+                    'browser': 'disco',
+                    'device': 'disco',
                 },
             })
 

@@ -46,6 +46,7 @@ class ClientConfig(Config):
     intents = 0
     max_reconnects = 5
     log_level = 'info'
+    log_unknown_events = False
 
     manhole_enable = False
     manhole_bind = ('127.0.0.1', 8484)

@@ -1062,3 +1062,11 @@ class GuildScheduledEventDelete(GatewayEvent):
 
 class GuildApplicationCommandIndexUpdate(GatewayEvent):
     guild_id = Field(snowflake)
+
+
+class AutoModerationActionExecution(GatewayEvent):
+    guild_id = Field(snowflake)
+
+
+class GuildAuditLogEntryCreate(GatewayEvent):
+    guild_id = Field(snowflake)
