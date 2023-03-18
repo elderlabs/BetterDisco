@@ -43,5 +43,8 @@ class VoiceRegion(SlottedModel):
     def __str__(self):
         return self.id
 
+    def __int__(self):
+        return self.id
+
     def __repr__(self):
-        return '<VoiceRegion {}>'.format(self.name)
+        return '<VoiceRegion name={}>'.format(self.name)

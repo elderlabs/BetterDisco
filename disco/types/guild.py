@@ -497,7 +497,7 @@ class Guild(SlottedModel, Permissible):
     rules_channel_id = Field(snowflake)
     joined_at = Field(datetime)
     large = Field(bool)
-    unavailable = Field(bool)
+    unavailable = Field(bool, default=False)
     member_count = Field(int)
     voice_states = AutoDictField(VoiceState, 'session_id')
     members = AutoDictField(GuildMember, 'id')

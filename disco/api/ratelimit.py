@@ -40,7 +40,7 @@ class RouteState(LoggingClass):
         self.update(response)
 
     def __repr__(self):
-        return '<RouteState {}>'.format(' '.join(self.route))
+        return '<RouteState route={}>'.format(' '.join(self.route))
 
     @property
     def chilled(self):

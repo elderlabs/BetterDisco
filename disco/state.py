@@ -9,7 +9,7 @@ from disco.util.emitter import Priority
 
 class StackMessage(namedtuple('StackMessage', ['id', 'channel_id', 'author_id'])):
     """
-    A message stored on a stack inside of the state object, used for tracking
+    A message stored on a stack inside the state object, used for tracking
     previously sent messages in channels.
 
     Attributes

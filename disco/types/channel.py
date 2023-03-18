@@ -212,7 +212,7 @@ class Channel(SlottedModel, Permissible):
         return self.id
 
     def __repr__(self):
-        return '<Channel {} ({})>'.format(self.id, self)
+        return '<Channel id={} name={}>'.format(self.id, self.name)
 
     def get_permissions(self, user):
         """

@@ -79,6 +79,8 @@ class MessageFlags(BitsetMap):
     EPHEMERAL = 1 << 6
     LOADING = 1 << 7
     FAILED_TO_MENTION_SOME_ROLES_IN_THREAD = 1 << 8
+    # UNKNOWN = 1 << 9
+    SHOULD_SHOW_LINK_NOT_DISCORD_WARNING = 1 << 10
 
 
 class MessageFlagValue(BitsetValue):
@@ -520,8 +522,8 @@ class _Message(SlottedModel):
     components = ListField(MessageComponent)
     sticker_items = ListField(StickerItemStructure)
 
-    def __str__(self):
-        return '<Message {} ({})>'.format(self.id, self.channel_id)
+    def __repr__(self):
+        return '<Message id={} channel_id={}>'.format(self.id, self.channel_id)
 
     def __int__(self):
         return self.id

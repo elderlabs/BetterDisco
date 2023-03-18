@@ -54,7 +54,7 @@ class BotConfig(Config):
         A function which takes in a message object and returns an array of strings
         (prefixes).
     commands_allow_edit : bool
-        If true, the bot will re-parse an edited message if it was the last sent
+        If true, the bot will reparse an edited message if it was the last sent
         message in a channel, and did not previously trigger a command. This is
         helpful for allowing edits to typed commands.
     commands_level_getter : function
@@ -131,7 +131,7 @@ class Bot(LoggingClass):
         The client this bot should utilize for its connection.
     config : Optional[:class:`BotConfig`]
         The configuration to use for this bot. If not provided will use the defaults
-        inside of :class:`BotConfig`.
+        inside :class:`BotConfig`.
 
     Attributes
     ----------
@@ -163,7 +163,7 @@ class Bot(LoggingClass):
 
         # Setup HTTP server (Flask app) if enabled
         self.http = None
-        if self.config.http_enabled:
+        if self.config.http_enabled and int(self.client.config.shard_id) == 0:
             try:
                 from flask import Flask
             except ImportError:
