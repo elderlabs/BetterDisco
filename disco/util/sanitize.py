@@ -26,6 +26,8 @@ def _re_sub_mention(mention):
 
 
 def S(text, escape_mentions=True, escape_codeblocks=False, escape_rtl=False):
+    if not isinstance(text, str):
+        text = str(text)
     if escape_mentions:
         text = MENTION_RE.sub(_re_sub_mention, text)
 

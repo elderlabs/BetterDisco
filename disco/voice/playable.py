@@ -6,6 +6,7 @@ import types
 
 from gevent.lock import Semaphore
 from gevent.queue import Queue
+from io import BytesIO
 from six import add_metaclass
 
 from disco.voice.opus import OpusEncoder
@@ -60,11 +61,13 @@ class BaseInput(BaseUtil):
 
 
 class FFmpegInput(BaseInput, AbstractOpus):
-    def __init__(self, source='-', command='ffmpeg', **kwargs):
+    def __init__(self, source='-', command='ffmpeg', live=False, **kwargs):
         super(FFmpegInput, self).__init__(**kwargs)
         if source:
             self.source = source
         self.command = command
+        if live:
+            self.live = live
 
         self._buffer = None
         self._proc = None
@@ -73,7 +76,10 @@ class FFmpegInput(BaseInput, AbstractOpus):
         if not self._buffer:
             # allows time for a buffer to form, otherwise there is nothing to send
             gevent.sleep(1)
-            self._buffer = self.proc.stdout
+            if self.live:
+                self._buffer = self.proc.stdout
+            else:
+                self._buffer = BytesIO(self.proc.stdout.read())
 
         return self._buffer.read(sz)
 
@@ -96,7 +102,7 @@ class FFmpegInput(BaseInput, AbstractOpus):
                 '-ab', '192k',
                 '-bufsize', str(self.sampling_rate),
                 '-loglevel', 'warning',
-                '-hls_time', '10',
+                '-hls_time', '8',
                 '-hls_playlist_type', 'vod',
                 'pipe:1',
             ]
@@ -123,13 +129,33 @@ class YoutubeDLInput(FFmpegInput):
                     if 'entries' not in results:
                         self._ie_info = results
                     else:
-                        self._ie_info = results['entries'][0]
+                        # logic to ignore live versions of a song if we're not asking for them when searching
+                        # rudimentary at the moment, but it's enough to get the job done
+                        # disabled by default if not specifically asking for multiple results
+                        if 'ytsearch' in self._url and len(self._url.split()) > 1 and len(results['entries']) > 1:
+                            self._ie_info = None
+                            ignored_terms = ('LIVE', 'VIDEO')
+                            for entry in results['entries']:
+                                for term in ignored_terms:
+                                    if term in entry['title'].upper() and term not in self._url.upper():
+                                        continue
+                                    self._ie_info = entry
+                                    break
+                                if self._ie_info:
+                                    break
+                            if not self._ie_info:
+                                self._ie_info = results['entries'][0]
+                        else:
+                            self._ie_info = results['entries'][0]
 
                     if self._ie_info['extractor'] == 'twitch:stream':
                         audio_formats = [fmt for fmt in self._ie_info['formats'] if fmt['format_id'] == 'audio_only']
                         self._info = audio_formats[0]
+                        self._ie_info['is_live'] = True
                     else:
                         self._info = self._ie_info
+                        if 'is_live' not in self._ie_info:
+                            self._ie_info['is_live'] = False
 
                     if not self._info:
                         raise Exception("Couldn't find valid audio format for {}".format(self._url))
@@ -156,11 +182,15 @@ class YoutubeDLInput(FFmpegInput):
     def source(self):
         return self.info['url']
 
+    @property
+    def live(self):
+        return self.info['is_live']
+
 
 class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
     def __init__(self, source, volume=1.0, frame_buffer=100, *args, **kwargs):
         self.source = source
-        self.frames = Queue(kwargs.pop('queue_size', 4096))
+        self.frames = Queue()
         self.frame_buffer = frame_buffer
         self.volume = volume
 
@@ -185,7 +215,8 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
                     break
 
                 self.frames.put(self.encode(raw, self.samples_per_frame))
-            gevent.idle()
+            gevent.sleep(0.002)  # temp-fix for CPU leak
+            # gevent.idle()
         self.source = None
         self.frames.put(None)
 

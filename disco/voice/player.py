@@ -16,7 +16,6 @@ class Player(LoggingClass):
         RESUME_PLAY = 'RESUME_PLAY'
         DISCONNECT = 'DISCONNECT'
 
-
     def __init__(self, client, queue=None):
         super(Player, self).__init__()
         self.client = client
@@ -69,9 +68,9 @@ class Player(LoggingClass):
             self.events.emit(self.Events.RESUME_PLAY)
 
     def play(self, item):
-        # Grab the first frame before we start anything else, sometimes playables
-        #  can do some lengthy async tasks here to setup the playable and we
-        #  don't want that lerp the first N frames of the playable into playing
+        #  Grab the first frame before we start anything else, sometimes playables
+        #  can do some lengthy async tasks here to set up the playable, and we
+        #  don't want to lerp the first N frames of the playable into playing
         #  faster
         frame = item.next_frame()
         if frame is None:
@@ -115,10 +114,10 @@ class Player(LoggingClass):
         while self.playing:
             self.now_playing = self.queue.get()
 
-            self.events.emit(self.Events.START_PLAY, self.now_playing)
+            self.events.emit(self.Events.START_PLAY, self)
             self.play_task = gevent.spawn(self.play, self.now_playing)
             self.play_task.join()
-            self.events.emit(self.Events.STOP_PLAY, self.now_playing)
+            self.events.emit(self.Events.STOP_PLAY, self)
 
             if self.client.state == VoiceState.DISCONNECTED:
                 self.playing = False

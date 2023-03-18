@@ -71,7 +71,7 @@ class State:
     config : `StateConfig`
         The configuration for this state instance.
     me : `User`
-        The currently logged in user.
+        The currently logged-in user.
     guilds : dict(snowflake, `Guild`)
         Mapping of all known/loaded Guilds.
     channels : dict(snowflake, `Channel`)
@@ -83,7 +83,7 @@ class State:
     voice_states : dict(str, `VoiceState`)
         Weak mapping of all known/active Voice States.
     messages : Optional[dict(snowflake, deque)]
-        Mapping of channel ids to deques containing `StackMessage` objects.
+        Mapping of channel ids to dequeue containing `StackMessage` objects.
     """
     EVENTS = [
         'Ready', 'GuildCreate', 'GuildUpdate', 'GuildDelete', 'GuildMemberAdd', 'GuildMemberUpdate',
@@ -314,12 +314,21 @@ class State:
             # Moving channels
             if event.state.channel_id:
                 self.voice_states[event.state.session_id].inplace_update(event.state)
+                if event.state.user_id == self.me.id:
+                    self.voice_clients[event.state.guild_id]._moving_channel = True
+                    self.voice_clients[event.state.guild_id]._session_id = event.state.session_id
+                    self.voice_clients[event.state.guild_id].channel_id = event.state.channel_id
             # Disconnection
             else:
                 if event.state.guild_id in self.guilds:
                     if event.state.session_id in self.guilds[event.state.guild_id].voice_states:
                         del self.guilds[event.state.guild_id].voice_states[event.state.session_id]
-                del self.voice_states[event.state.session_id]
+                if event.state.user_id == self.me.id:
+                    del self.voice_clients[event.state.guild_id]
+                try:
+                    del self.voice_states[event.state.session_id]
+                except KeyError:
+                    return
         # New connection
         elif event.state.channel_id:
             if event.state.guild_id in self.guilds:
@@ -331,6 +340,10 @@ class State:
             if expired_voice_state:
                 del self.voice_states[expired_voice_state.session_id]
             self.voice_states[event.state.session_id] = event.state
+            if event.state.user_id == self.me.id:
+                self.voice_clients[event.state.guild_id]._session_id = event.state.session_id
+                self.voice_clients[event.state.guild_id].channel_id = event.state.channel_id
+        return
 
     def on_guild_member_add(self, event):
         if event.member.user.id not in self.users:

@@ -270,11 +270,11 @@ class UDPVoiceClient(LoggingClass):
                             first_byte, = struct.unpack_from('>B', data[:offset])
                             offset += 1
 
-                            rtp_extension_identifer = first_byte & 0xF
+                            rtp_extension_identifier = first_byte & 0xF
                             rtp_extension_len = ((first_byte >> 4) & 0xF) + 1
 
-                            # Ignore data if identifer == 15, so skip if this is set as 0
-                            if rtp_extension_identifer:
+                            # Ignore data if identifier == 15, so skip if this is set as 0
+                            if rtp_extension_identifier:
                                 fields.append(data[offset:offset + rtp_extension_len])
 
                             offset += rtp_extension_len
@@ -310,7 +310,9 @@ class UDPVoiceClient(LoggingClass):
         self.conn.sendto(data, (self.ip, self.port))
 
     def disconnect(self):
-        self._run_task.kill()
+        if self._run_task:
+            self._run_task.kill()
+        return
 
     def connect(self, host, port, timeout=10, addrinfo=None):
         self.ip = socket.gethostbyname(host)
@@ -322,18 +324,20 @@ class UDPVoiceClient(LoggingClass):
             ip, port = addrinfo
         else:
             # Send discovery packet
-            packet = bytearray(70)
-            struct.pack_into('>I', packet, 0, self.vc.ssrc)
+            packet = bytearray(74)
+            struct.pack_into('>H', packet, 0, 1)
+            struct.pack_into('>H', packet, 2, 70)
+            struct.pack_into('>I', packet, 4, self.vc.ssrc)
             self.send(packet)
 
             # Wait for a response
             try:
-                data, addr = gevent.spawn(lambda: self.conn.recvfrom(70)).get(timeout=timeout)
+                data, addr = gevent.spawn(lambda: self.conn.recvfrom(74)).get(timeout=timeout)
             except gevent.Timeout:
                 return None, None
 
             # Read IP and port
-            ip = str(data[4:]).split('\x00', 1)[0]
+            ip = str(data[8:]).split('\x00', 1)[0]
             port = struct.unpack('<H', data[-2:])[0]
 
         # Spawn read thread so we don't max buffers
