@@ -315,7 +315,7 @@ class State:
             if event.state.channel_id:
                 self.voice_states[event.state.session_id].inplace_update(event.state)
                 if event.state.user_id == self.me.id:
-                    self.voice_clients[event.state.guild_id]._moving_channel = True
+                    self.voice_clients[event.state.guild_id]._safe_reconnect_state = True
                     self.voice_clients[event.state.guild_id]._session_id = event.state.session_id
                     self.voice_clients[event.state.guild_id].channel_id = event.state.channel_id
             # Disconnection

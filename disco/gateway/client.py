@@ -63,6 +63,7 @@ class GatewayClient(LoggingClass):
         self.replaying = False
         self.replayed_events = 0
         self.last_conn_state = None
+        self.resuming = False
 
         # Cached gateway URL
         self._cached_gateway_url = None
@@ -124,8 +125,9 @@ class GatewayClient(LoggingClass):
         self.latency = float('{:.2f}'.format((time.perf_counter() - self._last_heartbeat) * 1000))
 
     def handle_reconnect(self, _):
-        self.log.warning('Received RECONNECT request, forcing a fresh reconnect')
+        self.log.warning('Received RECONNECT request; resuming')
         self.last_conn_state = 'RECONNECT'
+        self.resuming = True
         self.ws.close(status=4000)
 
     def handle_invalid_session(self, _):
@@ -149,6 +151,7 @@ class GatewayClient(LoggingClass):
         self.log.info(f'RESUME completed, replayed {self.replayed_events} events')
         self.reconnects = 0
         self.replaying = False
+        self.resuming = False
 
     def connect_and_run(self, gateway_url=None):
         if not gateway_url:
@@ -212,10 +215,13 @@ class GatewayClient(LoggingClass):
         if isinstance(error, KeyboardInterrupt):
             self.shutting_down = True
             self.ws_event.set()
+        self.resuming = True  # ideally this should be fine
         if isinstance(error, WebSocketTimeoutException):
             return self.log.error('Websocket connection has timed out. An upstream connection issue is likely present.')
         if not isinstance(error, WebSocketConnectionClosedException):
             return self.log.error(f'WS received error: {error}')
+        else:
+            return self.log.warning(f'WS received error: {error}')
 
     def on_open(self):
         if self.zlib_stream_enabled:
@@ -251,14 +257,11 @@ class GatewayClient(LoggingClass):
         # Make sure we clean up any old data
         self._buffer = None
 
-        # Kill heartbeater, a reconnect/resume will trigger a HELLO which will
-        #  respawn it
+        # Kill heartbeater, a reconnect/resume will trigger a HELLO which will respawn it
         if self._heartbeat_task:
             self.log.info('WS Closed: killing heartbeater')
-            try:
-                self._heartbeat_task.kill(timeout=5)
-            except TimeoutError:
-                self.log.info('Heartbeater kill timeout')
+            self._heartbeat_task.kill()
+            self._heartbeat_task = None
 
         # If we're quitting, just break out of here
         if self.shutting_down:
@@ -266,18 +269,23 @@ class GatewayClient(LoggingClass):
             return
 
         self.replaying = False
+        self._heartbeat_acknowledged = True
 
         # Track reconnect attempts
         if reason:
             self.last_conn_state = reason
         self.reconnects += 1
-        self.log.info('WS Closed:{}{} ({})'.format(f' [{code}]' if code else '', f' {reason if reason else ""}', self.reconnects))
+        self.log.info('WS Closed: {}{}({})'.format(f'[{code}] ' if code else '', f'{reason} ' if reason else '', self.reconnects))
 
         if self.max_reconnects and self.reconnects > self.max_reconnects:
             return self.log.error(f'Failed to reconnect after {self.max_reconnects} attempts, giving up')
 
+        # Allows us to resume VC clients if our GW is lost at the same time
+        if not self.resuming:
+            for vc in self.client.state.voice_clients.values():
+                vc._safe_reconnect_state = True
         # Don't resume for these error codes
-        if code and (4000 < code <= 4010 or code in (1000, 1001)):
+        if code and (4000 < code <= 4010 or code in (1000, 1001)) or (not code and not self.resuming):
             self.session_id = None
         # 4004 and all codes above 4009 are not resumable
         if code and (code == 4004 or code >= 4010):
@@ -298,7 +306,7 @@ class GatewayClient(LoggingClass):
             import sys
             return sys.exit(1)
 
-        wait_time = (self.reconnects - 1 if self.session_id else self.reconnects) * 5 if self.reconnects < 6 else 30
+        wait_time = (self.reconnects - 1) * 5 if self.reconnects < 6 else 30
         self.log.info(f'Will attempt to {"resume" if self.session_id else "reconnect"} after {wait_time} seconds')
         gevent.sleep(wait_time)
 

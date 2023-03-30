@@ -112,7 +112,7 @@ class VoiceClient(LoggingClass):
         self._heartbeat_task = None
         self._heartbeat_acknowledged = True
         self._identified = False
-        self._moving_channel = False
+        self._safe_reconnect_state = False
 
         # Latency
         self._last_heartbeat = 0
@@ -126,7 +126,7 @@ class VoiceClient(LoggingClass):
 
     @cached_property
     def guild(self):
-        return self.client.state.guilds.get(self.server_id) if not self.is_dm else None
+        return self.client.state.guilds.get(self.server_id)
 
     @cached_property
     def channel(self):
@@ -227,7 +227,7 @@ class VoiceClient(LoggingClass):
 
     def set_voice_state(self, channel_id, mute=False, deaf=False, video=False):
         if self.server_id in self.client.state.voice_clients:
-            self._moving_channel = True
+            self._safe_reconnect_state = True
         if channel_id and self.media:
             try:
                 self.media.pause()
@@ -333,6 +333,8 @@ class VoiceClient(LoggingClass):
         self.log.info('[{}] WS Resumed'.format(self.channel_id))
         self.set_state(VoiceState.CONNECTED)
         self._reconnects = 0
+        if self.media:
+            self.media.resume()
 
     def on_voice_sdp(self, sdp):
         self.log.info('[{}] Received session description; connected'.format(self.channel_id))
@@ -352,11 +354,12 @@ class VoiceClient(LoggingClass):
 
         self._reconnects = 0
 
-        if self._moving_channel:
-            self._moving_channel = False
+        if self._safe_reconnect_state:
+            self._safe_reconnect_state = False
             try:
-                self.media.pause()
-                self.media.resume()
+                if self.media:
+                    self.media.pause()
+                    self.media.resume()
             except AttributeError:
                 pass
 
@@ -407,9 +410,9 @@ class VoiceClient(LoggingClass):
 
     def on_close(self, code=None, reason=None):
         gevent.sleep(0.001)
-        if self._moving_channel and self.media:
+        if self.media:
             self.media.pause()
-        self.log.info('[{}] WS Closed:{}{} ({})'.format(self.channel_id, ' [{}]'.format(code) if code else '', ' {}'.format(reason) if reason else '', self._reconnects))
+        self.log.info('[{}] WS Closed: {}{}({})'.format(self.channel_id, f'[{code}] ' if code else '', f'{reason} ' if reason else '', self._reconnects))
 
         if self._heartbeat_task:
             self.log.info('[{}] WS Closed: killing heartbeater'.format(self.channel_id))
@@ -417,12 +420,13 @@ class VoiceClient(LoggingClass):
             self._heartbeat_task = None
 
         self.ws = None
+        self._heartbeat_acknowledged = True
 
         # If we killed the connection, don't try resuming
         if self.state == VoiceState.DISCONNECTED:
             return
 
-        if not code or self._moving_channel or (code and code in (4009, 4015)):
+        if not code and self._safe_reconnect_state or (code and code in (4009, 4015)):
             self.log.info('[{}] Attempting WS resumption'.format(self.channel_id))
         self.set_state(VoiceState.RECONNECTING)
         self._reconnects += 1
@@ -432,18 +436,22 @@ class VoiceClient(LoggingClass):
             return self.disconnect()
 
         # Check if code is not None, was not from us
-        if code and (4000 < code <= 4016 or code == 1001):
+        if code and (4000 < code <= 4016 or code in (1000, 1001)):
             self._identified = False
+            try:
+                del self.client.state.voice_states[self.server_id]
+            except KeyError:
+                pass
 
             if self.udp and self.udp.connected:
                 self.udp.disconnect()
 
             # every other code is a failure, except these
-            if code not in (4009, 4015) and not self._moving_channel:
+            if code not in (1001, 4009, 4015) and not self._safe_reconnect_state:
                 self.log.warning('[{}] Session unexpectedly terminated. Not reconnecting.'.format(self.channel_id))
                 return self.disconnect()
 
-        wait_time = 1
+        wait_time = 0
 
         self.log.info('[{}] {} in {} second{}'.format(self.channel_id, 'Resuming' if self._identified else 'Reconnecting', wait_time, 's' if wait_time != 1 else ''))
         gevent.sleep(wait_time)
@@ -476,7 +484,7 @@ class VoiceClient(LoggingClass):
             return self
 
     def disconnect(self):
-        self._moving_channel = False
+        self._safe_reconnect_state = False
         if self.state == VoiceState.DISCONNECTED:
             return
 

@@ -61,13 +61,13 @@ class BaseInput(BaseUtil):
 
 
 class FFmpegInput(BaseInput, AbstractOpus):
-    def __init__(self, source='-', command='ffmpeg', live=False, **kwargs):
+    def __init__(self, source='-', command='ffmpeg', streaming=False, **kwargs):
         super(FFmpegInput, self).__init__(**kwargs)
         if source:
             self.source = source
         self.command = command
-        if live:
-            self.live = live
+        if streaming:
+            self.streaming = streaming
 
         self._buffer = None
         self._proc = None
@@ -76,7 +76,7 @@ class FFmpegInput(BaseInput, AbstractOpus):
         if not self._buffer:
             # allows time for a buffer to form, otherwise there is nothing to send
             gevent.sleep(1)
-            if self.live:
+            if self.streaming:
                 self._buffer = self.proc.stdout
             else:
                 self._buffer = BytesIO(self.proc.stdout.read())
@@ -95,15 +95,16 @@ class FFmpegInput(BaseInput, AbstractOpus):
             args = [
                 'stdbuf', '-oL',
                 self.command,
+                '-user_agent', '"Mozilla/5.0 (Linux x86_64; rv:102.0) Gecko/20100101 Firefox/102.0"',
                 '-i', str(self.source),
                 '-f', 's16le',
                 '-ar', str(self.sampling_rate),
                 '-ac', str(self.channels),
                 '-ab', '192k',
                 '-bufsize', str(self.sampling_rate),
-                '-loglevel', 'warning',
-                '-hls_time', '8',
-                '-hls_playlist_type', 'vod',
+                '-loglevel', 'fatal',
+                '-hls_time', '10',
+                '-hls_playlist_type', 'event',
                 'pipe:1',
             ]
             self._proc = gevent.subprocess.Popen(args, stdout=gevent.subprocess.PIPE)
@@ -148,14 +149,9 @@ class YoutubeDLInput(FFmpegInput):
                         else:
                             self._ie_info = results['entries'][0]
 
-                    if self._ie_info['extractor'] == 'twitch:stream':
-                        audio_formats = [fmt for fmt in self._ie_info['formats'] if fmt['format_id'] == 'audio_only']
-                        self._info = audio_formats[0]
-                        self._ie_info['is_live'] = True
-                    else:
-                        self._info = self._ie_info
-                        if 'is_live' not in self._ie_info:
-                            self._ie_info['is_live'] = False
+                    self._info = self._ie_info
+                    if 'is_live' not in self._ie_info:
+                        self._ie_info['is_live'] = False
 
                     if not self._info:
                         raise Exception("Couldn't find valid audio format for {}".format(self._url))
@@ -183,7 +179,7 @@ class YoutubeDLInput(FFmpegInput):
         return self.info['url']
 
     @property
-    def live(self):
+    def streaming(self):
         return self.info['is_live']
 
 
@@ -215,8 +211,7 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
                     break
 
                 self.frames.put(self.encode(raw, self.samples_per_frame))
-            gevent.sleep(0.002)  # temp-fix for CPU leak
-            # gevent.idle()
+            gevent.sleep(0.002)
         self.source = None
         self.frames.put(None)
 
@@ -230,8 +225,8 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
     @volume.setter
     def volume(self, value):
         if 0.0 > value:
-            raise Exception('Volume accepts float values between 0.0 and 1.0 only')
-        self._volume = max(value, 0.0)
+            raise Exception('Volume accepts float values between 0.0 and 2.0 only')
+        self._volume = min(value, 2.0)
 
 
 class PlaylistPlayable(BasePlayable, AbstractOpus):
