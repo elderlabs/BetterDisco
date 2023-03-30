@@ -555,6 +555,8 @@ class _Message(SlottedModel):
         """
         if self.guild_id:
             return self.client.state.guilds.get(self.guild_id)
+        elif self.channel and self.channel.guild:
+            return self.channel.guild
 
     @cached_property
     def member(self):

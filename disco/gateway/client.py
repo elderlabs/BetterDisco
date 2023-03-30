@@ -142,6 +142,7 @@ class GatewayClient(LoggingClass):
     def on_ready(self, ready):
         self.log.info('Received READY')
         self.session_id = ready.session_id
+        self._cached_gateway_url = ready.resume_gateway_url
         self.reconnects = 0
 
     def on_resumed(self, _):
@@ -302,7 +303,7 @@ class GatewayClient(LoggingClass):
         gevent.sleep(wait_time)
 
         # Reconnect
-        self.connect_and_run()
+        self.connect_and_run(self._cached_gateway_url)
 
     def run(self):
         gevent.spawn(self.connect_and_run)
