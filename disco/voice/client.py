@@ -52,12 +52,14 @@ class VoiceException(Exception):
 
 
 class VoiceClient(LoggingClass):
-    VOICE_GATEWAY_VERSION = 4
+    VOICE_GATEWAY_VERSION = 7
 
     SUPPORTED_MODES = {
-        'xsalsa20_poly1305_lite',
-        'xsalsa20_poly1305_suffix',
-        'xsalsa20_poly1305',
+         # 'aead_xchacha20_poly1305_rtpsize',
+         'xsalsa20_poly1305',
+         'xsalsa20_poly1305_lite',
+         'xsalsa20_poly1305_lite_rtpsize',
+         'xsalsa20_poly1305_suffix',
     }
 
     def __init__(self, client, server_id, is_dm=False, encoder=None, max_reconnects=5):
@@ -84,9 +86,9 @@ class VoiceClient(LoggingClass):
         self.packets.on(VoiceOPCode.HEARTBEAT_ACK, self.handle_heartbeat_acknowledge)
         self.packets.on(VoiceOPCode.HELLO, self.on_voice_hello)
         self.packets.on(VoiceOPCode.RESUMED, self.on_voice_resumed)
-        self.packets.on(VoiceOPCode.CLIENT_CONNECT, self.on_voice_client_connect)
+        # self.packets.on(VoiceOPCode.CLIENT_CONNECT, self.on_voice_client_connect)
         self.packets.on(VoiceOPCode.CLIENT_DISCONNECT, self.on_voice_client_disconnect)
-        # self.packets.on(VoiceOPCode.CODECS, self.on_voice_codecs)
+        self.packets.on(VoiceOPCode.CODECS, self.on_voice_codecs)
 
         # State + state change emitter
         self.state = VoiceState.DISCONNECTED
@@ -98,6 +100,10 @@ class VoiceClient(LoggingClass):
         self.ssrc = None
         self.ip = None
         self.port = None
+        self.enc_modes = None
+        self.experiments = None
+        self.streams = None
+        self.sdp = None
         self.mode = None
         self.udp = None
         self.audio_codec = None
@@ -283,10 +289,13 @@ class VoiceClient(LoggingClass):
         self.ssrc = data['ssrc']
         self.ip = data['ip']
         self.port = data['port']
+        self.enc_modes = data['modes']
+        self.experiments = data['experiments']
+        self.streams = data['streams']
         self._identified = True
 
-        for mode in self.SUPPORTED_MODES:
-            if mode in data['modes']:
+        for mode in self.enc_modes:
+            if mode in self.SUPPORTED_MODES:
                 self.mode = mode
                 self.log.debug('[{}] Selected mode {}'.format(self.channel_id, mode))
                 break
@@ -317,17 +326,18 @@ class VoiceClient(LoggingClass):
         self.send(VoiceOPCode.SELECT_PROTOCOL, {
             'protocol': 'udp',
             'data': {
-                'port': port,
                 'address': ip,
+                'port': port,
                 'mode': self.mode,
             },
             'codecs': codecs,
+            'experiments': [],
         })
-        self.send(VoiceOPCode.CLIENT_CONNECT, {
-            'audio_ssrc': self.ssrc,
-            'video_ssrc': 0,
-            'rtx_ssrc': 0,
-        })
+        # self.send(VoiceOPCode.CLIENT_CONNECT, {
+        #     'audio_ssrc': self.ssrc,
+        #     'video_ssrc': 0,
+        #     'rtx_ssrc': 0,
+        # })
 
     def on_voice_resumed(self, data):
         self.log.info('[{}] WS Resumed'.format(self.channel_id))
@@ -339,16 +349,18 @@ class VoiceClient(LoggingClass):
     def on_voice_sdp(self, sdp):
         self.log.info('[{}] Received session description; connected'.format(self.channel_id))
 
-        self.mode = sdp['mode']
+        self.mode = sdp['mode']  # UDP-only, does not apply to webRTC
         self.audio_codec = sdp['audio_codec']
         self.video_codec = sdp['video_codec']
-        self.transport_id = sdp['media_session_id']
+        self.transport_id = sdp['media_session_id']  # analytics
+        # self.sdp = sdp['sdp']  # webRTC only
+        # self.keyframe_interval = sdp['keyframe_interval']
 
         # Set the UDP's RTP Audio Header's Payload Type
         self.udp.set_audio_codec(sdp['audio_codec'])
 
         # Create a secret box for encryption/decryption
-        self.udp.setup_encryption(bytes(bytearray(sdp['secret_key'])))
+        self.udp.setup_encryption(bytes(bytearray(sdp['secret_key'])))  # UDP only
 
         self.set_state(VoiceState.CONNECTED)
 
