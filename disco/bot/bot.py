@@ -529,8 +529,12 @@ class Bot(LoggingClass):
         cls : subclass of :class:`disco.bot.plugin.Plugin`
             Plugin class to unload and remove.
         """
-        if cls.__name__ not in self.plugins:
-            raise Exception('Cannot remove non-existent plugin: {}'.format(cls.__name__))
+        if not hasattr(cls, '__name__') or cls.__name__ not in self.plugins:
+            try:
+                cls = cls.__class__
+                assert cls.__name__ in self.plugins
+            except:
+                raise Exception('Cannot remove non-existent plugin: {}'.format(cls.__name__))
 
         ctx = {}
         self.plugins[cls.__name__].unload(ctx)
@@ -542,6 +546,13 @@ class Bot(LoggingClass):
         """
         Reloads a plugin.
         """
+        if not hasattr(cls, '__name__') or cls.__name__ not in self.plugins:
+            try:
+                cls = cls.__class__
+                assert cls.__name__ in self.plugins
+            except:
+                raise Exception('Cannot reload non-existent plugin: {}'.format(cls.__name__))
+
         config = self.plugins[cls.__name__].config
 
         ctx = self.rmv_plugin(cls)
