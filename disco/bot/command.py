@@ -81,29 +81,35 @@ class CommandEvent:
     @simple_cached_property
     def member(self):
         """
-        Guild member (if relevant) for the user that created the message.
+        Guild member (if relevant) for the user that created the CommandEvent.
         """
-        # return self.guild.get_member(self.author)
         return self._event.member
 
     @simple_cached_property
     def channel(self):
         """
-        Channel the message was created in.
+        Channel the CommandEvent was created in.
         """
         return self._event.channel
 
     @simple_cached_property
+    def thread(self):
+        """
+        Thread the CommandEvent was created in.
+        """
+        return self._event.thread
+
+    @simple_cached_property
     def guild(self):
         """
-        Guild (if relevant) the message was created in.
+        Guild (if relevant) the CommandEvent was created in.
         """
         return self._event.guild
 
     @simple_cached_property
     def author(self):
         """
-        Author of the message.
+        Author of the CommandEvent.
         """
         if self.interaction:
             return self.interaction.member.user if self.interaction.member else self.interaction.user

@@ -518,7 +518,7 @@ class _Message(SlottedModel):
     message_reference = Field(MessageReference, create=False)
     flags = Field(MessageFlagValue)
     interaction = Field(MessageInteraction, create=False)
-    thread = Field(Channel, create=False)
+    t = Field(Channel, alias='thread', create=False)
     components = ListField(MessageComponent)
     sticker_items = ListField(StickerItemStructure)
 
@@ -544,6 +544,19 @@ class _Message(SlottedModel):
             if self.channel_id in self.client.state.dms:
                 return self.client.state.dms[self.channel_id]
             return self.client.api.channels_get(self.channel_id)
+
+    @cached_property
+    def thread(self):
+        """
+        Returns
+        -------
+        `Channel`
+            The thread this message was created in.
+        """
+        if self.t:
+            return self.t
+        if self.channel_id in self.client.state.threads:
+            return self.client.state.threads.get(self.channel_id)
 
     @cached_property
     def guild(self):

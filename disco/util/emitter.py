@@ -3,7 +3,6 @@ import gevent
 from collections import defaultdict
 from gevent.event import AsyncResult
 from gevent.queue import Queue, Full
-from websocket import WebSocketConnectionClosedException
 
 from disco.util.logging import LoggingClass
 

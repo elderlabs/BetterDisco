@@ -10,8 +10,7 @@ ZERO_WIDTH_SPACE = '\u200B'
 # A grave-looking character that can be used to escape codeblocks
 MODIFIER_GRAVE_ACCENT = '\u02CB'
 
-# Regex which matches all possible mention combinations, this may be over-zealous
-#  but its better safe than sorry.
+# This regex matches all possible mention combinations.
 MENTION_RE = re.compile('<?([@|#][!|&]?[0-9]+|@everyone|@here)>?')
 
 
@@ -28,6 +27,7 @@ def _re_sub_mention(mention):
 def S(text, escape_mentions=True, escape_codeblocks=False, escape_rtl=False):
     if not isinstance(text, str):
         text = str(text)
+
     if escape_mentions:
         text = MENTION_RE.sub(_re_sub_mention, text)
 

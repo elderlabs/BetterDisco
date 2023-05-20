@@ -381,7 +381,7 @@ class GuildMember(SlottedModel):
     @cached_property
     def mention(self):
         if self.nick:
-            return '<@!{}>'.format(self.id)
+            return '<@{}>'.format(self.id)
         return self.user.mention
 
     @property
@@ -457,15 +457,15 @@ class Guild(SlottedModel, Permissible):
     preferred_locale : str
         Guild's primary language
     members : dict(snowflake, :class:`GuildMember`)
-        All of the guild's members.
+        All guild members.
     channels : dict(snowflake, :class:`disco.types.channel.Channel`)
         All of the guild's channels.
     roles : dict(snowflake, :class:`Role`)
-        All of the guild's roles.
+        All guild roles.
     emojis : dict(snowflake, :class:`GuildEmoji`)
-        All of the guild's emojis.
+        All guild emojis.
     voice_states : dict(str, :class:`disco.types.voice.VoiceState`)
-        All of the guild's voice states.
+        All guild voice states.
     premium_tier : int
         Guild's premium tier.
     premium_subscription_count : int
@@ -520,14 +520,26 @@ class Guild(SlottedModel, Permissible):
     nsfw_level = Field(enum(GuildNSFWLevel))
     stage_instances = AutoDictField(StageInstance, 'id')
     stickers = AutoDictField(Sticker, 'id')
+    latest_onboarding_question_id = Field(snowflake)
+    max_stage_video_channel_users = Field(int)
+    lazy = Field(bool)
+    # guild_scheduled_events = ListField(None)
+    # embedded_activities = ListField(None)
+    # home_header = Field(None)
+    safety_alerts_channel_id = Field(snowflake)
+    # hub_type = Field(None)
+    premium_progress_bar_enabled = Field(bool)
+    # application_command_counts = Field(None)
 
     def __init__(self, *args, **kwargs):
         super(Guild, self).__init__(*args, **kwargs)
 
         self.attach(self.channels.values(), {'guild_id': self.id})
+        self.attach(self.threads.values(), {'guild_id': self.id})
         self.attach(self.members.values(), {'guild_id': self.id})
         self.attach(self.roles.values(), {'guild_id': self.id})
         self.attach(self.emojis.values(), {'guild_id': self.id})
+        self.attach(self.stickers.values(), {'guild_id': self.id})
         self.attach(self.voice_states.values(), {'guild_id': self.id})
 
     @cached_property
