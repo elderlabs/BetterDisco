@@ -38,6 +38,7 @@ class Integration(SlottedModel):
     subscriber_count = Field(int)
     revoked = Field(bool)
     application = Field(Application)
+    scopes = ListField(text)
 
 
 class UserConnectionVisibilityType:

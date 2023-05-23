@@ -7,7 +7,7 @@ from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
 from disco.types.base import (
     SlottedModel, Field, ListField, AutoDictField, DictField, snowflake, text, enum, datetime,
-    cached_property,
+    cached_property, BitsetMap,
 )
 from disco.types.user import User
 from disco.types.voice import VoiceState
@@ -236,6 +236,14 @@ class GuildPreview(SlottedModel):
     description = Field(text)
 
 
+class GuildMemberFlags(BitsetMap):
+    NONE = 0
+    DID_REJOIN = 1 << 0
+    COMPLETED_ONBOARDING = 1 << 1
+    BYPASSES_VERIFICATION = 1 << 2
+    STARTED_ONBOARDING = 1 << 3
+
+
 class GuildMember(SlottedModel):
     """
     A GuildMember object.
@@ -265,15 +273,16 @@ class GuildMember(SlottedModel):
     nick = Field(text)
     avatar = Field(text)
     roles = ListField(snowflake)
-    hoisted_role = Field(snowflake)
     joined_at = Field(datetime)
     premium_since = Field(datetime)
     deaf = Field(bool)
     mute = Field(bool)
+    flags = Field(int)
     pending = Field(bool, default=False)
     permissions = Field(text)
     communication_disabled_until = Field(datetime)
     guild_id = Field(snowflake)
+    hoisted_role = Field(snowflake)
 
     def __str__(self):
         return self.user.__str__()

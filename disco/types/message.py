@@ -496,7 +496,7 @@ class _Message(SlottedModel):
     channel_id = Field(snowflake)
     guild_id = Field(snowflake)
     author = Field(User)
-    m = Field(GuildMember, alias='member', create=False)
+    # m = Field(GuildMember, create=False)
     content = Field(text)
     timestamp = Field(datetime)
     edited_timestamp = Field(datetime)
@@ -539,11 +539,11 @@ class _Message(SlottedModel):
         if self.guild_id:
             if self.channel_id in self.client.state.threads:
                 return self.client.state.threads.get(self.channel_id)
-            return self.client.state.channels.get(self.channel_id)
-        else:
-            if self.channel_id in self.client.state.dms:
-                return self.client.state.dms[self.channel_id]
-            return self.client.api.channels_get(self.channel_id)
+            elif self.channel_id in self.client.state.channels:
+                return self.client.state.channels.get(self.channel_id)
+        elif self.channel_id in self.client.state.dms:
+            return self.client.state.dms[self.channel_id]
+        return self.client.api.channels_get(self.channel_id)
 
     @cached_property
     def thread(self):

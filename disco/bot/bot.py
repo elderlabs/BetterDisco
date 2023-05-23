@@ -339,7 +339,6 @@ class Bot(LoggingClass):
                         if member:
                             # Filter both the normal and nick mentions
                             content = content.replace(member.user.mention, '', 1)
-                            content = content.replace(member.user.mention_nickname, '', 1)
                     else:
                         content = content.replace(self.client.state.me.mention, '', 1)
                 elif mention_everyone:

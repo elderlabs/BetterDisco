@@ -157,7 +157,7 @@ class State:
 
         # if self.config.sync_guild_members:
         #     if event.guild and event.author.id not in self.guilds[event.message.guild_id].members:
-        #         self.guilds[event.message.guild_id].members[event.author.id] = event.message.member
+        #         self.guilds[event.message.guild_id].members[event.author.id] = event.member
 
         if self.config.track_messages:
             self.messages[event.message.channel_id].append(
@@ -165,6 +165,9 @@ class State:
 
         if event.message.channel_id in self.channels:
             self.channels[event.message.channel_id].last_message_id = event.message.id
+
+        if event.message.thread and event.message.channel_id not in self.threads:
+            self.threads[event.message.channel_id] = event.message.channel
 
         if event.message.channel_id in self.threads:
             self.threads[event.message.channel_id].last_message_id = event.message.id
@@ -314,7 +317,7 @@ class State:
             # Moving channels
             if event.state.channel_id:
                 self.voice_states[event.state.session_id].inplace_update(event.state)
-                if event.state.user_id == self.me.id:
+                if event.state.user_id == self.me.id and event.state.guild_id in self.voice_clients:
                     self.voice_clients[event.state.guild_id]._safe_reconnect_state = True
                     self.voice_clients[event.state.guild_id]._session_id = event.state.session_id
                     self.voice_clients[event.state.guild_id].channel_id = event.state.channel_id
@@ -323,7 +326,7 @@ class State:
                 if event.state.guild_id in self.guilds:
                     if event.state.session_id in self.guilds[event.state.guild_id].voice_states:
                         del self.guilds[event.state.guild_id].voice_states[event.state.session_id]
-                if event.state.user_id == self.me.id:
+                if event.state.user_id == self.me.id and event.state.guild_id in self.voice_clients:
                     del self.voice_clients[event.state.guild_id]
                 try:
                     del self.voice_states[event.state.session_id]
@@ -340,7 +343,7 @@ class State:
             if expired_voice_state:
                 del self.voice_states[expired_voice_state.session_id]
             self.voice_states[event.state.session_id] = event.state
-            if event.state.user_id == self.me.id:
+            if event.state.user_id == self.me.id and event.state.guild_id in self.voice_clients:
                 self.voice_clients[event.state.guild_id]._session_id = event.state.session_id
                 self.voice_clients[event.state.guild_id].channel_id = event.state.channel_id
         return

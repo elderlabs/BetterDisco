@@ -164,7 +164,7 @@ class Command:
         self.dispatch_func = None
         self.raw_args = None
         self.args = None
-        self.level = None
+        self.level = CommandLevels.DEFAULT
         self.group = None
         self.is_regex = None
         self.oob = False
@@ -187,7 +187,7 @@ class Command:
     def update(
             self,
             args=None,
-            level=None,
+            level=CommandLevels.DEFAULT,
             aliases=None,
             group=None,
             is_regex=None,

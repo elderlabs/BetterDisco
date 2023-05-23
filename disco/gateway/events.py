@@ -481,7 +481,9 @@ class GuildRoleDelete(GatewayEvent):
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
 
+
 @wraps_model(Message)
+# @attach('member', to=('message', 'm'))
 class MessageCreate(GatewayEvent):
     """
     Sent when a message is created.
@@ -494,7 +496,6 @@ class MessageCreate(GatewayEvent):
         The ID of the guild this message comes from.
     """
     guild_id = Field(snowflake)
-    m = Field(GuildMember, alias='member')
 
 
 @wraps_model(Message)

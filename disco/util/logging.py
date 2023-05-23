@@ -21,9 +21,27 @@ def setup_logging(**kwargs):
     # Pass through our basic configuration
     logging.basicConfig(**kwargs)
 
+    # handler = logging.StreamHandler()
+    # handler.setFormatter(LoggingFormatter)
+    # logging.getLogger().addHandler(handler)
+
     # Override some noisy loggers
     for logger, level in LEVEL_OVERRIDES.items():
         logging.getLogger(logger).setLevel(level)
+
+
+class LoggingFormatter(logging.Formatter):
+    def format(self, record):
+        lvl = {
+            logging.DEBUG: '[\\x1b[38;21m',
+            logging.INFO: '[',
+            logging.WARNING: '[\\x1b[33;21m',
+            logging.ERROR: '[\\x1b[31;21m',
+            logging.CRITICAL: '[\\x1b[33;41m',
+            logging.FATAL: '[\\x1b[33;41m',
+        }.get(record.levelno, 0)
+        self._style._fmt = f'{lvl}%(levelname)s\033[0m] %(asctime)s - %(name)s:%(lineno)d - %(message)s'
+        return super().format(record)
 
 
 class LoggingClass:
