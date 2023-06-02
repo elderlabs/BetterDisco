@@ -19,23 +19,25 @@ class UserFlags:
     NONE = 0
     DISCORD_EMPLOYEE = 1 << 0
     DISCORD_PARTNER = 1 << 1
-    HS_EVENTS = 1 << 2
-    BUG_HUNTER_LVL1 = 1 << 3
+    HYPESQUAD_EVENTS = 1 << 2
+    BUG_HUNTER_LEVEL_1 = 1 << 3
     MFA_SMS = 1 << 4
     PREMIUM_PROMO_DISMISSED = 1 << 5
-    HS_BRAVERY = 1 << 6
-    HS_BRILLIANCE = 1 << 7
-    HS_BALANCE = 1 << 8
-    EARLY_SUPPORTER = 1 << 9
-    TEAM_USER = 1 << 10
+    HYPESQUAD_ONLINE_HOUSE_1 = 1 << 6
+    HYPESQUAD_ONLINE_HOUSE_2 = 1 << 7
+    HYPESQUAD_ONLINE_HOUSE_3 = 1 << 8
+    PREMIUM_EARLY_SUPPORTER = 1 << 9
+    TEAM_PSEUDO_USER = 1 << 10
     # UNDOCUMENTED = 1 << 11
     SYSTEM = 1 << 12
     UNREAD_SYS_MSG = 1 << 13
-    BUG_HUNTER_LVL2 = 1 << 14
+    BUG_HUNTER_LEVEL_2 = 1 << 14
     UNDERAGE_DELETED = 1 << 15
     VERIFIED_BOT = 1 << 16
-    VERIFIED_DEV = 1 << 17
-    CERTIFIED_MOD = 1 << 18
+    VERIFIED_DEVELOPER = 1 << 17
+    CERTIFIED_MODERATOR = 1 << 18
+    BOT_HTTP_INTERACTIONS = 1 << 19
+    ACTIVE_DEVELOPER = 1 << 20
 
 
 class PremiumType:
@@ -60,11 +62,22 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     flags = Field(int)
     public_flags = Field(int, default=0)
     premium_type = Field(enum(PremiumType))
+    global_name = Field(text)
+    avatar_decoration = Field(text)
     # member = Field(GuildMember)
+
+    def __str__(self):
+        return f'{self.username}{"#" + str(self.discriminator).zfill(4) if self.discriminator else ""}'
+
+    def __int__(self):
+        return self.id
+
+    def __repr__(self):
+        return '<User id={} user={}>'.format(self.id, self)
 
     def get_avatar_url(self, fmt=None, size=1024):
         if not self.avatar:
-            return 'https://cdn.discordapp.com/embed/avatars/{}.png'.format(self.default_avatar)
+            return 'https://cdn.discordapp.com/embed/avatars/{}.png'.format((self.discriminator if self.discriminator else (self.id >> 22)) % len(DefaultAvatars.ALL))
 
         if not fmt:
             fmt = 'gif' if self.avatar.startswith('a_') else 'webp'
@@ -86,7 +99,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
 
     @property
     def default_avatar(self):
-        return DefaultAvatars.ALL[self.discriminator % len(DefaultAvatars.ALL)]
+        return DefaultAvatars.ALL[(self.discriminator if self.discriminator else (self.id >> 22)) % len(DefaultAvatars.ALL)]
 
     @property
     def avatar_url(self):
@@ -96,21 +109,8 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     def mention(self):
         return '<@{}>'.format(self.id)
 
-    @property
-    def mention_nickname(self):
-        return '<@!{}>'.format(self.id)
-
     def open_dm(self):
         return self.client.api.users_me_dms_create(self.id)
-
-    def __str__(self):
-        return '{}#{}'.format(self.username, str(self.discriminator).zfill(4))
-
-    def __int__(self):
-        return self.id
-
-    def __repr__(self):
-        return '<User {} ({})>'.format(self.id, self)
 
 
 class ActivityTypes:

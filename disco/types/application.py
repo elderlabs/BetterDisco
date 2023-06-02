@@ -140,8 +140,8 @@ class Interaction(SlottedModel):
     locale = Field(str)
     guild_locale = Field(str)
 
-    def __str__(self):
-        return '<Interaction {} ({})>'.format(self.id, self.channel_id)
+    def __repr__(self):
+        return '<Interaction id={} channel_id={}>'.format(self.id, self.channel_id)
 
     def __int__(self):
         return self.id
@@ -246,8 +246,8 @@ class InteractionResponse(Interaction):
     type = Field(enum(InteractionCallbackType))
     data = Field(InteractionCallbackData)
 
-    def __str__(self):
-        return '<InteractionResponse {} ({})>'.format(self.id, self.channel_id)
+    def __repr__(self):
+        return '<InteractionResponse id={} channel_id={}>'.format(self.id, self.channel_id)
 
     def __int__(self):
         return self.id

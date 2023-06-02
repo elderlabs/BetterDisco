@@ -55,7 +55,7 @@ def disco_main(run=False):
     from disco.bot import Bot, BotConfig
     from disco.util.logging import setup_logging
 
-    # Parse out all our command line arguments
+    # Parse out all command line arguments
     args = parser.parse_args()
 
     # Create the base configuration object

@@ -22,7 +22,7 @@ extras_require = {
         'ujson>=5.2.0',
         'wsaccel>=0.6.3',
     ],
-    'sharding': ['gipc>=1.4.0'],
+    'sharding': ['gipc>=1.5.0', 'dill>=0.3.6'],
 }
 
 setup(
@@ -47,6 +47,7 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         'Topic :: Internet',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules',

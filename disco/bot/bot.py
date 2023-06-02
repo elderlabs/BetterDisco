@@ -54,7 +54,7 @@ class BotConfig(Config):
         A function which takes in a message object and returns an array of strings
         (prefixes).
     commands_allow_edit : bool
-        If true, the bot will re-parse an edited message if it was the last sent
+        If true, the bot will reparse an edited message if it was the last sent
         message in a channel, and did not previously trigger a command. This is
         helpful for allowing edits to typed commands.
     commands_level_getter : function
@@ -131,7 +131,7 @@ class Bot(LoggingClass):
         The client this bot should utilize for its connection.
     config : Optional[:class:`BotConfig`]
         The configuration to use for this bot. If not provided will use the defaults
-        inside of :class:`BotConfig`.
+        inside :class:`BotConfig`.
 
     Attributes
     ----------
@@ -163,7 +163,7 @@ class Bot(LoggingClass):
 
         # Setup HTTP server (Flask app) if enabled
         self.http = None
-        if self.config.http_enabled:
+        if self.config.http_enabled and int(self.client.config.shard_id) == 0:
             try:
                 from flask import Flask
             except ImportError:
@@ -339,7 +339,6 @@ class Bot(LoggingClass):
                         if member:
                             # Filter both the normal and nick mentions
                             content = content.replace(member.user.mention, '', 1)
-                            content = content.replace(member.user.mention_nickname, '', 1)
                     else:
                         content = content.replace(self.client.state.me.mention, '', 1)
                 elif mention_everyone:
@@ -529,8 +528,12 @@ class Bot(LoggingClass):
         cls : subclass of :class:`disco.bot.plugin.Plugin`
             Plugin class to unload and remove.
         """
-        if cls.__name__ not in self.plugins:
-            raise Exception('Cannot remove non-existent plugin: {}'.format(cls.__name__))
+        if not hasattr(cls, '__name__') or cls.__name__ not in self.plugins:
+            try:
+                cls = cls.__class__
+                assert cls.__name__ in self.plugins
+            except:
+                raise Exception('Cannot remove non-existent plugin: {}'.format(cls.__name__))
 
         ctx = {}
         self.plugins[cls.__name__].unload(ctx)
@@ -542,6 +545,13 @@ class Bot(LoggingClass):
         """
         Reloads a plugin.
         """
+        if not hasattr(cls, '__name__') or cls.__name__ not in self.plugins:
+            try:
+                cls = cls.__class__
+                assert cls.__name__ in self.plugins
+            except:
+                raise Exception('Cannot reload non-existent plugin: {}'.format(cls.__name__))
+
         config = self.plugins[cls.__name__].config
 
         ctx = self.rmv_plugin(cls)

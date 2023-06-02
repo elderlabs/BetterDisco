@@ -7,7 +7,7 @@ from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
 from disco.types.base import (
     SlottedModel, Field, ListField, AutoDictField, DictField, snowflake, text, enum, datetime,
-    cached_property,
+    cached_property, BitsetMap,
 )
 from disco.types.user import User
 from disco.types.voice import VoiceState
@@ -236,6 +236,14 @@ class GuildPreview(SlottedModel):
     description = Field(text)
 
 
+class GuildMemberFlags(BitsetMap):
+    NONE = 0
+    DID_REJOIN = 1 << 0
+    COMPLETED_ONBOARDING = 1 << 1
+    BYPASSES_VERIFICATION = 1 << 2
+    STARTED_ONBOARDING = 1 << 3
+
+
 class GuildMember(SlottedModel):
     """
     A GuildMember object.
@@ -265,15 +273,16 @@ class GuildMember(SlottedModel):
     nick = Field(text)
     avatar = Field(text)
     roles = ListField(snowflake)
-    hoisted_role = Field(snowflake)
     joined_at = Field(datetime)
     premium_since = Field(datetime)
     deaf = Field(bool)
     mute = Field(bool)
+    flags = Field(int)
     pending = Field(bool, default=False)
     permissions = Field(text)
     communication_disabled_until = Field(datetime)
     guild_id = Field(snowflake)
+    hoisted_role = Field(snowflake)
 
     def __str__(self):
         return self.user.__str__()
@@ -381,7 +390,7 @@ class GuildMember(SlottedModel):
     @cached_property
     def mention(self):
         if self.nick:
-            return '<@!{}>'.format(self.id)
+            return '<@{}>'.format(self.id)
         return self.user.mention
 
     @property
@@ -513,15 +522,15 @@ class Guild(SlottedModel, Permissible):
     preferred_locale : str
         Guild's primary language
     members : dict(snowflake, :class:`GuildMember`)
-        All of the guild's members.
+        All guild members.
     channels : dict(snowflake, :class:`disco.types.channel.Channel`)
         All of the guild's channels.
     roles : dict(snowflake, :class:`Role`)
-        All of the guild's roles.
+        All guild roles.
     emojis : dict(snowflake, :class:`GuildEmoji`)
-        All of the guild's emojis.
+        All guild emojis.
     voice_states : dict(str, :class:`disco.types.voice.VoiceState`)
-        All of the guild's voice states.
+        All guild voice states.
     premium_tier : int
         Guild's premium tier.
     premium_subscription_count : int
@@ -553,7 +562,7 @@ class Guild(SlottedModel, Permissible):
     rules_channel_id = Field(snowflake)
     joined_at = Field(datetime)
     large = Field(bool)
-    unavailable = Field(bool)
+    unavailable = Field(bool, default=False)
     member_count = Field(int)
     voice_states = AutoDictField(VoiceState, 'session_id')
     members = AutoDictField(GuildMember, 'id')
@@ -576,14 +585,26 @@ class Guild(SlottedModel, Permissible):
     nsfw_level = Field(enum(GuildNSFWLevel))
     stage_instances = AutoDictField(StageInstance, 'id')
     stickers = AutoDictField(Sticker, 'id')
+    latest_onboarding_question_id = Field(snowflake)
+    max_stage_video_channel_users = Field(int)
+    lazy = Field(bool)
+    # guild_scheduled_events = ListField(None)
+    # embedded_activities = ListField(None)
+    # home_header = Field(None)
+    safety_alerts_channel_id = Field(snowflake)
+    # hub_type = Field(None)
+    premium_progress_bar_enabled = Field(bool)
+    # application_command_counts = Field(None)
 
     def __init__(self, *args, **kwargs):
         super(Guild, self).__init__(*args, **kwargs)
 
         self.attach(self.channels.values(), {'guild_id': self.id})
+        self.attach(self.threads.values(), {'guild_id': self.id})
         self.attach(self.members.values(), {'guild_id': self.id})
         self.attach(self.roles.values(), {'guild_id': self.id})
         self.attach(self.emojis.values(), {'guild_id': self.id})
+        self.attach(self.stickers.values(), {'guild_id': self.id})
         self.attach(self.voice_states.values(), {'guild_id': self.id})
 
     @cached_property

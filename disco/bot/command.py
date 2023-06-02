@@ -81,29 +81,35 @@ class CommandEvent:
     @simple_cached_property
     def member(self):
         """
-        Guild member (if relevant) for the user that created the message.
+        Guild member (if relevant) for the user that created the CommandEvent.
         """
-        # return self.guild.get_member(self.author)
         return self._event.member
 
     @simple_cached_property
     def channel(self):
         """
-        Channel the message was created in.
+        Channel the CommandEvent was created in.
         """
         return self._event.channel
 
     @simple_cached_property
+    def thread(self):
+        """
+        Thread the CommandEvent was created in.
+        """
+        return self._event.thread
+
+    @simple_cached_property
     def guild(self):
         """
-        Guild (if relevant) the message was created in.
+        Guild (if relevant) the CommandEvent was created in.
         """
         return self._event.guild
 
     @simple_cached_property
     def author(self):
         """
-        Author of the message.
+        Author of the CommandEvent.
         """
         if self.interaction:
             return self.interaction.member.user if self.interaction.member else self.interaction.user
@@ -158,7 +164,7 @@ class Command:
         self.dispatch_func = None
         self.raw_args = None
         self.args = None
-        self.level = None
+        self.level = CommandLevels.DEFAULT
         self.group = None
         self.is_regex = None
         self.oob = False
@@ -181,7 +187,7 @@ class Command:
     def update(
             self,
             args=None,
-            level=None,
+            level=CommandLevels.DEFAULT,
             aliases=None,
             group=None,
             is_regex=None,
@@ -312,7 +318,7 @@ class Command:
 
         if self.args:
             if len(event.args) < self.args.required_length:
-                event.command.plugin.log.warning(f'Error in disco.bot.command.execute() - malformated command: {event.name}')
+                # event.command.plugin.log.warning(f'Error in disco.bot.command.execute() - malformated command: {event.name}')
                 raise CommandError('Command {} requires {} argument{} (`{}`), passed {}'.format(
                     event.name,
                     self.args.required_length,

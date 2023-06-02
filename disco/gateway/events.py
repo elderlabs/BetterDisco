@@ -141,29 +141,31 @@ class Ready(GatewayEvent):
     ----------
     version : int
         The gateway version.
-    session_id : str
-        The session ID.
     user : :class:`disco.types.user.User`
         The user object for the authenticated account.
     guilds : list[:class:`disco.types.guild.Guild`
         All guilds this account is a member of. These are shallow guild objects.
         These are marked unavailable until the corresponding GuildCreate event is received.
-    private_channels list[:class:`disco.types.channel.Channel`]
-        An empty array.
+    session_id : str
+        The session ID.
+    resume_gateway_url : str
+    shard : hex
     """
-    trace = ListField(str, alias='_trace')
+    version = Field(int, alias='v')
+    user = Field(User)
+    guilds = ListField(Guild)
+    session_id = Field(text)
+    resume_gateway_url = Field(text)
+    shard = Field(str_or_int)
     application = Field(Application)
     geo_ordered_rtc_regions = ListField(str)
-    guilds = ListField(Guild)
-    # presences = Field(...)
+    # guild_join_requests = ListField(None)
+    # presences = ListField(None)
     private_channels = ListField(Channel)
-    relationships = ListField(None)
-    session_id = Field(text)
-    shard = Field(str_or_int)
-    user = Field(User)
+    # relationships = ListField(None)
+    session_type = Field(text)
+    trace = ListField(str, alias='_trace')
     # user_settings = Field(...)
-    version = Field(int, alias='v')
-    resume_gateway_url = Field(text)
 
 
 class Resumed(GatewayEvent):
@@ -483,6 +485,7 @@ class GuildRoleDelete(GatewayEvent):
 
 
 @wraps_model(Message)
+# @attach('member', to=('message', 'm'))
 class MessageCreate(GatewayEvent):
     """
     Sent when a message is created.
@@ -495,7 +498,6 @@ class MessageCreate(GatewayEvent):
         The ID of the guild this message comes from.
     """
     guild_id = Field(snowflake)
-    m = Field(GuildMember, alias='member')
 
 
 @wraps_model(Message)
@@ -1095,42 +1097,9 @@ class GuildApplicationCommandIndexUpdate(GatewayEvent):
     guild_id = Field(snowflake)
 
 
-@wraps_model(AutoModerationRule)
-class AutoModerationRuleCreate(GatewayEvent):
-    guild_id = Field(snowflake)
-
-
-@wraps_model(AutoModerationRule)
-class AutoModerationRuleUpdate(GatewayEvent):
-    guild_id = Field(snowflake)
-
-
-@wraps_model(AutoModerationRule)
-class AutoModerationRuleDelete(GatewayEvent):
-    guild_id = Field(snowflake)
-
-
 class AutoModerationActionExecution(GatewayEvent):
     guild_id = Field(snowflake)
-    action = Field(AutoModerationAction)
-    rule_id = Field(snowflake)
-    rule_trigger_type = Field(enum(TriggerTypes))
-    user_id = Field(snowflake)
-    channel_id = Field(snowflake)
-    message_id = Field(snowflake)
-    alert_system_message_id = Field(snowflake)
-    content = Field(text)
-    matched_keyword = Field(text)
-    matched_content = Field(text)
 
-    @property
-    def guild(self):
-        return self.client.state.guilds.get(self.guild_id)
 
-    @property
-    def channel(self):
-        return self.client.state.channels.get(self.channel_id)
-
-    @property
-    def user(self):
-        return self.client.state.channels.get(self.user_id)
+class GuildAuditLogEntryCreate(GatewayEvent):
+    guild_id = Field(snowflake)

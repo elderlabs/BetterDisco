@@ -79,6 +79,8 @@ class MessageFlags(BitsetMap):
     EPHEMERAL = 1 << 6
     LOADING = 1 << 7
     FAILED_TO_MENTION_SOME_ROLES_IN_THREAD = 1 << 8
+    # UNKNOWN = 1 << 9
+    SHOULD_SHOW_LINK_NOT_DISCORD_WARNING = 1 << 10
 
 
 class MessageFlagValue(BitsetValue):
@@ -495,7 +497,7 @@ class _Message(SlottedModel):
     channel_id = Field(snowflake)
     guild_id = Field(snowflake)
     author = Field(User)
-    m = Field(GuildMember, alias='member', create=False)
+    # m = Field(GuildMember, create=False)
     content = Field(text)
     timestamp = Field(datetime)
     edited_timestamp = Field(datetime)
@@ -517,12 +519,12 @@ class _Message(SlottedModel):
     message_reference = Field(MessageReference, create=False)
     flags = Field(MessageFlagValue)
     interaction = Field(MessageInteraction, create=False)
-    thread = Field(Channel, create=False)
+    t = Field(Channel, alias='thread', create=False)
     components = ListField(MessageComponent)
     sticker_items = ListField(StickerItemStructure)
 
-    def __str__(self):
-        return '<Message {} ({})>'.format(self.id, self.channel_id)
+    def __repr__(self):
+        return '<Message id={} channel_id={}>'.format(self.id, self.channel_id)
 
     def __int__(self):
         return self.id
@@ -538,11 +540,24 @@ class _Message(SlottedModel):
         if self.guild_id:
             if self.channel_id in self.client.state.threads:
                 return self.client.state.threads.get(self.channel_id)
-            return self.client.state.channels.get(self.channel_id)
-        else:
-            if self.channel_id in self.client.state.dms:
-                return self.client.state.dms[self.channel_id]
-            return self.client.api.channels_get(self.channel_id)
+            elif self.channel_id in self.client.state.channels:
+                return self.client.state.channels.get(self.channel_id)
+        elif self.channel_id in self.client.state.dms:
+            return self.client.state.dms[self.channel_id]
+        return self.client.api.channels_get(self.channel_id)
+
+    @cached_property
+    def thread(self):
+        """
+        Returns
+        -------
+        `Channel`
+            The thread this message was created in.
+        """
+        if self.t:
+            return self.t
+        if self.channel_id in self.client.state.threads:
+            return self.client.state.threads.get(self.channel_id)
 
     @cached_property
     def guild(self):
@@ -554,6 +569,8 @@ class _Message(SlottedModel):
         """
         if self.guild_id:
             return self.client.state.guilds.get(self.guild_id)
+        elif self.channel and self.channel.guild:
+            return self.channel.guild
 
     @cached_property
     def member(self):

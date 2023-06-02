@@ -20,7 +20,7 @@ class Emoji(SlottedModel):
     animated = Field(bool)
 
     @cached_property
-    def custom(self) -> bool:
+    def custom(self):
         return bool(self.id)
 
     def __eq__(self, other):
@@ -28,7 +28,7 @@ class Emoji(SlottedModel):
             return self.id == other.id and self.name == other.name
         raise NotImplementedError
 
-    def to_string(self) -> str:
+    def to_string(self):
         if self.id:
             return '{}:{}'.format(self.name, self.id)
         return self.name

@@ -1,14 +1,13 @@
+import dill
 import gipc
 import gevent
-import pickle
 import logging
-import marshal
 
 from disco.client import Client
 from disco.bot import Bot, BotConfig
 from disco.api.client import APIClient
 from disco.gateway.ipc import GIPCProxy
-from disco.util.logging import setup_logging
+from disco.util.logging import setup_logging, LOG_FORMAT
 from disco.util.snowflake import calculate_shard
 from disco.util.serializer import dump_function, load_function
 
@@ -16,7 +15,7 @@ from disco.util.serializer import dump_function, load_function
 def run_shard(config, shard_id, pipe):
     setup_logging(
         level=logging.INFO,
-        format='{} [%(levelname)s] %(asctime)s - %(name)s:%(lineno)d - %(message)s'.format(shard_id),
+        format=f'{shard_id} ' + LOG_FORMAT,
     )
 
     config.shard_id = shard_id
@@ -71,36 +70,19 @@ class AutoSharder:
         return self.shards[sid].execute(func).wait(timeout=15)
 
     def run(self):
-        for shard in range(self.config.shard_count):
-            if self.config.manhole_enable and shard != 0:
+        for shard_id in range(self.config.shard_count):
+            if self.config.manhole_enable and shard_id != 0:
                 self.config.manhole_enable = False
 
-            self.start_shard(shard)
+            self.start_shard(shard_id)
             gevent.sleep(6)
 
-        logging.basicConfig(
+        setup_logging(
             level=logging.INFO,
-            format='{} [%(levelname)s] %(asctime)s - %(name)s:%(lineno)d - %(message)s'.format(id),
+            format=f'{id} ' + LOG_FORMAT,
         )
 
-    @staticmethod
-    def dumps(data):
-        if isinstance(data, (str, int, bool, list, set, dict)):
-            return b'\x01' + marshal.dumps(data)
-        elif isinstance(data, object) and data.__class__.__name__ == 'code':
-            return b'\x01' + marshal.dumps(data)
-        else:
-            return b'\x02' + pickle.dumps(data)
-
-    @staticmethod
-    def loads(data):
-        enc_type = data[0]
-        if enc_type == b'\x01':
-            return marshal.loads(data[1:])
-        elif enc_type == b'\x02':
-            return pickle.loads(data[1:])
-
     def start_shard(self, sid):
-        cpipe, ppipe = gipc.pipe(duplex=True, encoder=self.dumps, decoder=self.loads)
+        cpipe, ppipe = gipc.pipe(duplex=True, encoder=dill.dumps, decoder=dill.loads)
         gipc.start_process(run_shard, (self.config, sid, cpipe), name=f'shard{sid}')
         self.shards[sid] = GIPCProxy(self, ppipe)
