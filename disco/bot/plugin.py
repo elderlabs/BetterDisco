@@ -1,8 +1,9 @@
-import types
+import functools
 import gevent
 import inspect
+import types
 import warnings
-import functools
+import weakref
 
 from gevent.event import AsyncResult
 
@@ -236,7 +237,7 @@ class Plugin(LoggingClass, PluginDeco):
         self.listeners = []
         self.commands = []
         self.schedules = {}
-        self.greenlets = set()
+        self.greenlets = weakref.WeakSet()
         self._pre = {}
         self._post = {}
 
@@ -349,11 +350,7 @@ class Plugin(LoggingClass, PluginDeco):
         try:
             return event.command.execute(event)
         except CommandError as e:
-            self.log.error(f'Error in disco.bot.plugin.execute(): {e.msg}')
-            if hasattr(event, 'msg') and event.msg:
-                event.msg.reply(e.msg)
-            else:
-                event.interaction.reply(e.msg)
+            event.reply(e.msg)
             return False
         finally:
             self.ctx.drop()
