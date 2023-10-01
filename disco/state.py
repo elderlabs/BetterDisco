@@ -1,5 +1,6 @@
 from collections import deque, namedtuple
 from gevent.event import Event
+import weakref
 
 from disco.util.config import Config
 from disco.util.string import underscore
@@ -102,15 +103,15 @@ class State:
 
         self.me = None
         self.guilds = HashMap()
-        self.channels = HashMap()
+        self.channels = HashMap(weakref.WeakValueDictionary())
         self.commands = HashMap()
-        self.dms = HashMap()
-        self.emojis = HashMap()
-        self.stickers = HashMap()
-        self.threads = HashMap()
-        self.users = HashMap()
-        self.voice_clients = HashMap()
-        self.voice_states = HashMap()
+        self.dms = HashMap(weakref.WeakValueDictionary())
+        self.emojis = HashMap(weakref.WeakValueDictionary())
+        self.stickers = HashMap(weakref.WeakValueDictionary())
+        self.threads = HashMap(weakref.WeakValueDictionary())
+        self.users = HashMap(weakref.WeakValueDictionary())
+        self.voice_clients = HashMap(weakref.WeakValueDictionary())
+        self.voice_states = HashMap(weakref.WeakValueDictionary())
 
         # If message tracking is enabled, listen to those events
         if self.config.track_messages:
@@ -147,6 +148,7 @@ class State:
     def on_ready(self, event):
         self.me = event.user
         self.guilds_waiting_sync = len(event.guilds)
+        self.ready.clear()
 
     def on_user_update(self, event):
         self.me.inplace_update(event.user)
@@ -372,7 +374,7 @@ class State:
 
         self.guilds[event.guild_id].members[event.member.user.id].inplace_update(event.member)
 
-        if not event.member.user.id in self.users:
+        if event.member.user.id not in self.users:
             self.users[event.member.user.id] = event.member.user
 
         if event.member.roles and event.guild_id in self.guilds:

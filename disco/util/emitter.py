@@ -143,6 +143,7 @@ class Emitter(LoggingClass):
         # Next enqueue all sequential handlers. This just puts stuff into a queue
         #  without blocking, so we don't have to worry too much
         for listener in self.event_handlers[Priority.SEQUENTIAL].get(name, []):
+            # TODO: find an error catch for this, will die silently on-error
             listener(*args, **kwargs)
 
         # Finally just spawn for everything else
