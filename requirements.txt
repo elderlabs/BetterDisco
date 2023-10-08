@@ -1,4 +1,4 @@
 gevent==23.9.1
 requests==2.31.0
 six==1.16.0
-websocket-client==1.6.3
+websocket-client==1.6.4
