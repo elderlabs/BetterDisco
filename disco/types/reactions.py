@@ -1,5 +1,5 @@
+from disco.types.base import SlottedModel, snowflake, Field, text, cached_property, ListField, enum, str_or_int
 from disco.types.user import User
-from disco.types.base import SlottedModel, snowflake, Field, text, cached_property, ListField, enum
 
 
 class Emoji(SlottedModel):
@@ -17,43 +17,40 @@ class Emoji(SlottedModel):
     """
     id = Field(snowflake)
     name = Field(text)
+    user = Field(User, create=False)
+    require_colons = Field(bool)
+    managed = Field(bool)
     animated = Field(bool)
+    available = Field(bool)
+    guild_id = Field(snowflake)
+    version = Field(int)
 
-    @cached_property
-    def custom(self):
-        return bool(self.id)
+    def __str__(self):
+        return '<{}:{}:{}>'.format('a' if self.animated else '', self.name, self.id if self.id else '')
+
+    def __int__(self):
+        return self.id
+
+    def __repr__(self):
+        return f'<Emoji {"id=" + str(self.id) if self.id else ""} name={self.name}>'
 
     def __eq__(self, other):
         if isinstance(other, Emoji):
             return self.id == other.id and self.name == other.name
         raise NotImplementedError
 
-    def to_string(self):
-        if self.id:
-            return '{}:{}'.format(self.name, self.id)
-        return self.name
+    @property
+    def url(self):
+        return 'https://cdn.discordapp.com/emojis/{}.{}'.format(self.id, 'gif' if self.animated else 'png')
+
+    @cached_property
+    def custom(self):
+        return bool(self.id)
 
 
-class MessageReactionEmoji(Emoji):
-    """
-    Represents an emoji which was used as a reaction on a message.
-
-    Attributes
-    ----------
-    count : int
-        The number of users who reacted with this emoji.
-    me : bool
-        Whether the current user reacted with this emoji.
-    emoji : `MessageReactionEmoji`
-        The emoji which was reacted.
-    """
-    id = Field(snowflake)
-    name = Field(text)
-    roles = ListField(snowflake)
-    user = Field(User)
-    require_colons = Field(bool)
-    managed = Field(bool)
-    animated = Field(bool)
+class MessageReactionCountDetails(SlottedModel):
+    burst = Field(int)
+    normal = Field(int)
 
 
 class MessageReaction(SlottedModel):
@@ -62,7 +59,7 @@ class MessageReaction(SlottedModel):
 
     Attributes
     ----------
-    emoji : `MessageReactionEmoji`
+    emoji : `Emoji`
         The emoji which was reacted.
     count : int
         The number of users who reacted with this emoji.
@@ -70,8 +67,11 @@ class MessageReaction(SlottedModel):
         Whether the current user reacted with this emoji.
     """
     count = Field(int)
+    count_details = Field(MessageReactionCountDetails)
     me = Field(bool)
-    emoji = Field(MessageReactionEmoji)
+    me_burst = Field(bool)
+    emoji = Field(Emoji)
+    burst_colors = Field(str_or_int)
 
 
 class StickerTypes:
@@ -83,9 +83,10 @@ class StickerFormatTypes:
     PNG = 1
     APNG = 2
     LOTTIE = 3
+    GIF = 4
 
 
-class StickerItemStructure(SlottedModel):
+class StickerItem(SlottedModel):
     id = Field(snowflake)
     name = Field(text)
     format_type = Field(enum(StickerFormatTypes))
@@ -103,6 +104,15 @@ class Sticker(SlottedModel):
     guild_id = Field(snowflake)
     user = Field(User)
     sort_value = Field(int)
+
+    def __repr__(self):
+        return '<Sticker {} name={}>'.format('id=' + str(self.id) if self.id else '', self.name)
+
+    def __str__(self):
+        return self.name
+
+    def __int__(self):
+        return self.id
 
 
 class StickerPack(SlottedModel):

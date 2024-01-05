@@ -2,12 +2,11 @@ import functools
 import gevent
 import inspect
 
-from datetime import datetime as real_datetime
-from holster.enum import BaseEnumMeta, EnumAttr
+from datetime import datetime as real_datetime, UTC
 from six import with_metaclass
 
 from disco.util.chains import Chainable
-from disco.util.enum import get_enum_members
+from disco.util.enum import BaseEnumMeta, EnumAttr, get_enum_members
 from disco.util.hashmap import HashMap
 
 DATETIME_FORMATS = [
@@ -48,8 +47,8 @@ def strict_cached_property(*args):
 class ConversionError(Exception):
     def __init__(self, field, raw, e):
         super(ConversionError, self).__init__(
-            'Failed to convert `{}` (`{}`) to {}: {}'.format(
-                str(raw)[:144], field.src_name, field.true_type, e))
+            'Failed to convert `{}` to `{}` - {}: {}\n{}'.format(
+                field.src_name, field.true_type, e.__class__.__name__, e, raw))
 
         self.__cause__ = e
 
@@ -203,8 +202,8 @@ def enum(typ):
         for k, v in get_enum_members(typ):
             if isinstance(data, str) and k == data.upper():
                 return v
-            elif k == data or v == data:
-                return v
+            elif k == data or v == data:  # perhaps separate and return inverse?
+                return k
 
         return None
     return _f
@@ -215,11 +214,11 @@ def datetime(data):
         return None
 
     if isinstance(data, int):
-        return real_datetime.utcfromtimestamp(data)
+        return real_datetime.fromtimestamp(data, tz=UTC)
 
     for fmt in DATETIME_FORMATS:
         try:
-            return real_datetime.strptime(data.rsplit('+', 1)[0], fmt)
+            return real_datetime.strptime(data.rsplit('+', 1)[0], fmt).replace(tzinfo=UTC)
         except (ValueError, TypeError):
             continue
 
@@ -509,5 +508,15 @@ class BitsetValue:
 
     def to_dict(self):
         return {
-            k: getattr(self, k) for k in list(self.map.keys())
+            k: getattr(self, k) for k in tuple(self.map.keys())
         }
+
+    def __iter__(self):
+        for k, v in self.to_dict().items():
+            if v:
+                yield k
+
+    def __repr__(self):
+        if not self.value:
+            return 'NONE'
+        return ', '.join(i for i in self.__iter__())

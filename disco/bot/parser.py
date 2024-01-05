@@ -39,7 +39,7 @@ TYPE_MAP['bool'] = to_bool
 
 class ArgumentError(Exception):
     """
-    An error thrown when passed in arguments cannot be conformed/casted to the
+    An error thrown when passed arguments cannot be conformed/cast to the
     argument specification.
     """
 

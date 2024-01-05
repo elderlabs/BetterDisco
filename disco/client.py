@@ -52,6 +52,7 @@ class ClientConfig(Config):
     manhole_bind = ('127.0.0.1', 8484)
 
     encoder = 'json'
+    compression = True
 
 
 class Client(LoggingClass):
@@ -94,7 +95,7 @@ class Client(LoggingClass):
         self.packets = Emitter()
 
         self.api = APIClient(self.config.token, self)
-        self.gw = GatewayClient(self, self.config.max_reconnects, self.config.encoder)
+        self.gw = GatewayClient(self, self.config.max_reconnects, self.config.encoder, self.config.compression)
         self.state = State(self, StateConfig(self.config.get('state', {})))
 
         if self.config.manhole_enable:
@@ -112,7 +113,7 @@ class Client(LoggingClass):
 
     def update_presence(self, status, game=None, afk=False, since=0.0):
         """
-        Updates the current clients presence.
+        Updates the current client's presence.
 
         Parameters
         ----------

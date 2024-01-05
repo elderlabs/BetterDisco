@@ -1,7 +1,7 @@
-from disco.types.base import SlottedModel, Field, datetime, text
+from disco.types.base import SlottedModel, Field, datetime, text, enum
 from disco.types.user import User
-from disco.types.guild import Guild
-from disco.types.channel import Channel
+from disco.types.guild import Guild, GuildScheduledEvent
+from disco.types.channel import Channel, StageInstance
 from disco.types.oauth import Application
 
 
@@ -47,12 +47,14 @@ class Invite(SlottedModel):
     guild = Field(Guild)
     channel = Field(Channel)
     inviter = Field(User)
-    target_type = Field(int)
+    target_type = Field(enum(InviteTargetTypes))
     target_user = Field(User)
     target_application = Field(Application)
     approximate_presence_count = Field(int)
     approximate_member_count = Field(int)
     expires_at = Field(datetime)
+    stage_instance = Field(StageInstance)
+    guild_scheduled_event = Field(GuildScheduledEvent)
     uses = Field(int)
     max_uses = Field(int)
     max_age = Field(int)

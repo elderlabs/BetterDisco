@@ -1,10 +1,12 @@
 from disco.types.base import SlottedModel, text, Field, snowflake, cached_property, datetime
+# from disco.types.guild import GuildMember  # cyclical
 
 
 class VoiceState(SlottedModel):
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
     user_id = Field(snowflake)
+    # member = Field(GuildMember)
     session_id = Field(text)
     deaf = Field(bool)
     mute = Field(bool)
@@ -14,6 +16,9 @@ class VoiceState(SlottedModel):
     self_video = Field(bool)
     suppress = Field(bool)
     request_to_speak_timestamp = Field(datetime)
+
+    def __repr__(self):
+        return f'<VoiceState session_id={self.session_id}>'
 
     @cached_property
     def guild(self):
@@ -27,6 +32,7 @@ class VoiceState(SlottedModel):
     def user(self):
         return self.client.state.users.get(self.user_id)
 
+    # deprecate after cyclical fix
     @property
     def member(self):
         return self.guild.get_member(self.user_id)
@@ -35,7 +41,7 @@ class VoiceState(SlottedModel):
 class VoiceRegion(SlottedModel):
     id = Field(text)
     name = Field(text)
-    vip = Field(bool)
+    # vip = Field(bool)
     optimal = Field(bool)
     deprecated = Field(bool)
     custom = Field(bool)

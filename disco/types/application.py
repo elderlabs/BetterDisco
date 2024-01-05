@@ -42,6 +42,8 @@ class _ApplicationCommandOption(SlottedModel):
     channel_types = ListField(ChannelType)
     min_value = Field(int)
     max_value = Field(int)
+    min_length = Field(int)
+    max_length = Field(int)
     autocomplete = Field(bool)
 
 
@@ -79,6 +81,7 @@ class InteractionData(SlottedModel):
     component_type = Field(int)
     values = ListField(SelectOption, create=False)
     target_id = Field(snowflake)
+    guild_id = Field(snowflake)
     components = ListField(MessageComponent)
 
 
@@ -92,9 +95,9 @@ class ApplicationCommand(SlottedModel):
     description = Field(text)
     description_localizations = DictField(str, str)
     options = ListField(ApplicationCommandOption)
-    default_member_permissions = Field(text)
+    default_member_permissions = Field(int)
     dm_permissions = Field(bool)
-    default_permission = Field(bool)
+    nsfw = Field(bool)
     version = Field(snowflake)
 
 
@@ -132,7 +135,7 @@ class Interaction(SlottedModel):
     data = Field(InteractionData)
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
-    m = Field(GuildMember, alias='member', create=False)
+    member = Field(GuildMember, create=False)
     user = Field(User, create=False)
     token = Field(text)
     version = Field(int)
@@ -161,16 +164,6 @@ class Interaction(SlottedModel):
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
 
-    @cached_property
-    def member(self):
-        """
-        Returns
-        -------
-        `GuildMember`
-            The guild member (if applicable) that sent this message.
-        """
-        return self.channel.guild.get_member(self.m or self.user)
-
     def pin(self):
         return self.channel.create_pin(self)
 
@@ -197,6 +190,7 @@ class InteractionCallbackType:
     UPDATE_MESSAGE = 7
     APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8
     MODAL = 9
+    PREMIUM_REQUIRED = 10
 
 
 class InteractionResponseFlags(BitsetMap):

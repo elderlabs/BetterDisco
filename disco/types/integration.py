@@ -9,7 +9,7 @@ class IntegrationAccount(SlottedModel):
 
 
 class IntegrationExpireBehaviors:
-    REMOVAL_ROLE = 0
+    REMOVE_ROLE = 0
     KICK = 1
 
 
@@ -55,4 +55,5 @@ class UserConnection(SlottedModel):
     verified = Field(bool)
     friend_sync = Field(bool)
     show_activity = Field(bool)
+    two_way_link = Field(bool)
     visibility = Field(enum(UserConnectionVisibilityType))

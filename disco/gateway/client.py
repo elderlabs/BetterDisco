@@ -108,7 +108,7 @@ class GatewayClient(LoggingClass):
             obj = GatewayEvent.from_dispatch(self.client, packet)
         except Exception as e:
             if self.client.config.log_unknown_events:
-                return self.log.warning(e)  # this probably isn't perfect
+                return self.log.warning(f'{e.__class__.__name__}: {e}')  # this probably isn't perfect
             return
 
         self.log.debug(f'GatewayClient.handle_dispatch {obj.__class__.__name__}')
@@ -162,7 +162,7 @@ class GatewayClient(LoggingClass):
 
         gateway_url += f'?v={self.GATEWAY_VERSION}&encoding={self.encoder.TYPE}'
 
-        if self.zlib_stream_enabled:
+        if self.zlib_stream_enabled:  # transport compression may not benefit ETF?
             gateway_url += '&compress=zlib-stream'
 
         self.log.info(f'Opening websocket connection to `{gateway_url}`')
@@ -239,7 +239,7 @@ class GatewayClient(LoggingClass):
             self.log.info('WS Opened: sending identify payload')
             self.send(OPCode.IDENTIFY, {
                 'token': self.client.config.token,
-                'compress': True,
+                'compress': False,  # json-only, payload compression
                 'large_threshold': 250,
                 'intents': self.client.config.intents,
                 'shard': [
