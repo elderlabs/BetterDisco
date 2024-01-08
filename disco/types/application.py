@@ -2,7 +2,10 @@ from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListFie
 from disco.types.channel import Channel, ChannelType
 from disco.types.guild import GuildMember, Role
 from disco.types.message import MessageEmbed, AllowedMentions, Message, MessageComponent, SelectOption, MessageAttachment
+from disco.types.reactions import Emoji
 from disco.types.user import User
+from disco.util.paginator import Paginator
+from disco.util.snowflake import to_snowflake
 
 
 class ApplicationCommandOptionType:
@@ -142,6 +145,7 @@ class Interaction(SlottedModel):
     message = Field(Message, create=False)
     locale = Field(str)
     guild_locale = Field(str)
+    recipients = ListField(User)
 
     def __repr__(self):
         return '<Interaction id={} channel_id={}>'.format(self.id, self.channel_id)
@@ -154,15 +158,25 @@ class Interaction(SlottedModel):
         if self.guild_id:
             if self.channel_id in self.client.state.threads:
                 return self.client.state.threads.get(self.channel_id)
-            return self.client.state.channels.get(self.channel_id)
-        else:
-            if self.channel_id in self.client.state.dms:
-                return self.client.state.dms[self.channel_id]
-            return self.client.api.channels_get(self.channel_id)
+            elif self.channel_id in self.client.state.channels:
+                return self.client.state.channels.get(self.channel_id)
+        elif self.channel_id in self.client.state.dms:
+            return self.client.state.dms[self.channel_id]
+        return self.client.api.channels_get(self.channel_id)
+
+    @cached_property
+    def thread(self):
+        if self.channel_id in self.client.state.threads:
+            return self.client.state.threads.get(self.channel_id)
 
     @cached_property
     def guild(self):
-        return self.client.state.guilds.get(self.guild_id)
+        if self.channel.is_dm:
+            return
+        if self.guild_id:
+            return self.client.state.guilds.get(self.guild_id)
+        elif self.channel and self.channel.guild:
+            return self.channel.guild
 
     def pin(self):
         return self.channel.create_pin(self)
@@ -178,6 +192,43 @@ class Interaction(SlottedModel):
 
     def delete(self):
         return self.client.api.interactions_delete_reply(self.client.state.me.id, self.token)
+
+    def get_reactors(self, emoji, *args, **kwargs):
+        if isinstance(emoji, Emoji):
+            emoji = emoji.to_string()
+
+        return Paginator(
+            self.client.api.channels_messages_reactions_get,
+            'after',
+            self.channel_id,
+            self.id,
+            emoji,
+            *args,
+            **kwargs)
+
+    def add_reaction(self, emoji):
+        if isinstance(emoji, Emoji):
+            emoji = emoji.to_string()
+
+        self.client.api.channels_messages_reactions_create(self.channel_id, self.id, emoji)
+
+    def delete_reaction(self, emoji, user=None):
+        if isinstance(emoji, Emoji):
+            emoji = emoji.to_string()
+
+        if user:
+            user = to_snowflake(user)
+
+        self.client.api.channels_messages_reactions_delete(self.channel_id, self.id, emoji, user)
+
+    def delete_single_reaction(self, emoji):
+        if isinstance(emoji, Emoji):
+            emoji = emoji.to_string()
+
+        self.client.api.channels_messages_reactions_delete_emoji(self.channel_id, self.id, emoji)
+
+    def delete_all_reactions(self):
+        self.client.api.channels_messages_reactions_delete_all(self.channel_id, self.id)
 
 
 class InteractionCallbackType:

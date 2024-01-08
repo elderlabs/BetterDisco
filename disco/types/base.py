@@ -3,7 +3,7 @@ import gevent
 import inspect
 
 from datetime import datetime as real_datetime, UTC
-from six import with_metaclass
+from disco.util.metaclass import with_metaclass
 
 from disco.util.chains import Chainable
 from disco.util.enum import BaseEnumMeta, EnumAttr, get_enum_members

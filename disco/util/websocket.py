@@ -17,6 +17,7 @@ class Websocket(LoggingClass, websocket.WebSocketApp):
         websocket.setdefaulttimeout(5)
         websocket.WebSocketApp.__init__(self, *args, **kwargs)
 
+        self.is_closed = False
         self.emitter = Emitter()
 
         # Hack to get events to emit

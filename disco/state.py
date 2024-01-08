@@ -56,6 +56,7 @@ class StateConfig(Config):
     track_messages_size = 100
 
     sync_guild_members = True
+    sync_guild_members_on_startup = True
 
 
 class State:
@@ -189,11 +190,11 @@ class State:
         if event.message.channel_id in self.threads:
             self.threads[event.message.channel_id].last_message_id = event.message.id
 
-        if event.message.channel_id in self.dms:
-            self.dms[event.message.channel_id].last_message_id = event.message.id
-
         if not event.message.guild_id and event.message.channel_id not in self.dms:
             self.dms[event.message.channel_id] = event.message.channel
+
+        if event.message.channel_id in self.dms:
+            self.dms[event.message.channel_id].last_message_id = event.message.id
 
     def on_message_delete(self, event):
         if event.message.channel_id not in self.messages:
@@ -213,6 +214,22 @@ class State:
         for sm in tuple(self.messages[event.channel_id]):
             if sm.id in event.ids:
                 self.messages[event.channel_id].remove(sm)
+
+    def on_interaction_create(self, event):
+        if event.interaction.user.id not in self.users:
+            self.users[event.interaction.user.id] = event.interaction.user
+        if event.guild and event.guild.id in self.guilds:
+            if event.interaction.member.id not in self.guilds[event.guild.id].members:
+                self.guilds[event.guild.id].members = event.interaction.member.id
+        if event.channel:
+            if event.channel.is_thread and event.channel.id not in self.threads:
+                self.threads[event.channel.id] = event.channel
+                self.guilds[event.guild.id].threads[event.channel.id] = event.channel
+            if event.channel.is_guild and event.channel.id not in self.channels:
+                self.channels[event.channel.id] = event.channel
+                self.guilds[event.guild.id].channels[event.channel.id] = event.channel
+            if event.channel.is_dm and event.channel.id not in self.dms:
+                self.dms[event.channel.id] = event.channel
 
     def on_guild_create(self, event):
         if not event.unavailable and not self.ready.is_set():
@@ -241,8 +258,14 @@ class State:
                 self.users[presence.user.id].presence = presence
 
         # TODO: better performance on large guild sync
-        if self.config.sync_guild_members and len(self.guilds[event.guild.id].members) < event.guild.member_count:
+        if self.config.sync_guild_members_on_startup and len(self.guilds[event.guild.id].members) < event.guild.member_count:
             event.guild.request_guild_members()
+        else:
+            for voice_state in event.guild.voice_states.values():
+                if voice_state.user_id not in self.guilds[event.guild.id].members:
+                    self.guilds[event.guild.id].members[voice_state.user_id] = voice_state.member
+                if voice_state.user_id not in self.users and voice_state.member.user:
+                    self.users[voice_state.user_id] = voice_state.member.user
 
     def on_guild_update(self, event):
         ignored = ['channels', 'emojis', 'members', 'stickers', 'threads', 'voice_states', 'presences']
@@ -349,6 +372,10 @@ class State:
         voice_client.set_token(event.token)
 
     def on_voice_state_update(self, event):
+        if event.state.member and event.state.user_id not in self.guilds[event.state.guild_id].members:
+            self.guilds[event.state.guild_id].members[event.state.user_id] = event.state.member
+            if event.state.user_id not in self.users:
+                self.users[event.state.user_id] = event.state.member.user
         # Existing connection, we are either moving channels or disconnecting
         if event.state.session_id in self.voice_states:
             # Moving channels
@@ -561,7 +588,7 @@ class State:
             self.guilds[event.guild_id].soundboard_sounds[event.sound_id] = event
 
     def on_guild_soundboard_sound_delete(self, event):
-        if event.guild_id not in self.guilds:
+        if event.guild_id in self.guilds and event.sound_id in self.guilds[event.guild_id].soundboard_sounds:
             del self.guilds[event.guild_id].soundboard_sounds[event.sound_id]
 
     def on_guild_soundboard_sounds_update(self, event):

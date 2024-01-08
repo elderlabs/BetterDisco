@@ -747,7 +747,7 @@ class _Message(SlottedModel):
         Returns
         -------
         bool
-            Whether the give entity was mentioned.
+            Whether the given entity was mentioned.
         """
         entity = to_snowflake(entity)
         return entity in self.mentions or entity in self.mention_roles

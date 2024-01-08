@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from six import with_metaclass
+from disco.util.metaclass import with_metaclass
 
 
 class EnumAttr(object):

@@ -278,6 +278,7 @@ class GuildMember(SlottedModel):
     communication_disabled_until = Field(datetime)
     guild_id = Field(snowflake)
     hoisted_role = Field(snowflake)
+    unusual_dm_activity_until = Field(datetime)
 
     def __repr__(self):
         return f'<GuildMember id={int(self.user)} name={str(self.user)}>' if self.user else f'<GuildMember partial guild={self.guild_id}>'
@@ -486,6 +487,13 @@ class GuildSoundboardSound(SlottedModel):
     emoji_id = Field(snowflake)
     available = Field(bool)
 
+    def __repr__(self):
+        return f'<GuildSoundboardSound id={self.sound_id} name={self.name}>'
+
+
+class GuildVoiceState(VoiceState):
+    member = Field(GuildMember)
+
 
 class Guild(SlottedModel, Permissible):
     """
@@ -602,7 +610,7 @@ class Guild(SlottedModel, Permissible):
     large = Field(bool)
     unavailable = Field(bool, default=False)
     member_count = Field(int)
-    voice_states = AutoDictField(VoiceState, 'session_id')
+    voice_states = AutoDictField(GuildVoiceState, 'session_id')
     members = AutoDictField(GuildMember, 'id')
     channels = AutoDictField(Channel, 'id')
     threads = AutoDictField(Thread, 'id')
@@ -632,10 +640,10 @@ class Guild(SlottedModel, Permissible):
         self.attach(self.voice_states.values(), {'guild_id': self.id})
 
     def __repr__(self):
-        return f'<Guild id={self.id} name={self.name}>'
+        return f'<Guild id={self.id}{" name={}".format(self.name) if self.name else ""}>'
 
     def __str__(self):
-        return self.name
+        return self.name if self.name else self.id
 
     def __int__(self):
         return self.id
@@ -1174,24 +1182,25 @@ class AuditLog(SlottedModel):
 
 
 class DiscoveryRequirementsHealthScore(SlottedModel):
-    avg_nonnew_participators = Field(text)
-    avg_nonnew_communicators = Field(text)
-    num_intentful_joiners = Field(text)
-    perc_ret_w1_intentful = Field(text)
+    avg_nonnew_communicators = Field(int)
+    avg_nonnew_participators = Field(int)
+    num_intentful_joiners = Field(int)
+    perc_ret_w1_intentful = Field(float)
 
 
 class DiscoveryRequirements(SlottedModel):
     age = Field(bool)
+    engagement_healthy = Field(bool, default=False)
+    grace_period_end_date = Field(datetime)
     guild_id = Field(snowflake)
     health_score = Field(DiscoveryRequirementsHealthScore)
     health_score_pending = Field(bool)
-    healthy = Field(bool)
+    healthy = Field(bool, default=False)
     minimum_age = Field(int)
     minimum_size = Field(int)
     nsfw_properties = Field(dict)
     protected = Field(bool)
     retention_healthy = Field(bool)
-    engagement_healthy = Field(bool)
     safe_environment = Field(bool)
     size = Field(bool)
     sufficient = Field(bool)

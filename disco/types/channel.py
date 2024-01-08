@@ -496,12 +496,23 @@ class Channel(SlottedModel, Permissible):
         Connect to this channel over voice.
         """
         from disco.voice.client import VoiceClient
-        assert self.is_voice, 'Channel must support voice to connect'
+        assert self.is_voice, 'Cannot connect to a non-voice channel'
 
         server_id = self.guild_id or self.id
         vc = self.client.state.voice_clients.get(server_id) or VoiceClient(self.client, server_id, is_dm=self.is_dm)
 
         return vc.connect(self.id, *args, **kwargs)
+
+    def disconnect(self):
+        """
+        Disconnect from this voice channel.
+        """
+        assert self.is_voice, 'Cannot disconnect from a non-voice channel'
+
+        server_id = self.guild_id or self.id
+        vc = self.client.state.voice_clients.get(server_id)
+
+        return vc.disconnect()
 
     def create_overwrite(self, *args, **kwargs):
         """

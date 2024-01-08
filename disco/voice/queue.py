@@ -2,7 +2,7 @@ import abc
 import random
 
 from gevent.event import Event
-from six import add_metaclass
+from disco.util.metaclass import add_metaclass
 
 
 @add_metaclass(abc.ABCMeta)

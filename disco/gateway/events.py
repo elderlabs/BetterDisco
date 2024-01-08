@@ -1,16 +1,16 @@
-from six import with_metaclass
+from disco.util.metaclass import with_metaclass
 
 from disco.types.application import ApplicationCommand, Interaction, ApplicationCommandPermissions
 from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, snowflake, datetime, text, str_or_int
 from disco.types.channel import Channel, PermissionOverwrite, ThreadMember, StageInstance, Thread
 from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration, GuildEntitlement, AuditLogEntry, \
-    AutoModerationRule, AutoModerationActionExecute, GuildScheduledEvent, GuildSoundboardSound
+    AutoModerationRule, AutoModerationActionExecute, GuildScheduledEvent, GuildSoundboardSound, GuildVoiceState
 from disco.types.invite import Invite
+from disco.types.permissions import PermissionValue
 from disco.types.reactions import Emoji, Sticker
 from disco.types.message import Message
 from disco.types.oauth import Application
 from disco.types.user import User, Presence
-from disco.types.voice import VoiceState
 from disco.util.string import underscore
 
 # Mapping of discords event name to our event classes
@@ -619,7 +619,8 @@ class TypingStart(GatewayEvent):
     member = Field(GuildMember)
 
 
-@wraps_model(VoiceState, alias='state')
+@wraps_model(GuildVoiceState, alias='state')
+@attach('member', ('state', 'member'))
 class VoiceStateUpdate(GatewayEvent):
     """
     Sent when a users voice state changes.
@@ -863,11 +864,18 @@ class IntegrationDelete(GatewayEvent):
 
 
 @wraps_model(Interaction)
+@attach('guild_id', ('member', 'guild_id'))
 class InteractionCreate(GatewayEvent):
     """
     Sent whenever a /command is sent to your application.
     """
-    guild_id = Field(snowflake)
+    app_permissions = Field(PermissionValue)
+    channel = Field(Channel)
+    entitlement_sku_ids = ListField(int)
+    entitlements = ListField(str)
+    guild = Field(Guild, create=False)
+    recipients = ListField(User)
+    interaction = Field(Interaction)
 
 
 @wraps_model(ApplicationCommand)
@@ -1081,6 +1089,11 @@ class GuildScheduledEventUpdate(GatewayEvent):
 @wraps_model(GuildScheduledEvent)
 class GuildScheduledEventDelete(GatewayEvent):
     guild_id = Field(snowflake)
+
+
+class GuildScheduledEventExceptionsDelete(GatewayEvent):
+    guild_id = Field(snowflake)
+    event_id = Field(snowflake)
 
 
 class GuildApplicationCommandIndexUpdate(GatewayEvent):

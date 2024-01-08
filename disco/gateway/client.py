@@ -77,8 +77,9 @@ class GatewayClient(LoggingClass):
         self.latency = -1
 
     def send(self, op, data):
-        self.limiter.check()
-        return self._send(op, data)
+        if not self.ws.is_closed:
+            self.limiter.check()
+            return self._send(op, data)
 
     def _send(self, op, data):
         self.log.debug('GatewayClient.send %s', op)
@@ -104,7 +105,9 @@ class GatewayClient(LoggingClass):
             gevent.sleep(interval / 1000)
 
     def handle_dispatch(self, packet):
+        timestamp = time.perf_counter_ns()
         try:
+            packet['d']['timestamp_ns'] = timestamp
             obj = GatewayEvent.from_dispatch(self.client, packet)
         except Exception as e:
             if self.client.config.log_unknown_events:
@@ -224,6 +227,7 @@ class GatewayClient(LoggingClass):
             return self.log.warning(f'WS received error: {error}')
 
     def on_open(self):
+        self.ws.is_closed = False
         if self.zlib_stream_enabled:
             self._zlib = zlib.decompressobj()
 
@@ -255,6 +259,7 @@ class GatewayClient(LoggingClass):
 
     def on_close(self, code=None, reason=None):
         # Make sure we clean up any old data
+        self.ws.is_closed = True
         self._buffer = None
 
         # Kill heartbeater, a reconnect/resume will trigger a HELLO which will respawn it

@@ -36,11 +36,13 @@ class Routes:
     Simple Python object-enum of all method/url route combinations available to this client.
     """
     APPLICATIONS = '/applications/{application}'
+    APPLICATIONS_GLOBAL_COMMANDS_BULK_OVERWRITE = (HTTPMethod.PUT, APPLICATIONS + '/commands')
     APPLICATIONS_GLOBAL_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/commands')
     APPLICATIONS_GLOBAL_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/commands/{command}')
     APPLICATIONS_GLOBAL_COMMANDS_GET = (HTTPMethod.GET, APPLICATIONS + '/command/{command}')
     APPLICATIONS_GLOBAL_COMMANDS_LIST = (HTTPMethod.GET, APPLICATIONS + '/commands')
     APPLICATIONS_GLOBAL_COMMANDS_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/commands/{command}')
+    APPLICATIONS_GUILD_COMMANDS_BULK_OVERWRITE = (HTTPMethod.PUT, APPLICATIONS + '/guilds/{guild}/commands')
     APPLICATIONS_GUILD_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/guilds/{guild}/commands')
     APPLICATIONS_GUILD_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/guilds/{guild}/commands/{command}')
     APPLICATIONS_GUILD_COMMANDS_GET = (HTTPMethod.GET, APPLICATIONS + '/guilds/{guild}/commands/{command}')
@@ -53,8 +55,6 @@ class Routes:
     APPLICATIONS_ME_MODIFY = (HTTPMethod.PATCH, '/applications/@me')
     APPLICATIONS_ROLE_CONNECTIONS_METADATA_GET = (HTTPMethod.GET, APPLICATIONS + '/role-connections/metadata')
     APPLICATIONS_ROLE_CONNECTIONS_METADATA_MODIFY = (HTTPMethod.PUT, APPLICATIONS + '/role-connections/metadata')
-    APPLICATION_GLOBAL_BULK_OVERWRITE = (HTTPMethod.PUT, APPLICATIONS + '/commands')
-    APPLICATION_GUILD_BULK_OVERWRITE = (HTTPMethod.PUT, APPLICATIONS + '/guilds/{guild}/commands')
 
     CHANNELS = '/channels/{channel}'
     CHANNELS_DELETE = (HTTPMethod.DELETE, CHANNELS)

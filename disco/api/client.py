@@ -151,6 +151,7 @@ class APIClient(LoggingClass):
             attachments=[],
             embed=None,
             embeds=[],
+            flags=0,
             allowed_mentions={},
             message_reference={},
             components={},
@@ -203,6 +204,9 @@ class APIClient(LoggingClass):
 
         if sticker_ids:
             payload['sticker_ids'] = sticker_ids
+
+        if flags:
+            payload['flags'] = flags
 
         if attachments:
             if len(attachments) > 1:
@@ -782,9 +786,9 @@ class APIClient(LoggingClass):
     def applications_global_commands_delete(self, command):
         return self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_DELETE, dict(application=self.client.state.me.id, command=command))
 
-    # TODO:
     def applications_global_commands_bulk_overwrite(self, commands):
-        pass
+        r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_BULK_OVERWRITE, dict(application=self.client.state.me.id), json=commands)
+        return ApplicationCommand.create_map(self.client, r.json())
 
     def applications_guild_commands_get(self, guild):
         r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_LIST, dict(application=self.client.state.me.id, guild=guild))
@@ -806,7 +810,7 @@ class APIClient(LoggingClass):
         return self.http(Routes.APPLICATIONS_GUILD_COMMANDS_DELETE, dict(application=self.client.state.me.id, guild=guild, command=command))
 
     def applications_guild_commands_bulk_overwrite(self, guild, commands):
-        r = self.http(Routes.APPLICATION_GUILD_BULK_OVERWRITE, dict(application=self.client.state.me.id, guild=guild), json=commands)
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_BULK_OVERWRITE, dict(application=self.client.state.me.id, guild=guild), json=commands)
         return ApplicationCommand.create_map(self.client, r.json())
 
     def applications_guild_commands_permissions_get(self, guild):
