@@ -1,4 +1,5 @@
 import websocket
+import platform
 
 from disco.util.emitter import Emitter
 from disco.util.logging import LoggingClass
