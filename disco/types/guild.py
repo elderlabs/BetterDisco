@@ -195,6 +195,11 @@ class GuildEmoji(Emoji):
         return self.client.state.guilds.get(self.guild_id)
 
 
+class GuildEmbed(SlottedModel):
+    enabled = Field(bool)
+    channel_id = Field(snowflake)
+
+
 class GuildBan(SlottedModel):
     user = Field(User)
     reason = Field(text)

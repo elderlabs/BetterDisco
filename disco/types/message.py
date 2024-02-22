@@ -828,6 +828,25 @@ class _Message(SlottedModel):
 
         return content
 
+    def start_thread(self, name, auto_archive_duration=None, rate_limit_per_user=None, *args, **kwargs):
+        """
+        Start a thread attached to the message.
+
+        Parameters
+        ----------
+        name : str
+            The name of the thread.
+        auto_archive_duration : int
+            Duration in minutes to automatically archive the thread after recent activity, can be set to:
+            60, 1440, 4320, 10080.
+        rate_limit_per_user : int
+            Amount of seconds a user has to wait before sending another message (0-21600)
+
+        Returns a Thread Channel
+        -------
+
+        """
+        return self.client.api.channels_messages_threads_create(self.channel_id, self.id, auto_archive_duration, rate_limit_per_user, *args, **kwargs)
 
 class Message(_Message):
     referenced_message = Field(_Message, create=False)
