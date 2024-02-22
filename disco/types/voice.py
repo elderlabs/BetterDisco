@@ -15,6 +15,9 @@ class VoiceState(SlottedModel):
     suppress = Field(bool)
     request_to_speak_timestamp = Field(datetime)
 
+    def __repr__(self):
+        return f'<VoiceState session_id={self.session_id}>'
+
     @cached_property
     def guild(self):
         return self.client.state.guilds.get(self.guild_id)
@@ -27,15 +30,11 @@ class VoiceState(SlottedModel):
     def user(self):
         return self.client.state.users.get(self.user_id)
 
-    @property
-    def member(self):
-        return self.guild.get_member(self.user_id)
-
 
 class VoiceRegion(SlottedModel):
     id = Field(text)
     name = Field(text)
-    vip = Field(bool)
+    # vip = Field(bool)
     optimal = Field(bool)
     deprecated = Field(bool)
     custom = Field(bool)

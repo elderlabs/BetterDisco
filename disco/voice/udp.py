@@ -11,6 +11,7 @@ try:
 except ImportError:
     warnings.warn('nacl is not installed, voice support is disabled')
 
+from disco.util.enum import Enum
 from disco.util.logging import LoggingClass
 
 AudioCodecs = ('opus',)
@@ -126,7 +127,7 @@ class UDPVoiceClient(LoggingClass):
 
         nonce = bytearray(24)  # for reference, 192-bits is 24 bytes
 
-        if self.vc.mode in ('xsalsa20_poly1305_lite', 'xsalsa20_poly1305_lite_rtpsize', 'aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm', 'aead_aes256_gcm_rtpsize'):
+        if self.vc.mode in ('xsalsa20_poly1305_lite', 'xsalsa20_poly1305_lite_rtpsize', 'aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
             # Use an incrementing number as a nonce, only first 4 bytes of the nonce is padded on
             self._nonce += 1
             if self._nonce > MAX_UINT32:
@@ -145,7 +146,12 @@ class UDPVoiceClient(LoggingClass):
             raise Exception('The voice mode, {}, isn\'t supported.'.format(self.vc.mode))
 
         # Encrypt the payload with the nonce
-        payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce)).ciphertext
+        if self.vc.mode in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
+            payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce), aad=b'')  # TODO
+        else:
+            payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce))
+        if 'aead_aes256_gcm' not in self.vc.mode:
+            payload = payload.ciphertext
 
         # Pad the payload with the nonce, if applicable
         if nonce_padding:

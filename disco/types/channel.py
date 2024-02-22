@@ -6,6 +6,7 @@ except ImportError:
 from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, cached_property, text, \
     BitsetMap, BitsetValue, ListField
 from disco.types.permissions import Permissions, Permissible, PermissionValue
+from disco.types.reactions import Emoji
 from disco.types.user import User
 from disco.util.functional import one_or_many, chunks
 from disco.util.snowflake import to_snowflake
@@ -19,14 +20,15 @@ class ChannelType:
     GUILD_VOICE = 2
     GROUP_DM = 3
     GUILD_CATEGORY = 4
-    GUILD_NEWS = 5
+    GUILD_ANNOUNCEMENT = 5
     GUILD_STORE = 6
-    GUILD_NEWS_THREAD = 10
+    GUILD_ANNOUNCEMENT_THREAD = 10
     GUILD_PUBLIC_THREAD = 11
     GUILD_PRIVATE_THREAD = 12
     GUILD_STAGE_VOICE = 13
     GUILD_DIRECTORY = 14
     GUILD_FORUM = 15
+    GUILD_MEDIA = 16
 
 
 class VideoQualityModes:
@@ -37,6 +39,7 @@ class VideoQualityModes:
 class ChannelFlags(BitsetMap):
     PINNED = 1 << 1
     REQUIRE_TAG = 1 << 4
+    HIDE_MEDIA_DOWNLOAD_OPTIONS = 1 << 15
 
 
 class ChannelFlagsValue(BitsetValue):
@@ -57,8 +60,8 @@ class ChannelSubType(SlottedModel):
 
 
 class PermissionOverwriteType:
-    ROLE = 'role'
-    MEMBER = 'member'
+    ROLE = 0
+    MEMBER = 1
 
 
 class PermissionOverwrite(ChannelSubType):
@@ -78,9 +81,12 @@ class PermissionOverwrite(ChannelSubType):
     """
     id = Field(snowflake)
     type = Field(enum(PermissionOverwriteType))
-    allow = Field(PermissionValue, cast=int)
-    deny = Field(PermissionValue, cast=int)
+    allow = Field(PermissionValue)
+    deny = Field(PermissionValue)
     channel_id = Field(snowflake)
+
+    def __repr__(self):
+        return '<PermissionOverwrite channel={} {}={}>'.format(self.channel_id, self.type, self.id)
 
     @classmethod
     def create_for_channel(cls, channel, entity, allow=0, deny=0):
@@ -143,7 +149,7 @@ class ThreadMember(SlottedModel):
     id = Field(snowflake)
     user_id = Field(snowflake)
     join_timestamp = Field(datetime)
-    flags = Field(int)
+    flags = Field(int)  # mapping doesn't exist?
 
 
 class ChannelMention(SlottedModel):
@@ -151,6 +157,19 @@ class ChannelMention(SlottedModel):
     guild_id = Field(snowflake)
     type = Field(enum(ChannelType))
     name = Field(text)
+
+
+class DefaultReaction(SlottedModel):
+    emoji_id = Field(snowflake)
+    emoji_name = Field(text)
+
+
+class ForumTag(SlottedModel):
+    id = Field(snowflake)
+    name = Field(text)
+    moderated = Field(bool)
+    emoji_id = Field(snowflake)
+    emoji_name = Field(text)
 
 
 class Channel(SlottedModel, Permissible):
@@ -196,22 +215,23 @@ class Channel(SlottedModel, Permissible):
     icon = Field(text)
     owner_id = Field(snowflake)
     application_id = Field(snowflake)
+    managed = Field(bool)
     parent_id = Field(snowflake)
     last_pin_timestamp = Field(datetime)
     rtc_region = Field(text)
     video_quality_mode = Field(enum(VideoQualityModes))
-    message_count = Field(int)
-    member_count = Field(int)
-    thread_metadata = Field(ThreadMetadata)
-    member = Field(ThreadMember)
     default_auto_archive_duration = Field(int)
-    # permissions = Field(text)
+    permissions = Field(PermissionValue)  # may lack implicit perms
     flags = Field(ChannelFlagsValue)
-    total_message_sent = Field(int)
     available_tags = ListField(ForumTag)
-    applied_tags = ListField(snowflake)
-    default_reaction_emoji = ListField(DefaultReaction)
+    default_reaction_emoji = Field(DefaultReaction, create=False)
     default_thread_rate_limit_per_user = Field(int)
+    default_sort_order = Field(int)
+    default_forum_layout = Field(int)
+    auto_archive_duration = Field(int)
+    status = Field(text)
+    icon_emoji = Field(Emoji)
+    version = Field(int)
 
     def __init__(self, *args, **kwargs):
         super(Channel, self).__init__(*args, **kwargs)
@@ -245,7 +265,7 @@ class Channel(SlottedModel, Permissible):
         member = self.guild.get_member(user)
         base = self.guild.get_permissions(member)
 
-        # First grab and apply the everyone overwrite
+        # First grab and apply the @everyone overwrite
         everyone = self.overwrites.get(self.guild_id)
         if everyone:
             base -= everyone.deny
@@ -273,16 +293,16 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel belongs to a guild.
         """
-        return self.type in (
+        return getattr(ChannelType, self.type) in (
             ChannelType.GUILD_TEXT,
             ChannelType.GUILD_VOICE,
             ChannelType.GUILD_CATEGORY,
-            ChannelType.GUILD_NEWS,
+            ChannelType.GUILD_ANNOUNCEMENT,
             ChannelType.GUILD_STORE,
             ChannelType.GUILD_STAGE_VOICE,
             ChannelType.GUILD_PUBLIC_THREAD,
             ChannelType.GUILD_PRIVATE_THREAD,
-            ChannelType.GUILD_NEWS_THREAD,
+            ChannelType.GUILD_ANNOUNCEMENT_THREAD,
         )
 
     @property
@@ -290,28 +310,29 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel is a text channel within a guild.
         """
-        return self.type in (
+        return getattr(ChannelType, self.type) in (
             ChannelType.GUILD_TEXT,
             ChannelType.GUILD_VOICE,
-            ChannelType.GUILD_NEWS_THREAD,
+            ChannelType.GUILD_ANNOUNCEMENT,
+            ChannelType.GUILD_ANNOUNCEMENT_THREAD,
             ChannelType.GUILD_PUBLIC_THREAD,
             ChannelType.GUILD_PRIVATE_THREAD,
         )
 
     @property
-    def is_news(self):
+    def is_announcement(self):
         """
         Whether this channel contains news for the guild (used for verified guilds
         to produce activity feed news).
         """
-        return self.type in (ChannelType.GUILD_NEWS, ChannelType.GUILD_NEWS_THREAD)
+        return getattr(ChannelType, self.type) in (ChannelType.GUILD_ANNOUNCEMENT, ChannelType.GUILD_ANNOUNCEMENT_THREAD)
 
     @property
     def is_dm(self):
         """
         Whether this channel is a DM (does not belong to a guild).
         """
-        return self.type in (ChannelType.DM, ChannelType.GROUP_DM)
+        return getattr(ChannelType, self.type) in (ChannelType.DM, ChannelType.GROUP_DM)
 
     @property
     def is_nsfw(self):
@@ -325,17 +346,17 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel is a stage channel.
         """
-        return self.type == ChannelType.GUILD_STAGE_VOICE
+        return getattr(ChannelType, self.type) == ChannelType.GUILD_STAGE_VOICE
 
     @property
     def is_thread(self):
         """
         Whether this channel is a thread.
         """
-        return self.type in (
+        return getattr(ChannelType, self.type) in (
             ChannelType.GUILD_PUBLIC_THREAD,
             ChannelType.GUILD_PRIVATE_THREAD,
-            ChannelType.GUILD_NEWS_THREAD,
+            ChannelType.GUILD_ANNOUNCEMENT_THREAD,
         )
 
     @property
@@ -350,7 +371,11 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel supports voice.
         """
-        return self.type in (ChannelType.GUILD_VOICE, ChannelType.DM, ChannelType.GROUP_DM, ChannelType.GUILD_STAGE_VOICE)
+        return getattr(ChannelType, self.type) in (ChannelType.GUILD_VOICE, ChannelType.DM, ChannelType.GROUP_DM, ChannelType.GUILD_STAGE_VOICE)
+
+    @property
+    def is_media(self):
+        return getattr(ChannelType, self.type) is ChannelType.GUILD_MEDIA
 
     @property
     def messages(self):
@@ -491,12 +516,23 @@ class Channel(SlottedModel, Permissible):
         Connect to this channel over voice.
         """
         from disco.voice.client import VoiceClient
-        assert self.is_voice, 'Channel must support voice to connect'
+        assert self.is_voice, 'Cannot connect to a non-voice channel'
 
         server_id = self.guild_id or self.id
         vc = self.client.state.voice_clients.get(server_id) or VoiceClient(self.client, server_id, is_dm=self.is_dm)
 
         return vc.connect(self.id, *args, **kwargs)
+
+    def disconnect(self):
+        """
+        Disconnect from this voice channel.
+        """
+        assert self.is_voice, 'Cannot disconnect from a non-voice channel'
+
+        server_id = self.guild_id or self.id
+        vc = self.client.state.voice_clients.get(server_id)
+
+        return vc.disconnect()
 
     def create_overwrite(self, *args, **kwargs):
         """
@@ -786,6 +822,21 @@ class Channel(SlottedModel, Permissible):
         return self.client.api.channels_threads_members_list(self.id)
 
 
+class Thread(Channel):
+    archived = Field(bool)
+    locked = Field(bool)
+    invitable = Field(bool)
+    applied_tags = ListField(snowflake)
+    message_count = Field(int)
+    member_count = Field(int)
+    thread_metadata = Field(ThreadMetadata)
+    member = Field(ThreadMember)
+    total_message_sent = Field(int)
+
+    def __repr__(self):
+        return f'<Thread id={self.id} name={self.name}>'
+
+
 class MessageIterator:
     """
     An iterator which supports scanning through the messages for a channel.
@@ -877,7 +928,7 @@ class MessageIterator:
 
 
 class StageInstancePrivacyLevel:
-    PUBLIC = 1
+    # PUBLIC = 1  # deprecated
     GUILD_ONLY = 2
 
 
@@ -888,3 +939,11 @@ class StageInstance(SlottedModel):
     topic = Field(text)
     privacy_level = Field(enum(StageInstancePrivacyLevel))
     discoverable_disabled = Field(bool)
+    guild_scheduled_event_id = Field(snowflake)
+
+
+class RoleSubscriptionData(SlottedModel):
+    role_subscription_listing_id = Field(snowflake)
+    tier_name = Field(text)
+    total_months_subscribed = Field(int)
+    is_renewal = Field(bool)

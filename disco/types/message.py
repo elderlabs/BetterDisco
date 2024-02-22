@@ -2,7 +2,6 @@ try:
     import regex as re
 except ImportError:
     import re
-import warnings
 import functools
 import unicodedata
 
@@ -11,10 +10,10 @@ from disco.types.base import (
     snowflake, text, datetime, enum, cached_property,
 )
 # from disco.types.application import InteractionType
-from disco.types.channel import Channel, ChannelMention
+from disco.types.channel import Channel, ChannelMention, ChannelType, Thread
 from disco.types.guild import GuildMember
 from disco.types.oauth import Application
-from disco.types.reactions import Emoji, MessageReaction, StickerItemStructure
+from disco.types.reactions import Emoji, MessageReaction, StickerItem
 from disco.types.user import User
 from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
@@ -45,6 +44,19 @@ class MessageType:
     THREAD_STARTER_MESSAGE = 21
     GUILD_INVITE_REMINDER = 22
     CONTEXT_MENU_COMMAND = 23
+    AUTO_MODERATION_ACTION = 24
+    ROLE_SUBSCRIPTION_PURCHASE = 25
+    INTERACTION_PREMIUM_UPSELL = 26
+    STAGE_START = 27
+    STAGE_END = 28
+    STAGE_SPEAKER = 29
+    STAGE_RAISE_HAND = 30
+    STAGE_TOPIC = 31
+    GUILD_APPLICATION_PREMIUM_SUBSCRIPTION = 32
+    GUILD_INCIDENT_ALERT_MODE_ENABLED = 36
+    GUILD_INCIDENT_ALERT_MODE_DISABLED = 37
+    GUILD_INCIDENT_REPORT_RAID = 38
+    GUILD_INCIDENT_REPORT_FALSE_ALARM = 39
 
 
 class MessageActivityType:
@@ -310,6 +322,14 @@ class MessageEmbed(SlottedModel):
         self.fields.append(MessageEmbedField(*args, **kwargs))
 
 
+class MessageAttachmentFlags(BitsetMap):
+    IS_REMIX = 1 << 2
+
+
+class MessageAttachmentFlagsValue(BitsetValue):
+    map = MessageAttachmentFlags
+
+
 class MessageAttachment(SlottedModel):
     """
     Message attachment object.
@@ -341,6 +361,9 @@ class MessageAttachment(SlottedModel):
     height = Field(int)
     width = Field(int)
     ephemeral = Field(bool)
+    duration_sec = Field(float)
+    waveform = Field(text)
+    flags = Field(MessageAttachmentFlagsValue)
 
 
 class AllowedMentionsTypes:
@@ -359,8 +382,12 @@ class AllowedMentions(SlottedModel):
 class ComponentTypes:
     ACTION_ROW = 1
     BUTTON = 2
-    SELECT_MENU = 3
+    STRING_SELECT = 3
     TEXT_INPUT = 4
+    USER_SELECT = 5
+    ROLE_SELECT = 6
+    MENTIONABLE_SELECT = 7
+    CHANNEL_SELECT = 8
 
 
 class ButtonStyles:
@@ -374,6 +401,11 @@ class ButtonStyles:
 class TextInputStyles:
     SHORT = 1
     PARAGRAPH = 2
+
+
+class SelectDefaultValue(SlottedModel):
+    id = Field(snowflake)
+    type = Field(text)
 
 
 class SelectOption(SlottedModel):
@@ -396,8 +428,12 @@ class _MessageComponent(SlottedModel):
     placeholder = Field(text)
     min_values = Field(int)
     max_values = Field(int)
+    min_length = Field(int)
+    max_length = Field(int)
     required = Field(bool)
     value = Field(text)
+    channel_types = ListField(ChannelType, cast=int)  # just int if fails
+    default_values = ListField(SelectDefaultValue)
 
 
 class MessageComponent(_MessageComponent):
@@ -497,7 +533,7 @@ class _Message(SlottedModel):
     channel_id = Field(snowflake)
     guild_id = Field(snowflake)
     author = Field(User)
-    # m = Field(GuildMember, create=False)
+    member = Field(GuildMember, create=False)
     content = Field(text)
     timestamp = Field(datetime)
     edited_timestamp = Field(datetime)
@@ -519,9 +555,9 @@ class _Message(SlottedModel):
     message_reference = Field(MessageReference, create=False)
     flags = Field(MessageFlagValue)
     interaction = Field(MessageInteraction, create=False)
-    t = Field(Channel, alias='thread', create=False)
+    # _thread = Field(Thread, alias='thread', create=False)  # fix this
     components = ListField(MessageComponent)
-    sticker_items = ListField(StickerItemStructure)
+    sticker_items = ListField(StickerItem)
 
     def __repr__(self):
         return '<Message id={} channel_id={}>'.format(self.id, self.channel_id)
@@ -551,11 +587,9 @@ class _Message(SlottedModel):
         """
         Returns
         -------
-        `Channel`
+        `Thread`
             The thread this message was created in.
         """
-        if self.t:
-            return self.t
         if self.channel_id in self.client.state.threads:
             return self.client.state.threads.get(self.channel_id)
 
@@ -567,21 +601,12 @@ class _Message(SlottedModel):
         `Guild`
             The guild (if applicable) this message was created in.
         """
+        if self.channel.is_dm:
+            return
         if self.guild_id:
             return self.client.state.guilds.get(self.guild_id)
         elif self.channel and self.channel.guild:
             return self.channel.guild
-
-    @cached_property
-    def member(self):
-        """
-        Returns
-        -------
-        `GuildMember`
-            The guild member (if applicable) that sent this message.
-        """
-        if self.guild_id:
-            return self.guild.get_member(self.author)
 
     def pin(self):
         """
@@ -672,12 +697,6 @@ class _Message(SlottedModel):
             *args,
             **kwargs)
 
-    def create_reaction(self, emoji):
-        warnings.warn(
-            'Message.create_reaction will be deprecated soon, use Message.add_reaction',
-            DeprecationWarning)
-        return self.add_reaction(emoji)
-
     def add_reaction(self, emoji):
         """
         Adds a reaction to the message.
@@ -690,10 +709,7 @@ class _Message(SlottedModel):
         if isinstance(emoji, Emoji):
             emoji = emoji.to_string()
 
-        self.client.api.channels_messages_reactions_create(
-            self.channel_id,
-            self.id,
-            emoji)
+        self.client.api.channels_messages_reactions_create(self.channel_id, self.id, emoji)
 
     def delete_reaction(self, emoji, user=None):
         """
@@ -705,11 +721,7 @@ class _Message(SlottedModel):
         if user:
             user = to_snowflake(user)
 
-        self.client.api.channels_messages_reactions_delete(
-            self.channel_id,
-            self.id,
-            emoji,
-            user)
+        self.client.api.channels_messages_reactions_delete(self.channel_id, self.id, emoji, user)
 
     def delete_single_reaction(self, emoji):
         """
@@ -722,26 +734,20 @@ class _Message(SlottedModel):
         if isinstance(emoji, Emoji):
             emoji = emoji.to_string()
 
-        self.client.api.channels_messages_reactions_delete_emoji(
-            self.channel_id,
-            self.id,
-            emoji)
+        self.client.api.channels_messages_reactions_delete_emoji(self.channel_id, self.id, emoji)
 
     def delete_all_reactions(self):
         """
         Deletes all the reactions from a message.
         """
-        self.client.api.channels_messages_reactions_delete_all(
-            self.channel_id,
-            self.id,
-        )
+        self.client.api.channels_messages_reactions_delete_all(self.channel_id, self.id)
 
     def is_mentioned(self, entity):
         """
         Returns
         -------
         bool
-            Whether the give entity was mentioned.
+            Whether the given entity was mentioned.
         """
         entity = to_snowflake(entity)
         return entity in self.mentions or entity in self.mention_roles

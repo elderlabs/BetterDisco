@@ -4,7 +4,7 @@ import time
 from collections import namedtuple
 from websocket import WebSocketConnectionClosedException, WebSocketTimeoutException
 
-from disco.gateway.encoding.json import JSONEncoder
+from disco.gateway.encoding import ENCODERS
 from disco.gateway.packets import OPCode
 from disco.types.base import cached_property
 from disco.util.emitter import Emitter
@@ -62,14 +62,14 @@ class VoiceClient(LoggingClass):
          'xsalsa20_poly1305_suffix',
     }
 
-    def __init__(self, client, server_id, is_dm=False, encoder=None, max_reconnects=5):
+    def __init__(self, client, server_id, is_dm=False, max_reconnects=5, encoder='json'):
         super(VoiceClient, self).__init__()
 
         self.client = client
         self.server_id = server_id
         self.channel_id = None
         self.is_dm = is_dm
-        self.encoder = encoder or JSONEncoder
+        self.encoder = ENCODERS[encoder]
         self.max_reconnects = max_reconnects
         self.video_enabled = False
         self.media = None
@@ -86,7 +86,6 @@ class VoiceClient(LoggingClass):
         self.packets.on(VoiceOPCode.HEARTBEAT_ACK, self.handle_heartbeat_acknowledge)
         self.packets.on(VoiceOPCode.HELLO, self.on_voice_hello)
         self.packets.on(VoiceOPCode.RESUMED, self.on_voice_resumed)
-        # self.packets.on(VoiceOPCode.CLIENT_CONNECT, self.on_voice_client_connect)
         self.packets.on(VoiceOPCode.CLIENT_DISCONNECT, self.on_voice_client_disconnect)
         self.packets.on(VoiceOPCode.CODECS, self.on_voice_codecs)
 
@@ -186,8 +185,12 @@ class VoiceClient(LoggingClass):
         if not self._identified:
             self.connect_and_run()
 
-    def connect_and_run(self):
-        self.ws = Websocket('wss://' + self.endpoint + '/?v={}'.format(self.VOICE_GATEWAY_VERSION))
+    def connect_and_run(self, gateway_url=None):
+        if not gateway_url:
+            gateway_url = f'wss://{self.endpoint}'
+        gateway_url += f'/?v={self.VOICE_GATEWAY_VERSION}&encoding={self.encoder.TYPE}'
+
+        self.ws = Websocket(gateway_url)
         self.ws.emitter.on('on_open', self.on_open)
         self.ws.emitter.on('on_error', self.on_error)
         self.ws.emitter.on('on_close', self.on_close)
@@ -255,17 +258,9 @@ class VoiceClient(LoggingClass):
         else:
             self.log.debug('[{}] dropping because WS is closed OP {} (data = {})'.format(self.channel_id, op, data))
 
-    def on_voice_client_connect(self, data):
-        user_id = int(data['user_id'])
-
-        self.audio_ssrcs[data['audio_ssrc']] = user_id
-        # ignore data['voice_ssrc'] for now
-
     def on_voice_client_disconnect(self, data):
-        user_id = int(data['user_id'])
-
         for ssrc in self.audio_ssrcs.keys():
-            if self.audio_ssrcs[ssrc] == user_id:
+            if self.audio_ssrcs[ssrc] == int(data['user_id']):
                 del self.audio_ssrcs[ssrc]
                 break
 
@@ -287,6 +282,7 @@ class VoiceClient(LoggingClass):
         self.log.info('[{}] Received READY payload, RTC connecting'.format(self.channel_id))
         self.set_state(VoiceState.CONNECTING)
         self.ssrc = data['ssrc']
+        self.audio_ssrcs[self.ssrc] = self.client.state.me.id
         self.ip = data['ip']
         self.port = data['port']
         self.enc_modes = data['modes']
@@ -333,11 +329,11 @@ class VoiceClient(LoggingClass):
             'codecs': codecs,
             'experiments': [],
         })
-        # self.send(VoiceOPCode.CLIENT_CONNECT, {
-        #     'audio_ssrc': self.ssrc,
-        #     'video_ssrc': 0,
-        #     'rtx_ssrc': 0,
-        # })
+        self.send(VoiceOPCode.CLIENT_CONNECT, {
+            'audio_ssrc': self.ssrc,
+            'video_ssrc': 0,
+            'rtx_ssrc': 0,
+        })
 
     def on_voice_resumed(self, data):
         self.log.info('[{}] WS Resumed'.format(self.channel_id))

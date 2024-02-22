@@ -18,9 +18,8 @@ from disco.types.automoderation import AutoModerationRule
 from disco.types.user import User
 from disco.types.message import Message
 from disco.types.oauth import Application
-from disco.types.guild import Guild, GuildMember, GuildBan, GuildEmbed, PruneCount, Role, GuildEmoji, AuditLogEntry, \
-    Integration, DiscoveryRequirements, GuildPreview, GuildScheduledEvent, GuildScheduledEventUserObject
-from disco.types.channel import Channel, ThreadMember
+from disco.types.guild import Guild, GuildMember, GuildBan, GuildWidgetSettings, PruneCount, Role, GuildEmoji, AuditLogEntry, Integration, DiscoveryRequirements, GuildPreview, GuildEmbed,GuildScheduledEvent, GuildScheduledEventUserObject
+from disco.types.channel import Channel, Thread
 from disco.types.invite import Invite
 from disco.types.voice import VoiceRegion
 from disco.types.webhook import Webhook
@@ -101,12 +100,15 @@ class APIClient(LoggingClass):
         return data
 
     def oauth2_applications_me_get(self):
-        r = self.http(Routes.OAUTH2_APPLICATIONS_ME)
+        r = self.http(Routes.OAUTH2_APPLICATIONS_ME_GET)
         return Application.create(self.client, r.json())
 
     def channels_get(self, channel):
         r = self.http(Routes.CHANNELS_GET, dict(channel=channel))
-        return Channel.create(self.client, r.json())
+        data = r.json()
+        if 'member' in data:
+            return Thread.create(self.client, data)
+        return Channel.create(self.client, data)
 
     def channels_modify(self, channel, reason=None, **kwargs):
         r = self.http(
@@ -150,6 +152,7 @@ class APIClient(LoggingClass):
             attachments=[],
             embed=None,
             embeds=[],
+            flags=0,
             allowed_mentions={},
             message_reference={},
             components={},
@@ -202,6 +205,9 @@ class APIClient(LoggingClass):
 
         if sticker_ids:
             payload['sticker_ids'] = sticker_ids
+
+        if flags:
+            payload['flags'] = flags
 
         if attachments:
             if len(attachments) > 1:
@@ -268,7 +274,7 @@ class APIClient(LoggingClass):
         self.http(Routes.CHANNELS_MESSAGES_DELETE, dict(channel=channel, message=message))
 
     def channels_messages_delete_bulk(self, channel, messages):
-        self.http(Routes.CHANNELS_MESSAGES_DELETE_BULK, dict(channel=channel), json={'messages': messages})
+        self.http(Routes.CHANNELS_MESSAGES_BULK_DELETE, dict(channel=channel), json={'messages': messages})
 
     def channels_messages_reactions_get(self, channel, message, emoji, after=None, limit=100):
         r = self.http(
@@ -281,23 +287,23 @@ class APIClient(LoggingClass):
         self.http(Routes.CHANNELS_MESSAGES_REACTIONS_CREATE, dict(channel=channel, message=message, emoji=emoji))
 
     def channels_messages_reactions_delete(self, channel, message, emoji, user=None):
-        route = Routes.CHANNELS_MESSAGES_REACTIONS_DELETE_ME
+        route = Routes.CHANNELS_MESSAGES_REACTIONS_ME_DELETE
         obj = dict(channel=channel, message=message, emoji=emoji)
 
         if user:
-            route = Routes.CHANNELS_MESSAGES_REACTIONS_DELETE_USER
+            route = Routes.CHANNELS_MESSAGES_REACTIONS_USER_DELETE
             obj['user'] = user
 
         self.http(route, obj)
 
     def channels_messages_reactions_delete_emoji(self, channel, message, emoji):
-        self.http(Routes.CHANNELS_MESSAGES_REACTIONS_DELETE_EMOJI, dict(channel=channel, message=message, emoji=emoji))
+        self.http(Routes.CHANNELS_MESSAGES_REACTIONS_EMOJI_DELETE, dict(channel=channel, message=message, emoji=emoji))
 
     def channels_messages_reactions_delete_all(self, channel, message):
-        self.http(Routes.CHANNELS_MESSAGES_REACTIONS_DELETE_ALL, dict(channel=channel, message=message))
+        self.http(Routes.CHANNELS_MESSAGES_REACTIONS_ALL_DELETE, dict(channel=channel, message=message))
 
     def channels_messages_publish(self, channel, message):
-        self.http(Routes.CHANNELS_MESSAGES_PUBLISH, dict(channel=channel, message=message))
+        self.http(Routes.CHANNELS_MESSAGES_POST, dict(channel=channel, message=message))
 
     def channels_permissions_modify(self, channel, permission, allow, deny, typ, reason=None):
         self.http(Routes.CHANNELS_PERMISSIONS_MODIFY, dict(channel=channel, permission=permission), json={
@@ -675,8 +681,8 @@ class APIClient(LoggingClass):
             dict(guild=guild, member=member, role=role),
             headers=_reason_header(reason))
 
-    def guilds_members_me_nick(self, guild, nick):
-        self.http(Routes.GUILDS_MEMBERS_ME_NICK, dict(guild=guild), json={'nick': nick})
+    def guilds_members_me_modify(self, guild, nick):
+        self.http(Routes.GUILDS_MEMBERS_ME_MODIFY, dict(guild=guild), json={'nick': nick})
 
     def guilds_members_add(self, guild, member, access_token, nick=None, roles=None, mute=None, deaf=None):
         payload = {
@@ -692,8 +698,8 @@ class APIClient(LoggingClass):
 
         self.http(Routes.GUILDS_MEMBERS_ADD, dict(guild=guild, member=member), json=payload)
 
-    def guilds_members_kick(self, guild, member, reason=None):
-        self.http(Routes.GUILDS_MEMBERS_KICK, dict(guild=guild, member=member), headers=_reason_header(reason))
+    def guilds_members_remove(self, guild, member, reason=None):
+        self.http(Routes.GUILDS_MEMBERS_REMOVE, dict(guild=guild, member=member), headers=_reason_header(reason))
 
     def guilds_bans_list(self, guild):
         r = self.http(Routes.GUILDS_BANS_LIST, dict(guild=guild))
@@ -754,7 +760,7 @@ class APIClient(LoggingClass):
         return Role.create(self.client, r.json(), guild_id=guild)
 
     def guilds_roles_modify_batch(self, guild, roles, reason=None):
-        r = self.http(Routes.GUILDS_ROLES_MODIFY_BATCH, dict(guild=guild), json=roles, headers=_reason_header(reason))
+        r = self.http(Routes.GUILDS_ROLES_BATCH_MODIFY, dict(guild=guild), json=roles, headers=_reason_header(reason))
         return Role.create_map(self.client, r.json(), guild_id=guild)
 
     def guilds_roles_modify(
@@ -829,17 +835,17 @@ class APIClient(LoggingClass):
         r = self.http(Routes.GUILDS_VANITY_URL_GET, dict(guild=guild))
         return Invite.create(self.client, r.json())
 
-    def guilds_embed_get(self, guild):
-        r = self.http(Routes.GUILDS_EMBED_GET, dict(guild=guild))
-        return GuildEmbed.create(self.client, r.json())
+    def guilds_widget_settings_get(self, guild):
+        r = self.http(Routes.GUILDS_WIDGET_SETTINGS_GET, dict(guild=guild))
+        return GuildWidgetSettings.create(self.client, r.json())
 
-    def guilds_embed_modify(self, guild, reason=None, **kwargs):
+    def guilds_widget_modify(self, guild, reason=None, **kwargs):
         r = self.http(
-            Routes.GUILDS_EMBED_MODIFY,
+            Routes.GUILDS_WIDGET_MODIFY,
             dict(guild=guild),
             json=kwargs,
             headers=_reason_header(reason))
-        return GuildEmbed.create(self.client, r.json())
+        return GuildWidgetSettings.create(self.client, r.json())
 
     def guilds_webhooks_list(self, guild):
         r = self.http(Routes.GUILDS_WEBHOOKS_LIST, dict(guild=guild))
@@ -880,7 +886,7 @@ class APIClient(LoggingClass):
         return GuildPreview.create(self.client, r.json())
 
     def guilds_auditlogs_list(self, guild, before=None, user_id=None, action_type=None, limit=50):
-        r = self.http(Routes.GUILDS_AUDITLOGS_LIST, dict(guild=guild), params=optional(
+        r = self.http(Routes.GUILDS_AUDIT_LOGS_LIST, dict(guild=guild), params=optional(
             before=before,
             user_id=user_id,
             action_type=int(action_type) if action_type else None,
@@ -894,7 +900,7 @@ class APIClient(LoggingClass):
         return AuditLogEntry.create_map(self.client, r.json()['audit_log_entries'], users, webhooks, guild_id=guild)
 
     def guilds_discovery_requirements(self, guild):
-        r = self.http(Routes.GUILDS_DISCOVERY_REQUIREMENTS, dict(guild=guild))
+        r = self.http(Routes.GUILDS_DISCOVERY_REQUIREMENTS_GET, dict(guild=guild))
         return DiscoveryRequirements.create(self.client, r.json())
 
     def guilds_scheduled_events_get(self, guild, with_user_count=False):
@@ -1005,8 +1011,8 @@ class APIClient(LoggingClass):
         r = self.http(Routes.USERS_ME_GET)
         return User.create(self.client, r.json())
 
-    def users_me_patch(self, payload):
-        r = self.http(Routes.USERS_ME_PATCH, json=payload)
+    def users_me_modify(self, payload):
+        r = self.http(Routes.USERS_ME_MODIFY, json=payload)
         return User.create(self.client, r.json())
 
     def users_me_guilds_list(self):
@@ -1077,11 +1083,11 @@ class APIClient(LoggingClass):
             return Message.create(self.client, obj.json())
 
     def applications_global_commands_get(self):
-        r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_GET, dict(application=self.client.state.me.id))
+        r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_LIST, dict(application=self.client.state.me.id))
         return ApplicationCommand.create_map(self.client, r.json())
 
     def applications_global_command_get(self, command):
-        r = self.http(Routes.APPLICATIONS_GLOBAL_COMMAND_GET, dict(application=self.client.state.me.id, command=command))
+        r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_GET, dict(application=self.client.state.me.id, command=command))
         return ApplicationCommand.create_map(self.client, r.json())
 
     def applications_global_commands_create(self, name, description, options=None, default_permission=None):
@@ -1105,16 +1111,16 @@ class APIClient(LoggingClass):
     def applications_global_commands_delete(self, command):
         return self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_DELETE, dict(application=self.client.state.me.id, command=command))
 
-    # TODO:
     def applications_global_commands_bulk_overwrite(self, commands):
-        pass
+        r = self.http(Routes.APPLICATIONS_GLOBAL_COMMANDS_BULK_OVERWRITE, dict(application=self.client.state.me.id), json=commands)
+        return ApplicationCommand.create_map(self.client, r.json())
 
     def applications_guild_commands_get(self, guild):
-        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_GET, dict(application=self.client.state.me.id, guild=guild))
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_LIST, dict(application=self.client.state.me.id, guild=guild))
         return ApplicationCommand.create_map(self.client, r.json())
 
     def applications_guild_command_get(self, guild):
-        r = self.http(Routes.APPLICATIONS_GUILD_COMMAND_GET, dict(application=self.client.state.me.id, guild=guild))
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_GET, dict(application=self.client.state.me.id, guild=guild))
         return ApplicationCommand.create_map(self.client, r.json())
 
     def applications_guild_commands_create(self, guild, name, data):
@@ -1129,11 +1135,11 @@ class APIClient(LoggingClass):
         return self.http(Routes.APPLICATIONS_GUILD_COMMANDS_DELETE, dict(application=self.client.state.me.id, guild=guild, command=command))
 
     def applications_guild_commands_bulk_overwrite(self, guild, commands):
-        r = self.http(Routes.APPLICATION_GUILD_BULK_OVERWRITE, dict(application=self.client.state.me.id, guild=guild), json=commands)
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_BULK_OVERWRITE, dict(application=self.client.state.me.id, guild=guild), json=commands)
         return ApplicationCommand.create_map(self.client, r.json())
 
     def applications_guild_commands_permissions_get(self, guild):
-        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_GET, dict(application=self.client.state.me.id, guild=guild))
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_LIST, dict(application=self.client.state.me.id, guild=guild))
         return GuildApplicationCommandPermissions.create_map(self.client, r.json())
 
     def applications_guild_command_permissions_get(self, guild, command):
@@ -1141,21 +1147,17 @@ class APIClient(LoggingClass):
         return GuildApplicationCommandPermissions.create(self.client, r.json())
 
     def applications_guild_command_permissions_modify(self, guild, command, permissions):
-        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_GET, dict(application=self.client.state.me.id, guild=guild, command=command), json=permissions)
-        return GuildApplicationCommandPermissions.create_map(self.client, r.json())
-
-    def applications_guilds_commands_permissions_bulk_modify(self, guild, data):
-        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_MODIFY, dict(application=self.client.state.me.id, guild=guild), json=data)
+        r = self.http(Routes.APPLICATIONS_GUILD_COMMANDS_PERMISSIONS_MODIFY, dict(application=self.client.state.me.id, guild=guild, command=command), json=permissions)
         return GuildApplicationCommandPermissions.create_map(self.client, r.json())
 
     def interactions_create(self, interaction, token, type, data=None, files=None):
         r = self.http(Routes.INTERACTIONS_CREATE, dict(id=interaction, token=token), json=dict(type=type, data=data), files=files)
         if r.status_code == 204:
-            rr = self.http(Routes.INTERACTIONS_GET_ORIGINAL_RESPONSE, dict(id=self.client.state.me.id, token=token))
+            rr = self.http(Routes.INTERACTIONS_ORIGINAL_RESPONSE_GET, dict(id=self.client.state.me.id, token=token))
             return InteractionResponse.create(self.client, dict(token=token, type=type, data=data, message=rr.json()))
 
     def interactions_edit(self, application, token, data=None):
-        r = self.http(Routes.INTERACTIONS_EDIT, dict(id=application, token=token), json=data)
+        r = self.http(Routes.INTERACTIONS_MODIFY, dict(id=application, token=token), json=data)
         if r.status_code == 200:
             return InteractionResponse.create(self.client, r.json())
 
@@ -1254,7 +1256,7 @@ class APIClient(LoggingClass):
         self.http(Routes.INTERACTIONS_DELETE, dict(id=application, token=token))
 
     def interactions_get_original(self, application, token):
-        r = self.http(Routes.INTERACTIONS_GET_ORIGINAL_RESPONSE, dict(id=application, token=token))
+        r = self.http(Routes.INTERACTIONS_ORIGINAL_RESPONSE_GET, dict(id=application, token=token))
         return Interaction.create(self.client, r.json())
 
     def interactions_followup_create(self, application, token, content=None, username=None, avatar_url=None, tts=None, file=None, embeds=None, payload_json=None, allowed_mentions=None, components=None, flags=None):
@@ -1273,7 +1275,7 @@ class APIClient(LoggingClass):
         return InteractionCallbackData.create(self.client, r.json())
 
     def interactions_followup_edit(self, application, token, message, content=None, embeds=None, file=None, payload_json=None, allowed_mentions=None, attachments=None, components=None, flags=None):
-        r = self.http(Routes.INTERACTIONS_FOLLOWUP_EDIT, dict(id=application, token=token, message=message), json=optional(
+        r = self.http(Routes.INTERACTIONS_FOLLOWUP_MODIFY, dict(id=application, token=token, message=message), json=optional(
             content=content,
             embeds=embeds,
             file=file,

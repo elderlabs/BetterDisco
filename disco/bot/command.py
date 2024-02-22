@@ -83,6 +83,8 @@ class CommandEvent:
         """
         Guild member (if relevant) for the user that created the CommandEvent.
         """
+        if self.interaction:
+            return self.interaction.member
         return self._event.member
 
     @simple_cached_property
@@ -97,7 +99,7 @@ class CommandEvent:
         """
         Thread the CommandEvent was created in.
         """
-        return self._event.thread
+        return self._event.channel
 
     @simple_cached_property
     def guild(self):
@@ -112,7 +114,9 @@ class CommandEvent:
         Author of the CommandEvent.
         """
         if self.interaction:
-            return self.interaction.member.user if self.interaction.member else self.interaction.user
+            if self._event.guild:
+                return self.interaction.member.user
+            return self.interaction.user
         return self.msg.author
 
     def reply(self, *args, **kwargs):

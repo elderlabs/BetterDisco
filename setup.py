@@ -16,13 +16,13 @@ extras_require = {
     'yaml': ['pyyaml>=5.3.1'],
     'music': ['yt-dlp>=2022.3.8.2'],
     'performance': [
-        'earl-etf>=2.1.2',
+        'erlpack>=1.0.0',
         'regex>=2022.3.15',
         'pylibyaml>=0.1.0',
         'ujson>=5.2.0',
         'wsaccel>=0.6.3',
     ],
-    'sharding': ['gipc>=1.5.0', 'dill>=0.3.6'],
+    'sharding': ['gipc>=1.6.0', 'dill>=0.3.6'],
 }
 
 setup(
@@ -48,6 +48,7 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Topic :: Internet',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules',

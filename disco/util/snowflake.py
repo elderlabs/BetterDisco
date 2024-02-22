@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, UTC
 
-UNIX_EPOCH = datetime(1970, 1, 1)
+UNIX_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 DISCORD_EPOCH = 1420070400000
 
 
@@ -8,7 +8,7 @@ def to_datetime(snowflake):
     """
     Converts a snowflake to a UTC datetime.
     """
-    return datetime.utcfromtimestamp(to_unix(snowflake))
+    return datetime.fromtimestamp(to_unix(snowflake), tz=UTC)
 
 
 def to_unix(snowflake):

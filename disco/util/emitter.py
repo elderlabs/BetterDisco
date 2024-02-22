@@ -14,7 +14,7 @@ class Priority:
     #  will be allowed to continue. Any exceptions raised will be ignored.
     BEFORE = 1
 
-    # AFTER has the same behavior as before with regards to dispatching events,
+    # AFTER has the same behavior as before with regard to dispatching events,
     #  with the one difference being it executes after all the BEFORE listeners.
     AFTER = 2
 
@@ -143,12 +143,28 @@ class Emitter(LoggingClass):
         # Next enqueue all sequential handlers. This just puts stuff into a queue
         #  without blocking, so we don't have to worry too much
         for listener in self.event_handlers[Priority.SEQUENTIAL].get(name, []):
-            # TODO: find an error catch for this, will die silently on-error
-            listener(*args, **kwargs)
+            try:
+                # TODO: find an error catch for this, will die silently on-error
+                listener(*args, **kwargs)
+            except Exception as e:
+                self.log.warning('SEQUENTIAL {} event handler `{}` raised: {}'.format(
+                    name,
+                    listener.callback.__name__,
+                    e.__class__.__name__,
+                    e,
+                ))
 
         # Finally just spawn for everything else
         for listener in self.event_handlers[Priority.NONE].get(name, []):
-            gevent.spawn(listener, *args, **kwargs)
+            try:
+                gevent.spawn(listener, *args, **kwargs)
+            except Exception as e:
+                self.log.warning('{} event handler `{}` raised {}: {}'.format(
+                    name,
+                    listener.callback.__name__,
+                    e.__class__.__name__,
+                    e,
+                ))
 
     def on(self, *args, **kwargs):
         return EmitterSubscription(args[:-1], args[-1], **kwargs).attach(self)

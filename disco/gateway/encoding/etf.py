@@ -1,8 +1,9 @@
+from erlpack import ErlangTermDecoder, pack  # this feels like chaos
 from websocket import ABNF
 
 from disco.gateway.encoding.base import BaseEncoder
 
-from earl import unpack, pack
+decoder = ErlangTermDecoder(encoding='utf-8')
 
 
 class ETFEncoder(BaseEncoder):
@@ -15,4 +16,4 @@ class ETFEncoder(BaseEncoder):
 
     @staticmethod
     def decode(obj):
-        return unpack(obj, encoding='utf-8', encode_binary_ext=True)
+        return decoder.loads(obj)

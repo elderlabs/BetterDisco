@@ -52,13 +52,6 @@ def find_loadable_plugins(mod):
         if modattr in _plugin_base_classes:
             continue
 
-        if getattr(modattr, '_shallow', False) and Plugin in modattr.__bases__:
-            warnings.warn(
-                'Setting _shallow to avoid plugin loading has been deprecated, see `register_plugin_base_class`',
-                DeprecationWarning,
-            )
-            continue
-
         yield modattr
 
 

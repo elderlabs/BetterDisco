@@ -1,7 +1,8 @@
 from datetime import datetime
 
 from disco.types.base import (
-    SlottedModel, Field, snowflake, text, with_equality, with_hash, enum, ListField, cached_property, str_or_int
+    SlottedModel, Field, snowflake, text, with_equality, with_hash, enum, ListField, cached_property, str_or_int,
+    BitsetValue, BitsetMap
 )
 
 
@@ -11,12 +12,12 @@ class DefaultAvatars:
     GREEN = 2
     ORANGE = 3
     RED = 4
+    PINK = 5
 
-    ALL = ['BLURPLE', 'GREY', 'GREEN', 'ORANGE', 'RED']
+    ALL = ['BLURPLE', 'GREY', 'GREEN', 'ORANGE', 'RED', 'PINK']
 
 
-class UserFlags:
-    NONE = 0
+class UserFlags(BitsetMap):
     DISCORD_EMPLOYEE = 1 << 0
     DISCORD_PARTNER = 1 << 1
     HYPESQUAD_EVENTS = 1 << 2
@@ -37,19 +38,26 @@ class UserFlags:
     VERIFIED_DEVELOPER = 1 << 17
     CERTIFIED_MODERATOR = 1 << 18
     BOT_HTTP_INTERACTIONS = 1 << 19
-    ACTIVE_DEVELOPER = 1 << 20
+    SPAMMER = 1 << 20
+    ACTIVE_DEVELOPER = 1 << 22
+
+
+class UserFlagsValue(BitsetValue):
+    map = UserFlags
 
 
 class PremiumType:
     NONE = 0
     CLASSIC = 1
     NITRO = 2
+    BASIC = 3
 
 
 class User(SlottedModel, with_equality('id'), with_hash('id')):
     id = Field(snowflake)
     username = Field(text)
     discriminator = Field(int)
+    global_name = Field(text)
     avatar = Field(text)
     bot = Field(bool, default=False)
     system = Field(bool, default=False)
@@ -59,11 +67,12 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     locale = Field(text)
     verified = Field(bool)
     email = Field(text)
-    flags = Field(int)
-    public_flags = Field(int, default=0)
+    flags = Field(UserFlagsValue)
     premium_type = Field(enum(PremiumType))
-    global_name = Field(text)
+    public_flags = Field(UserFlagsValue)
     avatar_decoration = Field(text)
+    display_name = Field(text)
+    # avatar_decoration_data = Field(text) ???
     # member = Field(GuildMember)
 
     def __str__(self):
@@ -99,7 +108,9 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
 
     @property
     def default_avatar(self):
-        return DefaultAvatars.ALL[(self.discriminator if self.discriminator else (self.id >> 22)) % len(DefaultAvatars.ALL)]
+        if self.discriminator:
+            return DefaultAvatars.ALL[self.discriminator % 5]
+        return DefaultAvatars.ALL[(self.id >> 22) % len(DefaultAvatars.ALL)]
 
     @property
     def avatar_url(self):
@@ -167,13 +178,17 @@ class ActivityTimestamps(SlottedModel):
         return datetime.utcfromtimestamp(self.end / 1000)
 
 
-class ActivityFlags:
+class ActivityFlags(BitsetMap):
     INSTANCE = 1 << 0
     JOIN = 1 << 1
     SPECTATE = 1 << 2
     JOIN_REQUEST = 1 << 3
     SYNC = 1 << 4
     PLAY = 1 << 5
+
+
+class ActivityFlagsValue(BitsetValue):
+    map = ActivityFlags
 
 
 class Activity(SlottedModel):
@@ -188,13 +203,14 @@ class Activity(SlottedModel):
     assets = Field(ActivityAssets)
     secrets = Field(ActivitySecrets)
     instance = Field(bool)
-    flags = Field(int)
+    flags = Field(ActivityFlagsValue)
 
 
 class Presence(SlottedModel):
-    user = Field(User, alias='user', ignore_dump=['presence'])
-    activity = Field(Activity)
+    user = Field(User, ignore_dump=['presence'])
+    activity = Field(Activity, create=False)
     guild_id = Field(snowflake)
     status = Field(enum(Status))
     activities = ListField(Activity)
     client_status = Field(ClientStatus)
+    broadcast = Field(text)

@@ -32,7 +32,7 @@ class Serializer:
 
     @staticmethod
     def pickle():
-        from pickle import loads, dumps
+        from dill import loads, dumps
         return loads, dumps
 
     @classmethod
