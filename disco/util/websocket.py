@@ -14,7 +14,12 @@ class Websocket(LoggingClass, websocket.WebSocketApp):
     """
     def __init__(self, *args, **kwargs):
         LoggingClass.__init__(self)
-        websocket.setdefaulttimeout(5)
+
+        if platform.system() != "Windows":
+            websocket.setdefaulttimeout(5)
+        else:
+            self.log.warning("Running on windows may result in the websocket timing out, Due to a bug in websocket & timeouts")
+        
         websocket.WebSocketApp.__init__(self, *args, **kwargs)
 
         self.emitter = Emitter()
