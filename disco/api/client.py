@@ -19,7 +19,7 @@ from disco.types.user import User
 from disco.types.message import Message
 from disco.types.oauth import Application
 from disco.types.guild import Guild, GuildMember, GuildBan, GuildWidgetSettings, PruneCount, Role, GuildEmoji, AuditLogEntry, Integration, DiscoveryRequirements, GuildPreview, GuildEmbed,GuildScheduledEvent, GuildScheduledEventUser
-from disco.types.channel import Channel, Thread
+from disco.types.channel import Channel, Thread, ThreadMember
 from disco.types.invite import Invite
 from disco.types.voice import VoiceRegion
 from disco.types.webhook import Webhook
@@ -509,20 +509,16 @@ class APIClient(LoggingClass):
     #     return Channel.create(self.client, r.json())
 
     def channels_messages_threads_create(self, channel, message, name, auto_archive_duration=None, rate_limit_per_user=None, reason=None):
-        if message and isinstance(message, Message):
-            message = message.id
-
         payload = {
             'name': name,
         }
 
         payload.update(optional(
-            message=message,
             auto_archive_duration=auto_archive_duration,
             rate_limit_per_user=rate_limit_per_user,
         ))
 
-        r = self.http(Routes.CHANNELS_MESSAGES_THREAD_CREATE, dict(channel=channel), json=payload, headers=_reason_header(reason))
+        r = self.http(Routes.CHANNELS_MESSAGES_THREAD_CREATE, dict(channel=channel, message=message), json=payload, headers=_reason_header(reason))
         return Channel.create(self.client, r.json())
 
     def channels_threads_create(self, channel, name, auto_archive_duration=None,

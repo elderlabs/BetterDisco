@@ -846,7 +846,7 @@ class _Message(SlottedModel):
         -------
 
         """
-        return self.client.api.channels_messages_threads_create(self.channel_id, self.id, auto_archive_duration, rate_limit_per_user, *args, **kwargs)
+        return self.client.api.channels_messages_threads_create(self.channel_id, self.id, name, auto_archive_duration, rate_limit_per_user, *args, **kwargs)
 
 class Message(_Message):
     referenced_message = Field(_Message, create=False)
