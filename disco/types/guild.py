@@ -493,6 +493,19 @@ class GuildScheduledEvent(SlottedModel):
         else:
             return None
 
+class GuildSoundboardSound(SlottedModel):
+    volume = Field(float)
+    user_id = Field(snowflake)
+    sound_id = Field(snowflake)
+    name = Field(text)
+    guild_id = Field(snowflake)
+    emoji_name = Field(text)
+    emoji_id = Field(snowflake)
+    available = Field(bool)
+
+    def __repr__(self):
+        return f'<GuildSoundboardSound id={self.sound_id} name={self.name}>'
+
 
 class GuildVoiceState(VoiceState):
     member = Field(GuildMember)
