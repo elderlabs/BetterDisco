@@ -16,19 +16,17 @@ from disco.util.logging import LoggingClass
 
 AudioCodecs = ('opus',)
 
-RTPPayloadTypes = {
-    "opus": 0x78
-}
+RTPPayloadTypes = Enum(OPUS=0x78)
 
-RTCPPayloadTypes = {
-    200: 'SENDER_REPORT',
-    201: 'RECEIVER_REPORT',
-    202: 'SOURCE_DESCRIPTION',
-    203: 'BYE',
-    204: 'APP',
-    205: 'RTPFB',
-    206: 'PSFB',
-}
+RTCPPayloadTypes = Enum(
+    SENDER_REPORT=200,
+    RECEIVER_REPORT=201,
+    SOURCE_DESCRIPTION=202,
+    BYE=203,
+    APP=204,
+    RTPFB=205,
+    PSFB=206,
+)
 
 MAX_UINT32 = 4294967295
 MAX_SEQUENCE = 65535
@@ -204,7 +202,7 @@ class UDPVoiceClient(LoggingClass):
                 payload = RTCPData(
                     client=self.vc,
                     user_id=user_id,
-                    payload_type=second,
+                    payload_type=payload_type.name,
                     header=rtcp,
                     data=data[8:],
                 )
