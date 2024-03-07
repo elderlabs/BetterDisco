@@ -315,7 +315,7 @@ class VoiceClient(LoggingClass):
                 'name': codec,
                 'type': 'audio',
                 'priority': (idx + 1) * 1000,
-                'payload_type': RTPPayloadTypes.get(codec),
+                'payload_type': RTPPayloadTypes.get(codec).value,
             })
 
         self.log.debug('[{}] IP discovery completed ({}:{}), sending SELECT_PROTOCOL'.format(self.channel_id, ip, port))
