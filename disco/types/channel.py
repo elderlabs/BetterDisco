@@ -293,7 +293,7 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel belongs to a guild.
         """
-        return getattr(ChannelType, self.type) in (
+        return self.type in (
             ChannelType.GUILD_TEXT,
             ChannelType.GUILD_VOICE,
             ChannelType.GUILD_CATEGORY,
@@ -310,7 +310,7 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel is a text channel within a guild.
         """
-        return getattr(ChannelType, self.type) in (
+        return self.type in (
             ChannelType.GUILD_TEXT,
             ChannelType.GUILD_VOICE,
             ChannelType.GUILD_ANNOUNCEMENT,
@@ -325,14 +325,14 @@ class Channel(SlottedModel, Permissible):
         Whether this channel contains news for the guild (used for verified guilds
         to produce activity feed news).
         """
-        return getattr(ChannelType, self.type) in (ChannelType.GUILD_ANNOUNCEMENT, ChannelType.GUILD_ANNOUNCEMENT_THREAD)
+        return self.type in (ChannelType.GUILD_ANNOUNCEMENT, ChannelType.GUILD_ANNOUNCEMENT_THREAD)
 
     @property
     def is_dm(self):
         """
         Whether this channel is a DM (does not belong to a guild).
         """
-        return getattr(ChannelType, self.type) in (ChannelType.DM, ChannelType.GROUP_DM)
+        return self.type in (ChannelType.DM, ChannelType.GROUP_DM)
 
     @property
     def is_nsfw(self):
@@ -346,14 +346,14 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel is a stage channel.
         """
-        return getattr(ChannelType, self.type) == ChannelType.GUILD_STAGE_VOICE
+        return self.type == ChannelType.GUILD_STAGE_VOICE
 
     @property
     def is_thread(self):
         """
         Whether this channel is a thread.
         """
-        return getattr(ChannelType, self.type) in (
+        return self.type in (
             ChannelType.GUILD_PUBLIC_THREAD,
             ChannelType.GUILD_PRIVATE_THREAD,
             ChannelType.GUILD_ANNOUNCEMENT_THREAD,
@@ -371,11 +371,11 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel supports voice.
         """
-        return getattr(ChannelType, self.type) in (ChannelType.GUILD_VOICE, ChannelType.DM, ChannelType.GROUP_DM, ChannelType.GUILD_STAGE_VOICE)
+        return self.type in (ChannelType.GUILD_VOICE, ChannelType.DM, ChannelType.GROUP_DM, ChannelType.GUILD_STAGE_VOICE)
 
     @property
     def is_media(self):
-        return getattr(ChannelType, self.type) is ChannelType.GUILD_MEDIA
+        return self.type is ChannelType.GUILD_MEDIA
 
     @property
     def messages(self):
