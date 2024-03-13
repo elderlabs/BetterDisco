@@ -412,7 +412,7 @@ class SelectOption(SlottedModel):
     label = Field(text)
     value = Field(text)
     description = Field(text)
-    emoji = Field(Emoji)
+    emoji = Field(Emoji, default=None)
     default = Field(bool)
 
 
@@ -422,7 +422,7 @@ class _MessageComponent(SlottedModel):
     disabled = Field(bool)
     style = Field(int)
     label = Field(text)
-    emoji = Field(Emoji)
+    emoji = Field(Emoji, default=None)
     url = Field(text)
     options = ListField(SelectOption)
     placeholder = Field(text)

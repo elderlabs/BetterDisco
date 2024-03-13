@@ -197,7 +197,8 @@ def enum(typ):
             if isinstance(data, str) and k == data.upper():
                 return v
             elif k == data or v == data:  # perhaps separate and return inverse?
-                return k
+                # TODO: Eventually fix this.
+                return v
 
         return None
     return _f
