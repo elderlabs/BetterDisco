@@ -1,5 +1,5 @@
-import time
-import gevent
+from time import time
+from gevent import spawn as gevent_spawn
 
 from disco.state import State, StateConfig
 from disco.api.client import APIClient
@@ -130,7 +130,7 @@ class Client(LoggingClass):
             raise TypeError('Game must be an Activity model')
 
         if status is Status.IDLE and not since:
-            since = int(time.time() * 1000)
+            since = int(time() * 1000)
 
         payload = {
             'afk': afk,
@@ -148,7 +148,7 @@ class Client(LoggingClass):
         """
         Run the client (e.g. the `GatewayClient`) in a new greenlet.
         """
-        return gevent.spawn(self.gw.run)
+        return gevent_spawn(self.gw.run)
 
     def run_forever(self):
         """

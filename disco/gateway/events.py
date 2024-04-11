@@ -1,5 +1,3 @@
-from disco.util.metaclass import with_metaclass
-
 from disco.types.application import ApplicationCommand, Interaction, ApplicationCommandPermissions
 from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, snowflake, datetime, text, str_or_int
 from disco.types.channel import Channel, PermissionOverwrite, ThreadMember, StageInstance, Thread
@@ -11,6 +9,7 @@ from disco.types.reactions import Emoji, Sticker
 from disco.types.message import Message
 from disco.types.oauth import Application
 from disco.types.user import User, Presence
+from disco.util.metaclass import with_metaclass
 from disco.util.string import underscore
 
 # Mapping of discords event name to our event classes
@@ -1120,6 +1119,12 @@ class AutoModerationActionExecution(GatewayEvent):
     guild_id = Field(snowflake)
 
 
+class AutoModerationMentionRaidDetection(GatewayEvent):
+    guild_id = Field(snowflake)
+    decision_id = Field(str)
+    suspicious_mention_activity_until = Field(datetime)
+
+
 @wraps_model(AuditLogEntry)
 class GuildAuditLogEntryCreate(GatewayEvent):
     guild_id = Field(snowflake)
@@ -1168,3 +1173,11 @@ class GuildSoundboardSoundDelete(GatewayEvent):
 class GuildSoundboardSoundsUpdate(GatewayEvent):
     guild_id = Field(snowflake)
     soundboard_sounds = ListField(GuildSoundboardSound)
+
+
+class MessagePollVoteAdd(GatewayEvent):
+    pass
+
+
+class MessagePollVoteRemove(GatewayEvent):
+    pass

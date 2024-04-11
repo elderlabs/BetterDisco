@@ -1,23 +1,16 @@
-import abc
-import audioop
-import gevent
-import struct
-import types
-
-from gevent.lock import Semaphore
-from gevent.queue import Queue
+from abc import ABCMeta, abstractmethod as abc_abstractmethod
+from audioop import mul as audioop_mul
+from gevent import sleep as gevent_sleep, spawn as gevent_spawn
+from gevent.lock import Semaphore as GeventSemaphore
+from gevent.subprocess import PIPE as GEVENT_PIPE, Popen as GeventPopen
 from io import BytesIO
-from disco.util.metaclass import add_metaclass
+from struct import calcsize as struct_calcsize
+from types import GeneratorType
 
+from disco.util.metaclass import add_metaclass
 from disco.voice.opus import OpusEncoder
 
-try:
-    import yt_dlp
-    ytdl = yt_dlp.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'default_search': 'ytsearch'})
-except ImportError:
-    ytdl = None
-
-OPUS_HEADER_SIZE = struct.calcsize('<h')
+OPUS_HEADER_SIZE = struct_calcsize('<h')
 
 
 class AbstractOpus:
@@ -46,16 +39,16 @@ class BaseUtil:
         self._metadata = value
 
 
-@add_metaclass(abc.ABCMeta)
+@add_metaclass(ABCMeta)
 class BasePlayable(BaseUtil):
-    @abc.abstractmethod
+    @abc_abstractmethod
     def next_frame(self):
         raise NotImplementedError
 
 
-@add_metaclass(abc.ABCMeta)
+@add_metaclass(ABCMeta)
 class BaseInput(BaseUtil):
-    @abc.abstractmethod
+    @abc_abstractmethod
     def read(self, size):
         raise NotImplementedError
 
@@ -75,7 +68,7 @@ class FFmpegInput(BaseInput, AbstractOpus):
     def read(self, sz):
         if not self._buffer:
             # allows time for a buffer to form, otherwise there is nothing to send
-            gevent.sleep(1)
+            gevent_sleep(1)
             if self.streaming:
                 self._buffer = self.proc.stdout
             else:
@@ -107,26 +100,34 @@ class FFmpegInput(BaseInput, AbstractOpus):
                 '-hls_playlist_type', 'event',
                 'pipe:1',
             ]
-            self._proc = gevent.subprocess.Popen(args, stdout=gevent.subprocess.PIPE)
+            self._proc = GeventPopen(args, stdout=GEVENT_PIPE)
         return self._proc
 
 
 class YoutubeDLInput(FFmpegInput):
     def __init__(self, url=None, ie_info=None, *args, **kwargs):
+        try:
+            from yt_dlp import YoutubeDL
+            from yt_dlp.utils import DownloadError
+            self.ytdl = YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'default_search': 'ytsearch'})
+        except ImportError:
+            self.ytdl = None
         super(YoutubeDLInput, self).__init__(None, *args, **kwargs)
         self._url = url
         self._ie_info = ie_info
         self._info = None
-        self._info_lock = Semaphore()
+        self._info_lock = GeventSemaphore()
 
     @property
     def info(self):
         with self._info_lock:
             if not self._info:
-                assert ytdl is not None, 'yt_dlp isn\'t installed'
+                assert self.ytdl is not None, 'yt_dlp isn\'t installed'
                 if self._url:
-                    results = ytdl.extract_info(self._url, download=False)
-
+                    try:
+                        results = self.ytdl.extract_info(self._url, download=False)
+                    except self.ytdl.utils.DownloadError:
+                        return  # something
                     if 'entries' not in results:
                         self._ie_info = results
                     else:
@@ -165,7 +166,7 @@ class YoutubeDLInput(FFmpegInput):
     # TODO: :thinking:
     @classmethod
     def many(cls, url, *args, **kwargs):
-        info = ytdl.extract_info(url, download=False)
+        info = cls.ytdl.extract_info(url, download=False)
 
         if 'entries' not in info:
             yield cls(ie_info=info, *args, **kwargs)
@@ -185,8 +186,9 @@ class YoutubeDLInput(FFmpegInput):
 
 class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
     def __init__(self, source, volume=1.0, frame_buffer=100, *args, **kwargs):
+        from gevent.queue import Queue as GeventQueue
         self.source = source
-        self.frames = Queue()
+        self.frames = GeventQueue()
         self.frame_buffer = frame_buffer
         self.volume = volume
 
@@ -198,20 +200,20 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
         OpusEncoder.__init__(self, self.sampling_rate, self.channels)
 
         # Spawn the encoder loop
-        gevent.spawn(self._encoder_loop)
+        gevent_spawn(self._encoder_loop)
 
     def _encoder_loop(self):
         while self.source:
             if len(self.frames.queue) < self.frame_buffer:
                 if self._volume != 1.0:
-                    raw = audioop.mul(self.source.read(self.frame_size), 2, min(self._volume, 2.0))
+                    raw = audioop_mul(self.source.read(self.frame_size), 2, min(self._volume, 2.0))
                 else:
                     raw = self.source.read(self.frame_size)
                 if len(raw) < self.frame_size:
                     break
 
                 self.frames.put(self.encode(raw, self.samples_per_frame))
-            gevent.sleep(0.002)
+            gevent_sleep(0.002)
         self.source = None
         self.frames.put(None)
 
@@ -236,7 +238,7 @@ class PlaylistPlayable(BasePlayable, AbstractOpus):
         self.now_playing = None
 
     def _get_next(self):
-        if isinstance(self.items, types.GeneratorType):
+        if isinstance(self.items, GeneratorType):
             return next(self.items, None)
         return self.items.pop()
 
@@ -258,12 +260,12 @@ class PlaylistPlayable(BasePlayable, AbstractOpus):
 
 class MemoryBufferedPlayable(BasePlayable, AbstractOpus):
     def __init__(self, other, *args, **kwargs):
-        from gevent.queue import Queue
+        from gevent.queue import Queue as GeventQueue
 
         super(MemoryBufferedPlayable, self).__init__(*args, **kwargs)
-        self.frames = Queue()
+        self.frames = GeventQueue()
         self.other = other
-        gevent.spawn(self._buffer)
+        gevent_spawn(self._buffer)
 
     def _buffer(self):
         while True:

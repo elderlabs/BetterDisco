@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 
 from disco.types.base import (
     SlottedModel, Field, snowflake, text, with_equality, with_hash, enum, ListField, cached_property, str_or_int,
@@ -171,11 +171,11 @@ class ActivityTimestamps(SlottedModel):
 
     @cached_property
     def start_time(self):
-        return datetime.utcfromtimestamp(self.start / 1000)
+        return datetime.fromtimestamp(self.start / 1000, UTC)
 
     @cached_property
     def end_time(self):
-        return datetime.utcfromtimestamp(self.end / 1000)
+        return datetime.fromtimestamp(self.end / 1000, UTC)
 
 
 class ActivityFlags(BitsetMap):

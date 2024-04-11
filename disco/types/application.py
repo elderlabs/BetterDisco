@@ -42,7 +42,7 @@ class _ApplicationCommandOption(SlottedModel):
     description_localizations = DictField(str, str)
     required = Field(bool)
     choices = ListField(ApplicationCommandOptionChoice)
-    channel_types = ListField(ChannelType)
+    channel_types = ListField(enum(ChannelType))
     min_value = Field(int)
     max_value = Field(int)
     min_length = Field(int)
@@ -200,7 +200,7 @@ class Interaction(SlottedModel):
         return Paginator(
             self.client.api.channels_messages_reactions_get,
             'after',
-            self.channel_id,
+            self.channel.id,
             self.id,
             emoji,
             *args,

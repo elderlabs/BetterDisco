@@ -1,8 +1,6 @@
 from disco.api.http import APIException
 from disco.types.integration import Integration
 from disco.types.webhook import Webhook
-from disco.util.paginator import Paginator
-from disco.util.snowflake import to_snowflake
 from disco.types.base import (
     SlottedModel, Field, ListField, AutoDictField, snowflake, text, enum, datetime,
     cached_property, BitsetMap, BitsetValue,
@@ -13,6 +11,8 @@ from disco.types.channel import Channel, ChannelType, StageInstance, PermissionO
     Thread
 from disco.types.reactions import Emoji, Sticker, StickerFormatTypes
 from disco.types.permissions import PermissionValue, Permissions, Permissible
+from disco.util.paginator import Paginator
+from disco.util.snowflake import to_snowflake
 
 
 class MFALevel:
@@ -495,6 +495,10 @@ class GuildVoiceState(VoiceState):
     member = Field(GuildMember)
 
 
+class InventorySettings(SlottedModel):
+    is_emoji_pack_collectible = Field(bool)
+
+
 class Guild(SlottedModel, Permissible):
     """
     A guild object.
@@ -624,7 +628,7 @@ class Guild(SlottedModel, Permissible):
     hub_type = Field(text)
     # application_command_counts = Field(None)
     soundboard_sounds = AutoDictField(GuildSoundboardSound, 'sound_id')
-    inventory_settings = Field(text)
+    inventory_settings = Field(InventorySettings)
     incidents_data = Field(text)
     version = Field(int)
 
@@ -733,11 +737,16 @@ class Guild(SlottedModel, Permissible):
 
         if user not in self.members:
             try:
-                self.members[user] = self.client.api.guilds_members_get(self.id, user)
+                member = self.client.api.guilds_members_get(self.id, user)
             except APIException:
                 return
 
-        return self.members.get(user)
+            if self.client.state.config.sync_guild_members:
+                self.members[user] = member
+        else:
+            member = self.members[user]
+
+        return member
 
     def get_prune_count(self, days=None):
         return self.client.api.guilds_prune_count_get(self.id, days=days)

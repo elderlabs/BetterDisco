@@ -1,14 +1,15 @@
-import gevent
-import random
-import string
-import weakref
+from gevent import spawn as gevent_spawn
+from gevent.event import AsyncResult as GeventAsyncResult
+from random import choice as random_choice
+from string import printable as string_printable
+from weakref import WeakValueDictionary
 
 from disco.util.logging import LoggingClass
 from disco.util.serializer import dump_function, load_function
 
 
 def get_random_str(size):
-    return ''.join([random.choice(string.printable) for _ in range(size)])
+    return ''.join([random_choice(string_printable) for _ in range(size)])
 
 
 class IPCMessageType:
@@ -23,8 +24,8 @@ class GIPCProxy(LoggingClass):
         super(GIPCProxy, self).__init__()
         self.obj = obj
         self.pipe = pipe
-        self.results = weakref.WeakValueDictionary()
-        gevent.spawn(self.read_loop)
+        self.results = WeakValueDictionary()
+        gevent_spawn(self.read_loop)
 
     def resolve(self, parts):
         base = self.obj
@@ -61,7 +62,10 @@ class GIPCProxy(LoggingClass):
 
     def read_loop(self):
         while True:
-            mtype, data = self.pipe.get()
+            try:
+                mtype, data = self.pipe.get()
+            except EOFError:
+                return self.log.error('SHARD DOWN. MEDIC!')
 
             try:
                 self.handle(mtype, data)
@@ -71,18 +75,18 @@ class GIPCProxy(LoggingClass):
     def execute(self, func):
         nonce = get_random_str(32)
         raw = dump_function(func)
-        self.results[nonce] = result = gevent.event.AsyncResult()
+        self.results[nonce] = result = GeventAsyncResult()
         self.pipe.put((IPCMessageType.EXECUTE, (nonce, raw)))
         return result
 
     def get(self, path):
         nonce = get_random_str(32)
-        self.results[nonce] = result = gevent.event.AsyncResult()
+        self.results[nonce] = result = GeventAsyncResult()
         self.pipe.put((IPCMessageType.GET_ATTR, (nonce, path)))
         return result
 
     def call(self, path, *args, **kwargs):
         nonce = get_random_str(32)
-        self.results[nonce] = result = gevent.event.AsyncResult()
+        self.results[nonce] = result = GeventAsyncResult()
         self.pipe.put((IPCMessageType.CALL_FUNC, (nonce, path, args, kwargs)))
         return result

@@ -1,8 +1,7 @@
-import gevent
-
 from collections import defaultdict
-from gevent.event import AsyncResult
-from gevent.queue import Queue, Full
+from gevent import spawn as gevent_spawn
+from gevent.event import AsyncResult as GeventAsyncResult
+from gevent.queue import Queue as GeventQueue, Full as GeventFull
 
 from disco.util.logging import LoggingClass
 
@@ -55,7 +54,7 @@ class EmitterSubscription:
         self._queue_greenlet = None
 
         if priority == Priority.SEQUENTIAL:
-            self._queue_greenlet = gevent.spawn(self._queue_handler)
+            self._queue_greenlet = gevent_spawn(self._queue_handler)
 
     def __del__(self):
         if self._emitter:
@@ -68,7 +67,7 @@ class EmitterSubscription:
         if self._queue is not None:
             try:
                 self._queue.put_nowait((args, kwargs))
-            except Full:
+            except GeventFull:
                 # TODO: warning
                 pass
             return
@@ -79,7 +78,7 @@ class EmitterSubscription:
         return self.callback(*args, **kwargs)
 
     def _queue_handler(self):
-        self._queue = Queue(self.max_queue_size)
+        self._queue = GeventQueue(self.max_queue_size)
 
         while True:
             args, kwargs = self._queue.get()
@@ -157,7 +156,7 @@ class Emitter(LoggingClass):
         # Finally just spawn for everything else
         for listener in self.event_handlers[Priority.NONE].get(name, []):
             try:
-                gevent.spawn(listener, *args, **kwargs)
+                gevent_spawn(listener, *args, **kwargs)
             except Exception as e:
                 self.log.warning('{} event handler `{}` raised {}: {}'.format(
                     name,
@@ -170,7 +169,7 @@ class Emitter(LoggingClass):
         return EmitterSubscription(args[:-1], args[-1], **kwargs).attach(self)
 
     def once(self, *args, **kwargs):
-        result = AsyncResult()
+        result = GeventAsyncResult()
         li = None
 
         def _f(e):
@@ -182,7 +181,7 @@ class Emitter(LoggingClass):
         return result.wait(kwargs.pop('timeout', None))
 
     def wait(self, *args, **kwargs):
-        result = AsyncResult()
+        result = GeventAsyncResult()
         match = args[-1]
 
         def _f(e):

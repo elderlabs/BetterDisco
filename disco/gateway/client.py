@@ -1,9 +1,9 @@
-import gevent
-import platform
-import time
-import zlib
-
+from gevent import sleep as gevent_sleep, spawn as gevent_spawn
+from gevent.event import Event as GeventEvent
+from platform import system as platform_system
+from time import perf_counter as time_perf_counter, perf_counter_ns as time_perf_counter_ns
 from websocket import ABNF, WebSocketConnectionClosedException, WebSocketTimeoutException
+from zlib import decompress as zlib_decompress, decompressobj as zlib_decompressobj
 
 from disco.gateway.packets import OPCode, RECV, SEND
 from disco.gateway.events import GatewayEvent
@@ -51,7 +51,7 @@ class GatewayClient(LoggingClass):
 
         # Websocket connection
         self.ws = None
-        self.ws_event = gevent.event.Event()
+        self.ws_event = GeventEvent()
         self._zlib = None
         self._buffer = None
 
@@ -98,14 +98,14 @@ class GatewayClient(LoggingClass):
                 self.ws.close(status=1000)
                 self.client.gw.on_close(0, 'HEARTBEAT failure')
                 return
-            self._last_heartbeat = time.perf_counter()
+            self._last_heartbeat = time_perf_counter()
 
             self._send(OPCode.HEARTBEAT, self.seq)
             self._heartbeat_acknowledged = False
-            gevent.sleep(interval / 1000)
+            gevent_sleep(interval / 1000)
 
     def handle_dispatch(self, packet):
-        timestamp = time.perf_counter_ns()
+        timestamp = time_perf_counter_ns()
         try:
             packet['d']['timestamp_ns'] = timestamp
             obj = GatewayEvent.from_dispatch(self.client, packet)
@@ -125,7 +125,7 @@ class GatewayClient(LoggingClass):
     def handle_heartbeat_acknowledge(self, _):
         self.log.debug('Received HEARTBEAT_ACK')
         self._heartbeat_acknowledged = True
-        self.latency = float('{:.2f}'.format((time.perf_counter() - self._last_heartbeat) * 1000))
+        self.latency = float('{:.2f}'.format((time_perf_counter() - self._last_heartbeat) * 1000))
 
     def handle_reconnect(self, _):
         self.log.warning('Received RECONNECT request; resuming')
@@ -142,7 +142,7 @@ class GatewayClient(LoggingClass):
     def handle_hello(self, packet):
         self.replayed_events = 0
         self.log.info('Received HELLO, starting heartbeater...')
-        self._heartbeat_task = gevent.spawn(self.heartbeat_task, packet['d']['heartbeat_interval'])
+        self._heartbeat_task = gevent_spawn(self.heartbeat_task, packet['d']['heartbeat_interval'])
 
     def on_ready(self, ready):
         self.log.info('Received READY')
@@ -163,7 +163,7 @@ class GatewayClient(LoggingClass):
 
             gateway_url = self._cached_gateway_url
 
-        gateway_url += f'?v={self.GATEWAY_VERSION}&encoding={self.encoder.TYPE}'
+        gateway_url += f'/?v={self.GATEWAY_VERSION}&encoding={self.encoder.TYPE}'
 
         if self.zlib_stream_enabled:  # transport compression may not benefit ETF?
             gateway_url += '&compress=zlib-stream'
@@ -199,7 +199,7 @@ class GatewayClient(LoggingClass):
             # Detect zlib, decompress
             is_erlpack = (msg[0] == 131)
             if msg[0] != '{' and not is_erlpack:
-                msg = str(zlib.decompress(msg, 15, TEN_MEGABYTES), 'utf=8')
+                msg = str(zlib_decompress(msg, 15, TEN_MEGABYTES), 'utf=8')
 
         try:
             data = self.encoder.decode(msg)
@@ -229,7 +229,7 @@ class GatewayClient(LoggingClass):
     def on_open(self):
         self.ws.is_closed = False
         if self.zlib_stream_enabled:
-            self._zlib = zlib.decompressobj()
+            self._zlib = zlib_decompressobj()
 
         if self.seq and self.session_id:
             self.log.info(f'WS Opened: attempting resume with SID: {self.session_id} SEQ: {self.seq}')
@@ -240,6 +240,7 @@ class GatewayClient(LoggingClass):
                 'seq': self.seq,
             })
         else:
+            self.seq = 0
             self.log.info('WS Opened: sending identify payload')
             self.send(OPCode.IDENTIFY, {
                 'token': self.client.config.token,
@@ -251,7 +252,7 @@ class GatewayClient(LoggingClass):
                     int(self.client.config.shard_count),
                 ],
                 'properties': {
-                    'os': platform.system(),
+                    'os': platform_system(),
                     'browser': 'disco',
                     'device': 'disco',
                 },
@@ -308,18 +309,18 @@ class GatewayClient(LoggingClass):
             if code == 4014:
                 reason = 'Unauthorized intents. (check the Discord Developer dashboard settings)'
             self.log.error(f'Unable to continue, shutting down. Reason: {reason}')
-            import sys
-            return sys.exit(1)
+            from sys import exit as sys_exit
+            return sys_exit(1)
 
         wait_time = (self.reconnects - 1) * 5 if self.reconnects < 6 else 30
         self.log.info(f'Will attempt to {"resume" if self.session_id else "reconnect"} after {wait_time} seconds')
-        gevent.sleep(wait_time)
+        gevent_sleep(wait_time)
 
         # Reconnect
         self.connect_and_run(self._cached_gateway_url)
 
     def run(self):
-        gevent.spawn(self.connect_and_run)
+        gevent_spawn(self.connect_and_run)
         self.ws_event.wait()
 
     def request_guild_members(self, guild_id, query=None, limit=0, presences=False):

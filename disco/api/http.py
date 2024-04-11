@@ -1,10 +1,7 @@
-import gevent
-import random
-import requests
-import platform
-
-from requests import __version__ as requests_version
-from requests.exceptions import ConnectionError
+from gevent import sleep as gevent_sleep
+from random import randint as random_randint
+from requests import Session as RequestsSession, __version__ as requests_version, ConnectionError, Timeout
+from platform import python_version
 
 from disco import VERSION as disco_version
 from disco.util.logging import LoggingClass
@@ -28,7 +25,7 @@ def random_backoff():
     :returns: a random backoff in milliseconds.
     :rtype: float
     """
-    return random.randint(500, 5000) / 1000.0
+    return random_randint(500, 5000) / 1000.0
 
 
 class Routes:
@@ -146,6 +143,7 @@ class Routes:
     GUILDS_MEMBERS_ROLES_ADD = (HTTPMethod.PUT, GUILDS + '/members/{member}/roles/{role}')
     GUILDS_MEMBERS_ROLES_REMOVE = (HTTPMethod.DELETE, GUILDS + '/members/{member}/roles/{role}')
     GUILDS_MEMBERS_SEARCH = (HTTPMethod.GET, GUILDS + '/members/search')
+    GUILDS_MEMBERS_SEARCH_NEW = (HTTPMethod.GET, GUILDS + '/members-search')
     GUILDS_MESSAGES_SEARCH = (HTTPMethod.GET, GUILDS + '/messages/search')
     GUILDS_MFA_LEVEL_MODIFY = (HTTPMethod.POST, GUILDS + '/mfa')
     GUILDS_MODIFY = (HTTPMethod.PATCH, GUILDS)
@@ -313,12 +311,12 @@ class HTTPClient(LoggingClass):
     def __init__(self, token, after_request=None):
         super(HTTPClient, self).__init__()
 
-        py_version = platform.python_version()
+        py_version = python_version()
 
         self.limiter = RateLimiter()
         self.after_request = after_request
 
-        self.session = requests.Session()
+        self.session = RequestsSession()
         self.session.headers.update({
             'User-Agent': 'DiscordBot (https://github.com/elderlabs/betterdisco {}) Python/{} requests/{}'.format(
                 disco_version,
@@ -394,7 +392,11 @@ class HTTPClient(LoggingClass):
             if r.status_code < 400:
                 return r
             elif r.status_code != 429 and 400 <= r.status_code < 500:
-                self.log.warning('Request failed with code %s: %s', r.status_code, r.content)
+                err = r.json()
+                if err and 'code' in err and 'message' in err:
+                    self.log.warning(f'Request failed with status code {r.status_code}: {err["code"]} - {err["message"]}')
+                else:
+                    self.log.warning(f'Request failed with status code {r.status_code}: {str(r.content, "utf=8")}')
                 response.exception = APIException(r)
                 raise response.exception
             elif r.status_code in [429, 500, 502, 503]:
@@ -414,9 +416,9 @@ class HTTPClient(LoggingClass):
                     ))
                 else:
                     self.log.warning('Request to `{}` failed with code {}, retrying after {}s ({})'.format(
-                        url, r.status_code, backoff, r.content,
+                        url, r.status_code, backoff, str(r.content, "utf=8"),
                     ))
-                gevent.sleep(backoff)
+                gevent_sleep(backoff)
 
                 # Otherwise just recurse and try again
                 return self(route, args, retry_number=retry, **kwargs)
@@ -424,10 +426,10 @@ class HTTPClient(LoggingClass):
             # Catch ConnectionResetError
             backoff = random_backoff()
             self.log.warning('Request to `{}` failed with ConnectionError, retrying after {}s'.format(url, backoff))
-            gevent.sleep(backoff)
+            gevent_sleep(backoff)
             return self(route, args, retry_number=retry, **kwargs)
-        except requests.exceptions.Timeout:
+        except Timeout:
             backoff = random_backoff()
             self.log.warning('Request to `{}` failed with ConnectionTimeout, retrying after {}s')
-            gevent.sleep(backoff)
+            gevent_sleep(backoff)
             return self(route, args, retry_number=retry, **kwargs)

@@ -1,7 +1,9 @@
-import dill
-import gipc
-import gevent
-import logging
+from dill import dumps as dill_dumps, loads as dill_loads
+from gipc import pipe as gipc_pipe, start_process as gipc_start_process
+from gevent import sleep as gevent_sleep
+from gevent.event import AsyncResult as GeventAsyncResult
+from gevent.pool import Pool as GeventPool
+from logging import INFO as LOGGING_INFO
 
 from disco.client import Client
 from disco.bot import Bot, BotConfig
@@ -14,7 +16,7 @@ from disco.util.serializer import dump_function, load_function
 
 def run_shard(config, shard_id, pipe):
     setup_logging(
-        level=logging.INFO,
+        level=LOGGING_INFO,
         format=f'{shard_id} ' + LOG_FORMAT,
     )
 
@@ -35,27 +37,27 @@ class ShardHelper:
         for sid in range(self.count):
             yield sid
 
-    def on(self, sid, func):
+    def on(self, sid, func, timeout=None):
         if sid == self.bot.client.config.shard_id:
-            result = gevent.event.AsyncResult()
+            result = GeventAsyncResult()
             result.set(func(self.bot))
             return result
 
-        return self.bot.sharder.call(('run_on', ), sid, dump_function(func))
+        return self.bot.sharder.call(('run_on', ), sid, dump_function(func)).wait(timeout=timeout)
 
     def all(self, func, timeout=None):
-        pool = gevent.pool.Pool(self.count)
+        pool = GeventPool(self.count)
         return dict(zip(
             range(self.count),
             pool.imap(
-                lambda i: self.on(i, func).wait(timeout=timeout),
+                lambda i: self.on(i, func, timeout),
                 range(self.count),
             ),
         ))
 
-    def for_id(self, sid, func):
+    def for_id(self, sid, func, timeout=None):
         shard = calculate_shard(self.count, sid)
-        return self.on(shard, func)
+        return self.on(shard, func, timeout)
 
 
 class AutoSharder:
@@ -75,14 +77,14 @@ class AutoSharder:
                 self.config.manhole_enable = False
 
             self.start_shard(shard_id)
-            gevent.sleep(6)
+            gevent_sleep(6)
 
         setup_logging(
-            level=logging.INFO,
+            level=LOGGING_INFO,
             format=f'{id} ' + LOG_FORMAT,
         )
 
     def start_shard(self, sid):
-        cpipe, ppipe = gipc.pipe(duplex=True, encoder=dill.dumps, decoder=dill.loads)
-        gipc.start_process(run_shard, (self.config, sid, cpipe), name=f'shard{sid}')
+        cpipe, ppipe = gipc_pipe(duplex=True, encoder=dill_dumps, decoder=dill_loads)
+        gipc_start_process(run_shard, (self.config, sid, cpipe), name=f'shard{sid}')
         self.shards[sid] = GIPCProxy(self, ppipe)

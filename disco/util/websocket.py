@@ -1,10 +1,10 @@
-import websocket
+from websocket import WebSocketApp, setdefaulttimeout
 
 from disco.util.emitter import Emitter
 from disco.util.logging import LoggingClass
 
 
-class Websocket(LoggingClass, websocket.WebSocketApp):
+class Websocket(LoggingClass, WebSocketApp):
     """
     A utility class which wraps the functionality of :class:`websocket.WebSocketApp`
     changing its behavior to better conform with standard style across disco.
@@ -14,8 +14,8 @@ class Websocket(LoggingClass, websocket.WebSocketApp):
     """
     def __init__(self, *args, **kwargs):
         LoggingClass.__init__(self)
-        websocket.setdefaulttimeout(5)
-        websocket.WebSocketApp.__init__(self, *args, **kwargs)
+        setdefaulttimeout(5)
+        WebSocketApp.__init__(self, *args, **kwargs)
 
         self.is_closed = False
         self.emitter = Emitter()

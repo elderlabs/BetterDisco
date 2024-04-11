@@ -1,4 +1,4 @@
-import gevent
+from gevent import joinall as gevent_joinall, spawn as gevent_spawn, wait as gevent_wait
 
 """
 Object.chain -> creates a chain where each action happens after the last
@@ -37,7 +37,7 @@ class Chain:
             return func
 
         def _wrapped(*args, **kwargs):
-            inst = gevent.spawn(func, *args, **kwargs)
+            inst = gevent_spawn(func, *args, **kwargs)
             self._parts.append(inst)
 
             # If async, just return instantly
@@ -55,7 +55,7 @@ class Chain:
         return self
 
     def then(self, func, *args, **kwargs):
-        inst = gevent.spawn(func, *args, **kwargs)
+        inst = gevent_spawn(func, *args, **kwargs)
         self._parts.append(inst)
         if self._async:
             return self
@@ -65,7 +65,7 @@ class Chain:
         return self._obj
 
     def get(self, timeout=None):
-        return gevent.wait(self._parts, timeout=timeout)
+        return gevent_wait(self._parts, timeout=timeout)
 
     def wait(self, timeout=None):
-        gevent.joinall(self._parts, timeout=None)
+        gevent_joinall(self._parts, timeout=timeout)

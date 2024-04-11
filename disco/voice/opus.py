@@ -1,38 +1,38 @@
-import array
-import ctypes
-import ctypes.util
-import sys
+from array import array
+from ctypes import POINTER, Structure as ctypes_Structure, c_int, c_int16, c_int32, c_float, c_char_p, cdll, \
+    util as c_util, byref as c_byref, c_char, cast as c_cast
+from sys import platform as sys_platform
 
 from disco.util.logging import LoggingClass
 
 
-c_int_ptr = ctypes.POINTER(ctypes.c_int)
-c_int16_ptr = ctypes.POINTER(ctypes.c_int16)
-c_float_ptr = ctypes.POINTER(ctypes.c_float)
+c_int_ptr = POINTER(c_int)
+c_int16_ptr = POINTER(c_int16)
+c_float_ptr = POINTER(c_float)
 
 
-class EncoderStruct(ctypes.Structure):
+class EncoderStruct(ctypes_Structure):
     pass
 
 
-class DecoderStruct(ctypes.Structure):
+class DecoderStruct(ctypes_Structure):
     pass
 
 
-EncoderStructPtr = ctypes.POINTER(EncoderStruct)
-DecoderStructPtr = ctypes.POINTER(DecoderStruct)
+EncoderStructPtr = POINTER(EncoderStruct)
+DecoderStructPtr = POINTER(DecoderStruct)
 
 
 class BaseOpus(LoggingClass):
     BASE_EXPORTED = {
-        'opus_strerror': ([ctypes.c_int], ctypes.c_char_p),
+        'opus_strerror': ([c_int], c_char_p),
     }
 
     EXPORTED = {}
 
     def __init__(self, library_path=None):
         self.path = library_path or self.find_library()
-        self.lib = ctypes.cdll.LoadLibrary(self.path)
+        self.lib = cdll.LoadLibrary(self.path)
 
         methods = {}
         methods.update(self.BASE_EXPORTED)
@@ -50,10 +50,10 @@ class BaseOpus(LoggingClass):
 
     @staticmethod
     def find_library():
-        if sys.platform == 'win32':
+        if sys_platform == 'win32':
             raise Exception('Cannot auto-load opus on Windows, please specify full library path')
 
-        return ctypes.util.find_library('opus')
+        return c_util.find_library('opus')
 
 
 class Application:
@@ -71,10 +71,10 @@ class Control:
 
 class OpusEncoder(BaseOpus):
     EXPORTED = {
-        'opus_encoder_get_size': ([ctypes.c_int], ctypes.c_int),
-        'opus_encoder_create': ([ctypes.c_int, ctypes.c_int, ctypes.c_int, c_int_ptr], EncoderStructPtr),
-        'opus_encode': ([EncoderStructPtr, c_int16_ptr, ctypes.c_int, ctypes.c_char_p, ctypes.c_int32], ctypes.c_int32),
-        'opus_encoder_ctl': (None, ctypes.c_int32),
+        'opus_encoder_get_size': ([c_int], c_int),
+        'opus_encoder_create': ([c_int, c_int, c_int, c_int_ptr], EncoderStructPtr),
+        'opus_encode': ([EncoderStructPtr, c_int16_ptr, c_int, c_char_p, c_int32], c_int32),
+        'opus_encoder_ctl': (None, c_int32),
         'opus_encoder_destroy': ([EncoderStructPtr], None),
     }
 
@@ -115,8 +115,8 @@ class OpusEncoder(BaseOpus):
             raise Exception('Failed to set PLP to {}: {}'.format(perc, ret))
 
     def create(self):
-        ret = ctypes.c_int()
-        result = self.opus_encoder_create(self.sampling_rate, self.channels, self.application, ctypes.byref(ret))
+        ret = c_int()
+        result = self.opus_encoder_create(self.sampling_rate, self.channels, self.application, c_byref(ret))
 
         if ret.value != 0:
             raise Exception('Failed to create opus encoder: {}'.format(ret.value))
@@ -130,14 +130,14 @@ class OpusEncoder(BaseOpus):
 
     def encode(self, pcm, frame_size):
         max_data_bytes = len(pcm)
-        pcm = ctypes.cast(pcm, c_int16_ptr)
-        data = (ctypes.c_char * max_data_bytes)()
+        pcm = c_cast(pcm, c_int16_ptr)
+        data = (c_char * max_data_bytes)()
 
         ret = self.opus_encode(self.inst, pcm, frame_size, data, max_data_bytes)
         if ret < 0:
             raise Exception('Failed to encode: {}'.format(ret))
 
-        return array.array('b', data[:ret]).tobytes()
+        return array('b', data[:ret]).tobytes()
 
 
 class OpusDecoder(BaseOpus):

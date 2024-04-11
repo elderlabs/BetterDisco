@@ -1,7 +1,7 @@
 from disco.types.base import SlottedModel, Field, ListField, snowflake, text, enum, DictField, BitsetMap, BitsetValue
 from disco.types.permissions import PermissionValue
-from disco.types.user import User
 from disco.util.snowflake import to_snowflake
+from disco.types.user import User
 
 
 class TeamMembershipState:

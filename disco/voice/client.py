@@ -1,7 +1,7 @@
-import gevent
-import time
+from gevent import sleep as gevent_sleep, spawn as gevent_spawn
+from time import perf_counter as time_perf_counter, time
 
-from collections import namedtuple
+from collections import namedtuple as collections_namedtuple
 from websocket import WebSocketConnectionClosedException, WebSocketTimeoutException
 
 from disco.gateway.encoding import ENCODERS
@@ -36,7 +36,7 @@ class VoiceState:
     AUTHENTICATED = 'AUTHENTICATED'
 
 
-VoiceSpeaking = namedtuple('VoiceSpeaking', [
+VoiceSpeaking = collections_namedtuple('VoiceSpeaking', [
     'client',
     'user_id',
     'speaking',
@@ -55,11 +55,11 @@ class VoiceClient(LoggingClass):
     VOICE_GATEWAY_VERSION = 7
 
     SUPPORTED_MODES = {
-         # 'aead_xchacha20_poly1305_rtpsize',
-         'xsalsa20_poly1305',
-         'xsalsa20_poly1305_lite',
-         'xsalsa20_poly1305_lite_rtpsize',
-         'xsalsa20_poly1305_suffix',
+        # 'aead_aes256_gcm_rtpsize',
+        'xsalsa20_poly1305_lite_rtpsize',
+        'xsalsa20_poly1305_lite',
+        'xsalsa20_poly1305_suffix',
+        'xsalsa20_poly1305',
     }
 
     def __init__(self, client, server_id, is_dm=False, max_reconnects=5, encoder='json'):
@@ -73,6 +73,8 @@ class VoiceClient(LoggingClass):
         self.max_reconnects = max_reconnects
         self.video_enabled = False
         self.media = None
+
+        self.proxy = None
 
         # Set the VoiceClient in the state's voice clients
         self.client.state.voice_clients[self.server_id] = self
@@ -125,6 +127,9 @@ class VoiceClient(LoggingClass):
 
         # SSRCs
         self.audio_ssrcs = {}
+
+        self.deaf = False
+        self.mute = False
 
     def __repr__(self):
         return '<VoiceClient guild_id={} channel_id={}>'.format(self.server_id, self.channel_id)
@@ -205,19 +210,19 @@ class VoiceClient(LoggingClass):
                 self.ws.close(status=4000)
                 self.on_close(0, 'HEARTBEAT failure')
                 return
-            self._last_heartbeat = time.perf_counter()
+            self._last_heartbeat = time_perf_counter()
 
-            self.send(VoiceOPCode.HEARTBEAT, time.time())
+            self.send(VoiceOPCode.HEARTBEAT, time())
             self._heartbeat_acknowledged = False
-            gevent.sleep(interval / 1000)
+            gevent_sleep(interval / 1000)
 
     def handle_heartbeat(self, _):
-        self.send(VoiceOPCode.HEARTBEAT, time.time())
+        self.send(VoiceOPCode.HEARTBEAT, time())
 
     def handle_heartbeat_acknowledge(self, _):
         self.log.debug('[{}] Received WS HEARTBEAT_ACK'.format(self.channel_id))
         self._heartbeat_acknowledged = True
-        self.latency = float('{:.2f}'.format((time.perf_counter() - self._last_heartbeat) * 1000))
+        self.latency = float('{:.2f}'.format((time_perf_counter() - self._last_heartbeat) * 1000))
 
     def set_speaking(self, voice=False, soundshare=False, priority=False, delay=0):
         value = SpeakingFlags.NONE
@@ -275,7 +280,7 @@ class VoiceClient(LoggingClass):
 
     def on_voice_hello(self, packet):
         self.log.info('[{}] Received Voice HELLO payload, starting heartbeater'.format(self.channel_id))
-        self._heartbeat_task = gevent.spawn(self.heartbeat_task, packet['heartbeat_interval'])
+        self._heartbeat_task = gevent_spawn(self.heartbeat_task, packet['heartbeat_interval'])
         self.set_state(VoiceState.AUTHENTICATED)
 
     def on_voice_ready(self, data):
@@ -417,7 +422,7 @@ class VoiceClient(LoggingClass):
             })
 
     def on_close(self, code=None, reason=None):
-        gevent.sleep(0.001)
+        gevent_sleep(0.001)
         if self.media:
             self.media.pause()
         self.log.info('[{}] WS Closed: {}{}({})'.format(self.channel_id, f'[{code}] ' if code else '', f'{reason} ' if reason else '', self._reconnects))
@@ -455,14 +460,18 @@ class VoiceClient(LoggingClass):
                 self.udp.disconnect()
 
             # every other code is a failure, except these
-            if code not in (1001, 4009, 4015) and not self._safe_reconnect_state:
+            if code not in (1001, 4006, 4009, 4015) and not self._safe_reconnect_state:
                 self.log.warning('[{}] Session unexpectedly terminated. Not reconnecting.'.format(self.channel_id))
                 return self.disconnect()
+
+            if code == 4006 or (code == 0 and 'HEARTBEAT' in reason):
+                self.log.warning(f'[{self.channel_id}] Session invalidated. Spawning fresh connection to channel.')
+                return self.connect(self.channel_id, mute=self.mute, deaf=self.deaf, video=self.video_enabled)
 
         wait_time = 0
 
         self.log.info('[{}] {} in {} second{}'.format(self.channel_id, 'Resuming' if self._identified else 'Reconnecting', wait_time, 's' if wait_time != 1 else ''))
-        gevent.sleep(wait_time)
+        gevent_sleep(wait_time)
         self.connect_and_run()
 
     def connect(self, channel_id, timeout=10, **kwargs):
@@ -500,6 +509,7 @@ class VoiceClient(LoggingClass):
 
         try:
             self.media.now_playing.source.proc.kill()
+            self.media.now_playing.source = None
         except:
             pass
 

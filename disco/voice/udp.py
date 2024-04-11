@@ -1,15 +1,14 @@
-import struct
-import socket
-import gevent
-import warnings
-
 from collections import namedtuple
+from struct import pack_into as struct_pack_into, unpack_from as struct_unpack_from, unpack as struct_unpack
+from socket import socket, gethostbyname as socket_gethostbyname, AF_INET as SOCKET_AF_INET, SOCK_DGRAM as SOCKET_SOCK_DGRAM
+from gevent import spawn as gevent_spawn, Timeout as GeventTimeout
+from warnings import warn as warnings_warn
 
 try:
-    import nacl.secret
-    import nacl.utils
+    from nacl.secret import SecretBox, Aead
+    from nacl.utils import random as nacl_random
 except ImportError:
-    warnings.warn('nacl is not installed, voice support is disabled')
+    warnings_warn('nacl is not installed, voice support is disabled')
 
 from disco.util.enum import Enum
 from disco.util.logging import LoggingClass
@@ -113,15 +112,15 @@ class UDPVoiceClient(LoggingClass):
 
     def setup_encryption(self, encryption_key):
         if 'xsalsa20' in self.vc.mode:
-            self._secret_box = nacl.secret.SecretBox(encryption_key)
+            self._secret_box = SecretBox(encryption_key)
         elif self.vc.mode == 'aead_xchacha20_poly1305_rtpsize':
-            self._secret_box = nacl.secret.Aead(encryption_key)
+            self._secret_box = Aead(encryption_key)
 
     def send_frame(self, frame, sequence=None, timestamp=None, incr_timestamp=None):
         # Pack the RTC header into our buffer (a list of numbers)
-        struct.pack_into('>H', self._rtp_audio_header, 2, sequence or self.sequence)
-        struct.pack_into('>I', self._rtp_audio_header, 4, timestamp or self.timestamp)
-        struct.pack_into('>i', self._rtp_audio_header, 8, self.vc.ssrc_audio)
+        struct_pack_into('>H', self._rtp_audio_header, 2, sequence or self.sequence)
+        struct_pack_into('>I', self._rtp_audio_header, 4, timestamp or self.timestamp)
+        struct_pack_into('>i', self._rtp_audio_header, 8, self.vc.ssrc_audio)
 
         nonce = bytearray(24)  # for reference, 192-bits is 24 bytes
 
@@ -130,11 +129,11 @@ class UDPVoiceClient(LoggingClass):
             self._nonce += 1
             if self._nonce > MAX_UINT32:
                 self._nonce = 0
-            struct.pack_into('>I', nonce, 0, self._nonce)
+            struct_pack_into('>I', nonce, 0, self._nonce)
             nonce_padding = nonce[:4]
         elif self.vc.mode == 'xsalsa20_poly1305_suffix':
             # Generate a nonce
-            nonce = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE)
+            nonce = nacl_random(SecretBox.NONCE_SIZE)
             nonce_padding = nonce
         elif self.vc.mode == 'xsalsa20_poly1305':
             # Nonce is the header
@@ -176,11 +175,11 @@ class UDPVoiceClient(LoggingClass):
                 self.log.debug('[{}] [VoiceData] Received voice data under 13 bytes'.format(self.vc.channel_id))
                 continue
 
-            first, second = struct.unpack_from('>BB', data)
+            first, second = struct_unpack_from('>BB', data)  # big-endian, 2x unsigned chars
 
             payload_type = RTCPPayloadTypes.get(second)
             if payload_type:
-                length, ssrc = struct.unpack_from('>HI', data, 2)
+                length, ssrc = struct_unpack_from('>HI', data, 2)  # BE, unsigned short, unsigned int
 
                 rtcp = RTCPHeader(
                     version=first >> 6,
@@ -209,7 +208,7 @@ class UDPVoiceClient(LoggingClass):
 
                 self.vc.client.gw.events.emit('RTCPData', payload)
             else:
-                sequence, timestamp, ssrc = struct.unpack_from('>HII', data, 2)
+                sequence, timestamp, ssrc = struct_unpack_from('>HII', data, 2)  # BE, unsigned short, 2x unsigned int
 
                 rtp = RTPHeader(
                     version=first >> 6,
@@ -256,21 +255,21 @@ class UDPVoiceClient(LoggingClass):
 
                 # RFC3550 Section 5.1 (Padding)
                 if rtp.padding:
-                    padding_amount, = struct.unpack_from('>B', data[:-1])
+                    padding_amount, = struct_unpack_from('>B', data[:-1])  # BE, unsigned char
                     data = data[-padding_amount:]
 
                 if rtp.extension:
                     # RFC5285 Section 4.2: One-Byte Header
-                    rtp_extension_header = struct.unpack_from('>BB', data)
+                    rtp_extension_header = struct_unpack_from('>BB', data)  # BE, 2x unsigned char
                     if rtp_extension_header == RTP_EXTENSION_ONE_BYTE:
                         data = data[2:]
 
-                        fields_amount, = struct.unpack_from('>H', data)
+                        fields_amount, = struct_unpack_from('>H', data)  # BE, unsigned short
                         fields = []
 
                         offset = 4
                         for i in range(fields_amount):
-                            first_byte, = struct.unpack_from('>B', data[:offset])
+                            first_byte, = struct_unpack_from('>B', data[:offset])  # BE, unsigned char
                             offset += 1
 
                             rtp_extension_identifier = first_byte & 0xF
@@ -318,33 +317,33 @@ class UDPVoiceClient(LoggingClass):
         return
 
     def connect(self, host, port, timeout=10, addrinfo=None):
-        self.ip = socket.gethostbyname(host)
+        self.ip = socket_gethostbyname(host)
         self.port = port
 
-        self.conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.conn = socket(SOCKET_AF_INET, SOCKET_SOCK_DGRAM)
 
         if addrinfo:
             ip, port = addrinfo
         else:
             # Send discovery packet
             packet = bytearray(74)
-            struct.pack_into('>H', packet, 0, 1)
-            struct.pack_into('>H', packet, 2, 70)
-            struct.pack_into('>I', packet, 4, self.vc.ssrc)
+            struct_pack_into('>H', packet, 0, 1)  # BE, unsigned short
+            struct_pack_into('>H', packet, 2, 70)  # BE, unsigned short
+            struct_pack_into('>I', packet, 4, self.vc.ssrc)  # BE, unsigned int
             self.send(packet)
 
             # Wait for a response
             try:
-                data, addr = gevent.spawn(lambda: self.conn.recvfrom(74)).get(timeout=timeout)
-            except gevent.Timeout:
+                data, addr = gevent_spawn(lambda: self.conn.recvfrom(74)).get(timeout=timeout)
+            except GeventTimeout:
                 return None, None
 
             # Read IP and port
             ip = str(data[8:]).split('\x00', 1)[0]
-            port = struct.unpack('<H', data[-2:])[0]
+            port = struct_unpack('<H', data[-2:])[0]  # little endian, unsigned short
 
         # Spawn read thread so we don't max buffers
         self.connected = True
-        self._run_task = gevent.spawn(self.run)
+        self._run_task = gevent_spawn(self.run)
 
         return ip, port

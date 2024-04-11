@@ -1,13 +1,12 @@
-import functools
-import gevent
-import inspect
-
 from datetime import datetime as real_datetime, UTC
-from disco.util.metaclass import with_metaclass
+from functools import partial as functools_partial
+from gevent import sleep as gevent_sleep
+from inspect import isclass as inspect_isclass
 
 from disco.util.chains import Chainable
 from disco.util.enum import BaseEnumMeta, EnumAttr, get_enum_members
 from disco.util.hashmap import HashMap
+from disco.util.metaclass import with_metaclass
 
 DATETIME_FORMATS = [
     '%Y-%m-%dT%H:%M:%S.%f',
@@ -76,7 +75,7 @@ class Field:
 
             if isinstance(self.deserializer, Field) and self.default is None:
                 self.default = self.deserializer.default
-            elif (inspect.isclass(self.deserializer) and
+            elif (inspect_isclass(self.deserializer) and
                     issubclass(self.deserializer, Model) and
                     self.default is None and
                     create):
@@ -105,7 +104,7 @@ class Field:
 
     @staticmethod
     def type_to_deserializer(typ):
-        if isinstance(typ, Field) or inspect.isclass(typ) and issubclass(typ, Model):
+        if isinstance(typ, Field) or inspect_isclass(typ) and issubclass(typ, Model):
             return typ
         elif isinstance(typ, BaseEnumMeta):
             def _f(raw, client, **kwargs):
@@ -185,7 +184,7 @@ class AutoDictField(Field):
 
 
 def _make(typ, data, client):
-    if inspect.isclass(typ) and issubclass(typ, Model):
+    if inspect_isclass(typ) and issubclass(typ, Model):
         return typ(data, client)
     return typ(data)
 
@@ -338,7 +337,7 @@ class Model(with_metaclass(ModelMeta, Chainable)):
         self.validate()
 
     def after(self, delay):
-        gevent.sleep(delay)
+        gevent_sleep(delay)
         return self
 
     def validate(self):
@@ -414,7 +413,7 @@ class Model(with_metaclass(ModelMeta, Chainable)):
 
     @classmethod
     def create_map(cls, client, data, *args, **kwargs):
-        return list(map(functools.partial(cls.create, client, *args, **kwargs), data))
+        return list(map(functools_partial(cls.create, client, *args, **kwargs), data))
 
     @classmethod
     def create_hash(cls, client, key, data, **kwargs):

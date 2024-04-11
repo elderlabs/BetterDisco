@@ -1,4 +1,4 @@
-import types
+from types import FunctionType as types_FunctionType
 
 
 class Serializer:
@@ -66,4 +66,4 @@ def dump_function(func):
 def load_function(args):
     code, name, defaults, closure = args
     closure = tuple(map(load_cell, closure))
-    return types.FunctionType(code, globals(), name, defaults, closure)
+    return types_FunctionType(code, globals(), name, defaults, closure)

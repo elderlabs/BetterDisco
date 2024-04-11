@@ -1,6 +1,6 @@
-import os
+from os import path as os_path
 
-from .serializer import Serializer
+from disco.util.serializer import Serializer
 
 
 class Config:
@@ -33,7 +33,7 @@ class Config:
             data = f.read()
             f.close()
 
-        _, ext = os.path.splitext(path)
+        _, ext = os_path.splitext(path)
         Serializer.check_format(ext[1:])
         inst.__dict__.update(Serializer.loads(ext[1:], data))
         return inst

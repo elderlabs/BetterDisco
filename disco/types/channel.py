@@ -1,7 +1,7 @@
 try:
-    import regex as re
+    from regex import compile as re_compile
 except ImportError:
-    import re
+    from re import compile as re_compile
 
 from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, datetime, cached_property, text, \
     BitsetMap, BitsetValue, ListField
@@ -11,7 +11,7 @@ from disco.types.user import User
 from disco.util.functional import one_or_many, chunks
 from disco.util.snowflake import to_snowflake
 
-NSFW_RE = re.compile('^nsfw(-|$)')
+NSFW_RE = re_compile('^nsfw(-|$)')
 
 
 class ChannelType:

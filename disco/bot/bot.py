@@ -1,13 +1,12 @@
 try:
-    import regex as re
+    from regex import compile as re_compile, IGNORECASE
 except ImportError:
-    import re
-import os
-import gevent
-import inspect
-import importlib
-
+    from re import compile as re_compile, IGNORECASE
+from os import path as os_path
+from gevent import spawn as gevent_spawn
 from gevent.pywsgi import WSGIServer
+from inspect import isclass as inspect_isclass, getmodule as inspect_getmodule
+from importlib import import_module as importlib_import_module, reload as importlib_reload
 
 from disco.bot.plugin import find_loadable_plugins
 from disco.bot.command import CommandEvent, CommandLevels
@@ -172,7 +171,7 @@ class Bot(LoggingClass):
             self.log.info(f'Starting HTTP server bound to {self.config.http_host}:{self.config.http_port}')
             self.http = Flask('disco')
             self.http_server = WSGIServer((self.config.http_host, self.config.http_port), self.http, log=self.log if self.config.http_logging else None)
-            self.http_server_greenlet = gevent.spawn(self.http_server.serve_forever)
+            self.http_server_greenlet = gevent_spawn(self.http_server.serve_forever)
 
         self.plugins = {}
         self.group_abbrev = {}
@@ -187,7 +186,7 @@ class Bot(LoggingClass):
         # If we have a level getter, and it is a string, try to load it
         if isinstance(self.config.commands_level_getter, str):
             mod, func = self.config.commands_level_getter.rsplit('.', 1)
-            mod = importlib.import_module(mod)
+            mod = importlib_import_module(mod)
             self.config.commands_level_getter = getattr(mod, func)
 
         # Stores the last message for every single channel
@@ -285,7 +284,7 @@ class Bot(LoggingClass):
         commands = tuple(self.commands)
         re_str = '|'.join(command.regex(grouped=False) for command in commands)
         if re_str:
-            self.command_matches_re = re.compile(re_str, re.I)
+            self.command_matches_re = re_compile(re_str, IGNORECASE)
         else:
             self.command_matches_re = None
 
@@ -501,7 +500,7 @@ class Bot(LoggingClass):
             Context (previous state) to pass the plugin. Usually used along w/
             unload.
         """
-        if inspect.isclass(inst):
+        if inspect_isclass(inst):
             if not config:
                 if callable(self.config.plugin_config_provider):
                     config = self.config.plugin_config_provider(inst)
@@ -555,7 +554,7 @@ class Bot(LoggingClass):
         config = self.plugins[cls.__name__].config
 
         ctx = self.rmv_plugin(cls)
-        module = importlib.reload(inspect.getmodule(cls))
+        module = importlib_reload(inspect_getmodule(cls))
         self.add_plugin(getattr(module, cls.__name__), config, ctx)
 
     def run_forever(self):
@@ -569,7 +568,7 @@ class Bot(LoggingClass):
         Adds and loads a plugin, based on its module path.
         """
         self.log.info(f'Adding plugin module at path "{path}"')
-        mod = importlib.import_module(path)
+        mod = importlib_import_module(path)
         loaded = False
 
         plugins = find_loadable_plugins(mod)
@@ -585,7 +584,7 @@ class Bot(LoggingClass):
         if name.endswith('plugin'):
             name = name[:-6]
 
-        path = os.path.join(
+        path = os_path.join(
             self.config.plugin_config_dir, name) + '.' + self.config.plugin_config_format
 
         data = {}
@@ -595,7 +594,7 @@ class Bot(LoggingClass):
         if name in self.config.plugin_config:
             data.update(self.config.plugin_config[name])
 
-        if os.path.exists(path):
+        if os_path.exists(path):
             with open(path, 'r') as f:
                 data.update(Serializer.loads(self.config.plugin_config_format, f.read()))
                 f.close()

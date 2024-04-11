@@ -1,6 +1,5 @@
-import os
-
 from collections import UserDict
+from os import path as os_path
 
 from disco.util.hashmap import HashMap
 from disco.util.serializer import Serializer
@@ -46,12 +45,11 @@ class Storage:
         self._fsync = config.fsync
         self._data = {}
 
-        if os.path.exists(self._path):
+        if os_path.exists(self._path):
             with open(self._path, 'r') as f:
                 self._data = Serializer.loads(self._serializer, f.read())
                 if not self._data:
                     self._data = {}
-                f.close()
 
     def __getitem__(self, key):
         if key not in self._data:

@@ -1,4 +1,4 @@
-import gevent
+from gevent import getcurrent as gevent_getcurrent
 
 
 class ThreadLocal:
@@ -8,13 +8,13 @@ class ThreadLocal:
         self.storage = {}
 
     def get(self):
-        if gevent.getcurrent() not in self.storage:
-            self.storage[gevent.getcurrent()] = {}
-        return self.storage[gevent.getcurrent()]
+        if gevent_getcurrent() not in self.storage:
+            self.storage[gevent_getcurrent()] = {}
+        return self.storage[gevent_getcurrent()]
 
     def drop(self):
-        if gevent.getcurrent() in self.storage:
-            del self.storage[gevent.getcurrent()]
+        if gevent_getcurrent() in self.storage:
+            del self.storage[gevent_getcurrent()]
 
     def __contains__(self, key):
         return key in self.get()

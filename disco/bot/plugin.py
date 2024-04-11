@@ -1,11 +1,9 @@
-import functools
-import gevent
-import inspect
-import types
-import warnings
-import weakref
-
+from functools import partial as functools_partial
+from gevent import sleep as gevent_sleep, spawn as gevent_spawn, spawn_later as gevent_spawn_later, getcurrent as gevent_getcurrent
 from gevent.event import AsyncResult
+from inspect import isclass as inspect_isclass, ismethod as inspect_ismethod, getmembers as inspect_getmembers
+from types import MethodType
+from weakref import WeakSet as WeakSet
 
 from disco.util.emitter import Priority
 from disco.util.logging import LoggingClass
@@ -28,7 +26,7 @@ def register_plugin_base_class(cls):
     base class that other plugins in your project inherit from, but do not want
     the automatic plugin loading to consider the class for loading.
     """
-    if not inspect.isclass(cls):
+    if not inspect_isclass(cls):
         raise TypeError('cls must be a class')
 
     _plugin_base_classes.add(cls)
@@ -43,7 +41,7 @@ def find_loadable_plugins(mod):
     """
     module_attributes = (getattr(mod, attr) for attr in dir(mod))
     for modattr in module_attributes:
-        if not inspect.isclass(modattr):
+        if not inspect_isclass(modattr):
             continue
 
         if not issubclass(modattr, Plugin):
@@ -230,20 +228,20 @@ class Plugin(LoggingClass, PluginDeco):
         self.listeners = []
         self.commands = []
         self.schedules = {}
-        self.greenlets = weakref.WeakSet()
+        self.greenlets = WeakSet()
         self._pre = {}
         self._post = {}
 
         # This is an array of all meta functions we sniff at init
         self.meta_funcs = []
 
-        for name, member in inspect.getmembers(self, predicate=inspect.ismethod):
+        for name, member in inspect_getmembers(self, predicate=inspect_ismethod):
             if hasattr(member, 'meta'):
                 self.meta_funcs.append(member)
 
                 # Unsmash local functions
                 if hasattr(Plugin, name):
-                    method = types.MethodType(getattr(Plugin, name), self, self.__class__)
+                    method = MethodType(getattr(Plugin, name), self, self.__class__)
                     setattr(self, name, method)
 
         self.bind_all()
@@ -329,17 +327,17 @@ class Plugin(LoggingClass, PluginDeco):
         return obj
 
     def spawn(self, *args, **kwargs):
-        return self.spawn_wrap(gevent.spawn, *args, **kwargs)
+        return self.spawn_wrap(gevent_spawn, *args, **kwargs)
 
     def spawn_later(self, delay, *args, **kwargs):
-        return self.spawn_wrap(functools.partial(gevent.spawn_later, delay), *args, **kwargs)
+        return self.spawn_wrap(functools_partial(gevent_spawn_later, delay), *args, **kwargs)
 
     def execute(self, event):
         """
         Executes a CommandEvent this plugin owns.
         """
         if not event.command.oob:
-            self.greenlets.add(gevent.getcurrent())
+            self.greenlets.add(gevent_getcurrent())
         try:
             return event.command.execute(event)
         except CommandError as e:
@@ -356,11 +354,11 @@ class Plugin(LoggingClass, PluginDeco):
 
     def dispatch(self, typ, func, event, *args, **kwargs):
         # Link the greenlet with our exception handler
-        gevent.getcurrent().link_exception(lambda g: self.handle_exception(g, event))
+        gevent_getcurrent().link_exception(lambda g: self.handle_exception(g, event))
 
         # TODO: this is ugly
         if typ != 'command':
-            self.greenlets.add(gevent.getcurrent())
+            self.greenlets.add(gevent_getcurrent())
 
         self.ctx['plugin'] = self
 
@@ -397,7 +395,7 @@ class Plugin(LoggingClass, PluginDeco):
         desc
             The descriptor of the event/packet.
         """
-        args = list(args) + [functools.partial(self.dispatch, 'listener', func)]
+        args = list(args) + [functools_partial(self.dispatch, 'listener', func)]
 
         if what == 'event':
             li = self.bot.client.events.on(*args, **kwargs)
@@ -451,7 +449,7 @@ class Plugin(LoggingClass, PluginDeco):
                 func(**kwargs)
 
             while True:
-                gevent.sleep(interval)
+                gevent_sleep(interval)
                 func(**kwargs)
                 if not repeat:
                     break

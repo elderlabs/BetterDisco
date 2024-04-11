@@ -1,7 +1,7 @@
 try:
-    import regex as re
+    from regex import compile as re_compile
 except ImportError:
-    import re
+    from re import compile as re_compile
 
 
 # Zero width (non-rendering) space that can be used to escape mentions
@@ -11,7 +11,7 @@ ZERO_WIDTH_SPACE = '\u200B'
 MODIFIER_GRAVE_ACCENT = '\u02CB'
 
 # This regex matches all possible mention combinations.
-MENTION_RE = re.compile('<?([@|#][!|&]?[0-9]+|@everyone|@here)>?')
+MENTION_RE = re_compile('<?([@|#][!|&]?[0-9]+|@everyone|@here)>?')
 
 
 def _re_sub_mention(mention):

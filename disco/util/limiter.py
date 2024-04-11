@@ -1,11 +1,12 @@
-import gevent
+from gevent import sleep as gevent_sleep, spawn as gevent_spawn
+from gevent.lock import Semaphore as GeventSemaphore
 
 
 class SimpleLimiter:
     def __init__(self, total, per):
         self.total = total
         self.per = per
-        self._lock = gevent.lock.Semaphore(total)
+        self._lock = GeventSemaphore(total)
 
         self.count = 0
         self.reset_at = 0
@@ -15,7 +16,7 @@ class SimpleLimiter:
         self._lock.acquire()
 
         def _release_lock():
-            gevent.sleep(self.per)
+            gevent_sleep(self.per)
             self._lock.release()
 
-        gevent.spawn(_release_lock)
+        gevent_spawn(_release_lock)

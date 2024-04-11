@@ -1,19 +1,19 @@
 try:
-    import regex as re
+    from regex import compile as re_compile, IGNORECASE
 except ImportError:
-    import re
-import argparse
+    from re import compile as re_compile, IGNORECASE
+from argparse import ArgumentParser
 
 from disco.bot.parser import ArgumentSet, ArgumentError
 from disco.util.functional import simple_cached_property
 
 ARGS_REGEX = '(?: ((?:\n|.)*)$|$)'
 ARGS_UNGROUPED_REGEX = '(?: (?:\n|.)*$|$)'
-SPLIT_SPACES_NO_QUOTE = re.compile(r'["|\']([^"\']+)["|\']|(\S+)')
+SPLIT_SPACES_NO_QUOTE = re_compile(r'["|\']([^"\']+)["|\']|(\S+)')
 
-USER_MENTION_RE = re.compile('<@!?([0-9]+)>')
-ROLE_MENTION_RE = re.compile('<@&([0-9]+)>')
-CHANNEL_MENTION_RE = re.compile('<#([0-9]+)>')
+USER_MENTION_RE = re_compile('<@!?([0-9]+)>')
+ROLE_MENTION_RE = re_compile('<@&([0-9]+)>')
+CHANNEL_MENTION_RE = re_compile('<#([0-9]+)>')
 
 
 class CommandLevels:
@@ -24,7 +24,7 @@ class CommandLevels:
     OWNER = 500
 
 
-class PluginArgumentParser(argparse.ArgumentParser):
+class PluginArgumentParser(ArgumentParser):
     def error(self, message):
         raise CommandError(message)
 
@@ -287,7 +287,7 @@ class Command:
         """
         A compiled version of this command's regex.
         """
-        return re.compile(self.regex(), re.I)
+        return re_compile(self.regex(), IGNORECASE)
 
     def regex(self, grouped=True):
         """
@@ -322,7 +322,7 @@ class Command:
 
         if self.args:
             if len(event.args) < self.args.required_length:
-                # event.command.plugin.log.warning(f'Error in disco.bot.command.execute() - malformated command: {event.name}')
+                # event.command.plugin.log.warning(f'Error in disco.bot.command.execute() - malformed command: {event.name}')
                 raise CommandError('Command {} requires {} argument{} (`{}`), passed {}'.format(
                     event.name,
                     self.args.required_length,

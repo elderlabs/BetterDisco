@@ -1,15 +1,14 @@
 try:
-    import regex as re
+    from regex import sub as re_sub
 except ImportError:
-    import re
-import functools
-import unicodedata
+    from re import sub as re_sub
+from functools import partial as functools_partial
+from unicodedata import normalize as unicodedata_normalize
 
 from disco.types.base import (
     BitsetMap, BitsetValue, SlottedModel, Field, ListField, AutoDictField,
     snowflake, text, datetime, enum, cached_property,
 )
-# from disco.types.application import InteractionType
 from disco.types.channel import Channel, ChannelMention, ChannelType, Thread
 from disco.types.guild import GuildMember
 from disco.types.oauth import Application
@@ -432,7 +431,7 @@ class _MessageComponent(SlottedModel):
     max_length = Field(int)
     required = Field(bool)
     value = Field(text)
-    channel_types = ListField(ChannelType, cast=int)  # just int if fails
+    channel_types = ListField(enum(ChannelType))
     default_values = ListField(SelectDefaultValue)
 
 
@@ -850,16 +849,16 @@ class _Message(SlottedModel):
         content = self.content
 
         if user_replace:
-            replace_user = functools.partial(replace, self.mentions.get, user_replace)
-            content = re.sub('(<@!?([0-9]+)>)', replace_user, content)
+            replace_user = functools_partial(replace, self.mentions.get, user_replace)
+            content = re_sub('(<@!?([0-9]+)>)', replace_user, content)
 
         if role_replace:
-            replace_role = functools.partial(replace, lambda v: (self.guild and self.guild.roles.get(v)), role_replace)
-            content = re.sub('(<@&([0-9]+)>)', replace_role, content)
+            replace_role = functools_partial(replace, lambda v: (self.guild and self.guild.roles.get(v)), role_replace)
+            content = re_sub('(<@&([0-9]+)>)', replace_role, content)
 
         if channel_replace:
-            replace_channel = functools.partial(replace, self.client.state.channels.get, channel_replace)
-            content = re.sub('(<#([0-9]+)>)', replace_channel, content)
+            replace_channel = functools_partial(replace, self.client.state.channels.get, channel_replace)
+            content = re_sub('(<#([0-9]+)>)', replace_channel, content)
 
         return content
 
@@ -880,7 +879,7 @@ class MessageTable:
 
     def recalculate_size_index(self, cols):
         for idx, col in enumerate(cols):
-            size = len(unicodedata.normalize('NFC', col))
+            size = len(unicodedata_normalize('NFC', col))
             if idx not in self.size_index or size > self.size_index[idx]:
                 self.size_index[idx] = size
 

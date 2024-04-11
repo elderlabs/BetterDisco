@@ -1,13 +1,13 @@
-import abc
-import random
+from abc import ABCMeta, abstractmethod as abc_abstractmethod
+from random import shuffle as random_shuffle
 
 from gevent.event import Event
 from disco.util.metaclass import add_metaclass
 
 
-@add_metaclass(abc.ABCMeta)
+@add_metaclass(ABCMeta)
 class BaseQueue:
-    @abc.abstractmethod
+    @abc_abstractmethod
     def get(self):
         raise NotImplementedError
 
@@ -36,7 +36,7 @@ class PlayableQueue(BaseQueue):
         return self._get()
 
     def shuffle(self):
-        random.shuffle(self._data)
+        random_shuffle(self._data)
 
     def clear(self):
         self._data = []
