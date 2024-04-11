@@ -1,7 +1,7 @@
 from array import array
 from ctypes import POINTER, Structure as ctypes_Structure, c_int, c_int16, c_int32, c_float, c_char_p, cdll, \
     util as c_util, byref as c_byref, c_char, cast as c_cast
-from sys import platform as sys_platform
+from platform import system as platform_system
 
 from disco.util.logging import LoggingClass
 
@@ -50,7 +50,7 @@ class BaseOpus(LoggingClass):
 
     @staticmethod
     def find_library():
-        if sys_platform == 'win32':
+        if platform_system() == 'Windows':
             raise Exception('Cannot auto-load opus on Windows, please specify full library path')
 
         return c_util.find_library('opus')

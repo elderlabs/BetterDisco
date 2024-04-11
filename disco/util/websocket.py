@@ -1,4 +1,5 @@
 from websocket import WebSocketApp, setdefaulttimeout
+from platform import system as platform_system
 
 from disco.util.emitter import Emitter
 from disco.util.logging import LoggingClass
@@ -14,7 +15,9 @@ class Websocket(LoggingClass, WebSocketApp):
     """
     def __init__(self, *args, **kwargs):
         LoggingClass.__init__(self)
-        setdefaulttimeout(5)
+        # All other tested operating systems suffer with a timeout of 5 seconds
+        if platform_system() == 'Linux':
+            setdefaulttimeout(5)
         WebSocketApp.__init__(self, *args, **kwargs)
 
         self.is_closed = False
