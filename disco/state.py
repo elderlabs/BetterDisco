@@ -1,6 +1,7 @@
 from collections import deque, namedtuple
+from copy import copy
 from gevent.event import Event
-import weakref
+from weakref import WeakValueDictionary
 
 from disco.types.channel import Thread, Channel
 from disco.util.config import Config
@@ -58,6 +59,18 @@ class StateConfig(Config):
     sync_guild_members = True
     sync_guild_members_on_startup = True
 
+    cache_dm_channels = False
+    cache_channels = True
+    cache_threads = True
+    cache_roles = True
+    cache_users = True
+    cache_voice_states = True
+    cache_emojis = False
+    cache_stickers = False
+    cache_soundboard = False
+    cache_scheduled_events = False
+    cache_stage_instances = False
+
 
 class State:
     """
@@ -89,14 +102,14 @@ class State:
         Mapping of channel ids to dequeue containing `StackMessage` objects.
     """
     EVENTS = [
-        'Ready', 'GuildCreate', 'GuildUpdate', 'GuildDelete', 'GuildMemberAdd', 'GuildMemberUpdate',
-        'GuildMemberRemove', 'GuildMembersChunk', 'GuildRoleCreate', 'GuildRoleUpdate', 'GuildRoleDelete',
-        'GuildEmojisUpdate', 'GuildStickersUpdate', 'ChannelCreate', 'ChannelUpdate', 'ChannelDelete',
-        'VoiceServerUpdate', 'VoiceStateUpdate', 'MessageCreate', 'PresenceUpdate', 'UserUpdate', 'ThreadCreate',
-        'ThreadUpdate', 'ThreadDelete', 'ThreadListSync', 'GuildScheduledEventCreate', 'GuildScheduledEventUpdate',
-        'GuildScheduledEventDelete', 'StageInstanceCreate', 'StageInstanceUpdate', 'StageInstanceDelete',
-        'ChannelTopicUpdate', 'VoiceChannelStatusUpdate', 'GuildSoundboardSoundCreate', 'GuildSoundboardSoundUpdate',
-        'GuildSoundboardSoundDelete',
+        'Ready', 'UserUpdate', 'MessageCreate', 'ChannelCreate', 'ChannelDelete', 'ChannelTopicUpdate', 'ChannelUpdate',
+        'GuildCreate', 'GuildDelete', 'GuildUpdate', 'GuildEmojisUpdate', 'GuildMemberAdd', 'GuildMemberRemove',
+        'GuildMembersChunk', 'GuildMemberUpdate', 'GuildRoleCreate', 'GuildRoleDelete', 'GuildRoleUpdate',
+        'GuildScheduledEventCreate', 'GuildScheduledEventDelete', 'GuildScheduledEventUpdate',
+        'GuildSoundboardSoundCreate', 'GuildSoundboardSoundDelete', 'GuildSoundboardSoundUpdate', 'GuildStickersUpdate',
+        'PresenceUpdate', 'StageInstanceCreate', 'StageInstanceDelete', 'StageInstanceUpdate', 'ThreadCreate',
+        'ThreadDelete', 'ThreadListSync', 'ThreadUpdate', 'VoiceChannelStatusUpdate', 'VoiceServerUpdate',
+        'VoiceStateUpdate',
     ]
 
     def __init__(self, client, config):
@@ -108,15 +121,15 @@ class State:
 
         self.me = None
         self.guilds = HashMap()
-        self.channels = HashMap(weakref.WeakValueDictionary())
+        self.channels = HashMap(WeakValueDictionary())
         self.commands = HashMap()
-        self.dms = HashMap(weakref.WeakValueDictionary())
-        self.emojis = HashMap(weakref.WeakValueDictionary())
-        self.stickers = HashMap(weakref.WeakValueDictionary())
-        self.threads = HashMap(weakref.WeakValueDictionary())
-        self.users = HashMap(weakref.WeakValueDictionary())
-        self.voice_clients = HashMap(weakref.WeakValueDictionary())
-        self.voice_states = HashMap(weakref.WeakValueDictionary())
+        self.dms = HashMap(WeakValueDictionary())
+        self.emojis = HashMap(WeakValueDictionary())
+        self.stickers = HashMap(WeakValueDictionary())
+        self.threads = HashMap(WeakValueDictionary())
+        self.users = HashMap(WeakValueDictionary())
+        self.voice_clients = HashMap(WeakValueDictionary())
+        self.voice_states = HashMap(WeakValueDictionary())
 
         # If message tracking is enabled, listen to those events
         if self.config.track_messages:
@@ -159,7 +172,7 @@ class State:
         self.me.inplace_update(event.user)
 
     def on_message_create(self, event):
-        if event.message.author.id not in self.users:
+        if self.config.cache_users and event.message.author.id not in self.users:
             self.users[event.message.author.id] = event.message.author
 
         if self.config.sync_guild_members and event.message.member:
@@ -172,15 +185,15 @@ class State:
                 StackMessage(event.message.id, event.message.channel_id, event.message.author.id))
 
         # in the event we gain access to a thread or channel suddenly...
-        if event.message.channel_id not in self.channels and event.message.channel_id not in self.threads:
+        if self.config.cache_channels and event.message.channel_id not in self.channels and event.message.channel_id not in self.threads:
             channel = event.message.channel
-            if isinstance(channel, Thread):
+            if self.config.cache_threads and isinstance(channel, Thread):
                 self.threads[event.message.channel_id] = channel
                 self.guilds[event.message.guild_id].threads[event.message.channel_id] = channel
             elif isinstance(channel, Channel):
-                if channel.is_dm:
+                if self.config.cache_dm_channels and channel.is_dm and event.message.channel_id not in self.dms:
                     self.dms[event.message.channel_id] = channel
-                else:
+                elif self.config.cache_channels:
                     self.channels[event.message.channel_id] = channel
                     self.guilds[event.message.guild_id].channels[event.message.channel_id] = channel
 
@@ -190,7 +203,7 @@ class State:
         if event.message.channel_id in self.threads:
             self.threads[event.message.channel_id].last_message_id = event.message.id
 
-        if not event.message.guild_id and event.message.channel_id not in self.dms:
+        if self.config.cache_dm_channels and not event.message.guild_id and event.message.channel_id not in self.dms:
             self.dms[event.message.channel_id] = event.message.channel
 
         if event.message.channel_id in self.dms:
@@ -216,55 +229,79 @@ class State:
                 self.messages[event.channel_id].remove(sm)
 
     def on_interaction_create(self, event):
-        if event.interaction.user.id not in self.users:
+        if self.config.cache_users and event.interaction.user.id not in self.users:
             self.users[event.interaction.user.id] = event.interaction.user
-        if event.guild and event.guild.id in self.guilds:
+        if self.config.sync_guild_members and event.guild and event.guild.id in self.guilds:
             if event.interaction.member.id not in self.guilds[event.guild.id].members:
                 self.guilds[event.guild.id].members = event.interaction.member.id
         if event.channel:
-            if event.channel.is_thread and event.channel.id not in self.threads:
+            if self.config.cache_threads and event.channel.is_thread and event.channel.id not in self.threads:
                 self.threads[event.channel.id] = event.channel
                 self.guilds[event.guild.id].threads[event.channel.id] = event.channel
-            if event.channel.is_guild and event.channel.id not in self.channels:
+            if self.config.cache_channels and event.channel.is_guild and event.channel.id not in self.channels:
                 self.channels[event.channel.id] = event.channel
                 self.guilds[event.guild.id].channels[event.channel.id] = event.channel
-            if event.channel.is_dm and event.channel.id not in self.dms:
+            if self.config.cache_dm_channels and event.channel.is_dm and event.channel.id not in self.dms:
                 self.dms[event.channel.id] = event.channel
 
     def on_guild_create(self, event):
-        if not event.unavailable and not self.ready.is_set():
+        if not self.ready.is_set():
             self.guilds_waiting_sync -= 1
             if self.guilds_waiting_sync <= 0:
                 self.ready.set()
 
-        if event.guild.id in self.guilds:
-            return
+        guild = copy(event.guild)
 
-        self.guilds[event.guild.id] = event.guild
-        self.channels.update(event.guild.channels)
-        self.threads.update(event.guild.threads)
-        self.emojis.update(event.guild.emojis)
-        self.stickers.update(event.guild.stickers)
+        if not self.config.sync_guild_members:
+            guild.members = {}
+        if not self.config.cache_channels:
+            guild.channels = {}
+        if not self.config.cache_threads:
+            guild.threads = {}
+        if not self.config.cache_roles:
+            guild.roles = {}
+        if not self.config.cache_emojis:
+            guild.emojis = {}
+        if not self.config.cache_stickers:
+            guild.stickers = {}
+        if not self.config.cache_voice_states:
+            guild.voice_states = {}
+        if not self.config.cache_soundboard:
+            guild.soundboard_sounds = {}
+        if not self.config.cache_scheduled_events and hasattr(guild, 'scheduled_events'):
+            guild.scheduled_events = {}
+        if not self.config.cache_stage_instances:
+            guild.stage_instances = {}
 
-        for voice_state in event.guild.voice_states.values():
-            self.voice_states[voice_state.session_id] = voice_state
+        self.guilds[event.guild.id] = guild
 
-        for member in event.guild.members.values():
-            if member.user.id not in self.users:
-                self.users[member.user.id] = member.user
+        self.channels.update(guild.channels)
+        self.threads.update(guild.threads)
+        self.emojis.update(guild.emojis)
+        self.stickers.update(guild.stickers)
 
-        for presence in event.presences:
-            if presence.user.id in self.users:
-                self.users[presence.user.id].presence = presence
+        if self.config.cache_voice_states:
+            for voice_state in event.guild.voice_states.values():
+                if voice_state.session_id not in self.voice_states:
+                    self.voice_states[voice_state.session_id] = voice_state
+
+        if self.config.cache_users:
+            for member in event.guild.members.values():
+                if member.user.id not in self.users:
+                    self.users[member.user.id] = member.user
+
+            for presence in event.presences:
+                if presence.user.id in self.users:
+                    self.users[presence.user.id].presence = presence
 
         # TODO: better performance on large guild sync
         if self.config.sync_guild_members_on_startup and len(self.guilds[event.guild.id].members) < event.guild.member_count:
             event.guild.request_guild_members()
         else:
             for voice_state in event.guild.voice_states.values():
-                if voice_state.user_id not in self.guilds[event.guild.id].members:
+                if self.config.sync_guild_members and voice_state.user_id not in self.guilds[event.guild.id].members:
                     self.guilds[event.guild.id].members[voice_state.user_id] = voice_state.member
-                if voice_state.user_id not in self.users and voice_state.member.user:
+                if self.config.cache_users and voice_state.user_id not in self.users and voice_state.member.user:
                     self.users[voice_state.user_id] = voice_state.member.user
 
     def on_guild_update(self, event):
@@ -311,7 +348,7 @@ class State:
                 del self.voice_states[vstate]
 
     def on_channel_create(self, event):
-        if event.channel.is_guild and event.channel.guild_id in self.guilds:
+        if self.config.cache_channels and event.channel.is_guild and event.channel.guild_id in self.guilds:
             self.guilds[event.channel.guild_id].channels[event.channel.id] = event.channel
             self.channels[event.channel.id] = event.channel
 
@@ -326,14 +363,18 @@ class State:
     def on_channel_delete(self, event):
         if event.channel.is_guild and event.channel.guild and event.channel.id in event.channel.guild.channels:
             del event.channel.guild.channels[event.channel.id]
+        if event.channel.id in self.channels:
             del self.channels[event.channel.id]
 
     def on_thread_create(self, event):
-        if event.thread.guild_id in self.guilds:
+        if self.config.cache_threads and event.thread.guild_id in self.guilds:
             self.guilds[event.thread.guild_id].threads[event.thread.id] = event.thread
             self.threads[event.thread.id] = event.thread
 
     def on_thread_update(self, event):
+        if not self.config.cache_threads:
+            return
+
         if event.thread.guild_id in self.guilds:
             if event.thread.id in self.guilds[event.thread.guild_id].threads:
                 self.guilds[event.thread.guild_id].threads[event.thread.id].inplace_update(event.thread)
@@ -356,7 +397,7 @@ class State:
             del self.threads[event.thread.id]
 
     def on_thread_list_sync(self, event):
-        if event.guild_id in self.guilds:
+        if self.config.cache_threads and event.guild_id in self.guilds:
             for thread in event.threads:
                 if thread.id not in self.threads:
                     self.threads[thread.id] = thread
@@ -372,9 +413,12 @@ class State:
         voice_client.set_token(event.token)
 
     def on_voice_state_update(self, event):
-        if event.state.member and event.state.user_id not in self.guilds[event.state.guild_id].members:
+        if not self.config.cache_voice_states:
+            return
+
+        if self.config.sync_guild_members and event.state.member and event.state.user_id not in self.guilds[event.state.guild_id].members:
             self.guilds[event.state.guild_id].members[event.state.user_id] = event.state.member
-            if event.state.user_id not in self.users:
+            if self.config.cache_users and event.state.user_id not in self.users:
                 self.users[event.state.user_id] = event.state.member.user
         # Existing connection, we are either moving channels or disconnecting
         if event.state.session_id in self.voice_states:
@@ -412,9 +456,9 @@ class State:
                 self.voice_clients[event.state.guild_id].channel_id = event.state.channel_id
 
     def on_guild_member_add(self, event):
-        if event.member.user.id not in self.users:
+        if self.config.cache_users and event.member.user.id not in self.users:
             self.users[event.member.user.id] = event.member.user
-        else:
+        elif self.config.sync_guild_members:
             event.member.user = self.users[event.member.user.id]  # why?
 
         if event.guild_id not in self.guilds:
@@ -428,21 +472,19 @@ class State:
             self.guilds[event.guild_id].members[event.member.user.id] = event.member
 
     def on_guild_member_update(self, event):
-        if event.guild_id not in self.guilds:
-            return
+        if self.config.cache_users:
+            if event.member.user.id not in self.users:
+                self.users[event.member.user.id] = event.member.user
+            else:
+                self.users[event.member.user.id].inplace_update(event.member.user)
 
-        if event.member.user.id not in self.users:
-            self.users[event.member.user.id] = event.member.user
-        else:
-            self.users[event.member.user.id].inplace_update(event.member.user)
-
-        if self.config.sync_guild_members:
+        if self.config.sync_guild_members and event.guild_id in self.guilds:
             if event.member.user.id not in self.guilds[event.guild_id].members:
                 self.guilds[event.guild_id].members[event.member.user.id] = event.member
             else:
                 self.guilds[event.guild_id].members[event.member.user.id].inplace_update(event.member)
 
-            if event.member.roles:  # ???
+            if self.config.cache_roles and event.member.roles:  # ???
                 self.guilds[event.guild_id].members[event.member.user.id].roles = event.member.roles
 
     def on_guild_member_remove(self, event):
@@ -459,37 +501,39 @@ class State:
 
         guild = self.guilds[event.guild_id]
         for member in event.members:
-            member.guild_id = guild.id
-            guild.members[member.id] = member
+            if self.config.sync_guild_members:
+                member.guild_id = guild.id
+                guild.members[member.id] = member
 
-            if member.id not in self.users:
-                self.users[member.id] = member.user
-            else:
-                member.user = self.users[member.id]
+            if self.config.cache_users:
+                if member.id not in self.users:
+                    self.users[member.id] = member.user
+                else:
+                    member.user = self.users[member.id]
 
-        if not event.presences:
-            return
+            if not event.presences:
+                return
 
-        for presence in event.presences:
-            # TODO: this matches the recursive, hackfix method found in on_presence_update
-            user = presence.user
-            user.presence = presence
-            self.users[user.id].inplace_update(user)
+            for presence in event.presences:
+                # TODO: this matches the recursive/hack-fix method found in on_presence_update
+                user = presence.user
+                user.presence = presence
+                self.users[user.id].inplace_update(user)
 
     def on_guild_role_create(self, event):
-        if event.guild_id not in self.guilds:
+        if not self.config.cache_roles or event.guild_id not in self.guilds:
             return
 
         self.guilds[event.guild_id].roles[event.role.id] = event.role
 
     def on_guild_role_update(self, event):
-        if event.guild_id not in self.guilds:
+        if not self.config.cache_roles or event.guild_id not in self.guilds:
             return
 
         self.guilds[event.guild_id].roles[event.role.id].inplace_update(event.role)
 
     def on_guild_role_delete(self, event):
-        if event.guild_id not in self.guilds:
+        if not self.config.cache_roles or event.guild_id not in self.guilds:
             return
 
         if event.role_id not in self.guilds[event.guild_id].roles:
@@ -503,7 +547,7 @@ class State:
                 member.roles.remove(event.role_id)
 
     def on_guild_emojis_update(self, event):
-        if event.guild_id not in self.guilds:
+        if not self.config.cache_emojis or event.guild_id not in self.guilds:
             return
 
         for emoji in event.emojis:
@@ -516,7 +560,7 @@ class State:
             self.emojis.update(guild.emojis)
 
     def on_guild_stickers_update(self, event):
-        if event.guild_id not in self.guilds or not hasattr(event, 'stickers'):
+        if not self.config.cache_stickers or not event.guild_id not in self.guilds:
             return
 
         for sticker in event.stickers:
@@ -529,7 +573,10 @@ class State:
             self.stickers.update(guild.stickers)
 
     def on_presence_update(self, event):
-        # TODO: this is recursive, we hackfix in Model
+        # TODO: this is recursive, we hack-fix in Model
+        if not self.config.cache_users:
+            return
+
         user = event.presence.user
         user.presence = event.presence
 
@@ -544,47 +591,49 @@ class State:
             self.users[user.id] = user
 
     def on_guild_scheduled_event_create(self, event):
-        if event.guild_id in self.guilds:
+        if self.config.cache_scheduled_events and event.guild_id in self.guilds:
             self.guilds[event.guild_id].guild_scheduled_events[event.id] = event
 
     def on_guild_scheduled_event_update(self, event):
-        if event.guild_id in self.guilds:
+        if self.config.cache_scheduled_events and event.guild_id in self.guilds:
             self.guilds[event.guild_id].guild_scheduled_events[event.id] = event
 
     def on_guild_scheduled_event_delete(self, event):
-        if event.guild_id in self.guilds:
+        if self.config.cache_scheduled_events and event.guild_id in self.guilds:
             del self.guilds[event.guild_id].guild_scheduled_events[event.id]
 
     def on_stage_instance_create(self, event):
-        if event.guild_id in self.guilds:
+        if self.config.cache_stage_instances and event.guild_id in self.guilds:
             self.guilds[event.guild_id].stage_instances[event.id] = event
 
     def on_stage_instance_update(self, event):
-        if event.guild_id in self.guilds:
+        if self.config.cache_stage_instances and event.guild_id in self.guilds:
             self.guilds[event.guild_id].stage_instances[event.id] = event
 
     def on_stage_instance_delete(self, event):
-        if event.guild_id in self.guilds:
+        if self.config.cache_stage_instances and event.guild_id in self.guilds:
             del self.guilds[event.guild_id].stage_instances[event.id]
 
     def on_channel_topic_update(self, event):
-        if event.guild_id in self.guilds:
-            self.guilds[event.guild_id].channels[event.id].topic = event.topic
-        if event.id in self.channels:
-            self.channels[event.id].topic = event.topic
+        if self.config.cache_channels:
+            if event.guild_id in self.guilds:
+                self.guilds[event.guild_id].channels[event.id].topic = event.topic
+            if event.id in self.channels:
+                self.channels[event.id].topic = event.topic
 
     def on_voice_channel_status_update(self, event):
-        if event.guild_id in self.guilds:
-            self.guilds[event.guild_id].channels[event.id].status = event.status
-        if event.id in self.channels:
-            self.channels[event.id].status = event.status
+        if self.config.cache_channels:
+            if event.guild_id in self.guilds:
+                self.guilds[event.guild_id].channels[event.id].status = event.status
+            if event.id in self.channels:
+                self.channels[event.id].status = event.status
 
     def on_guild_soundboard_sound_create(self, event):
-        if event.guild_id in self.guilds:
+        if self.config.cache_soundboard and event.guild_id in self.guilds:
             self.guilds[event.guild_id].soundboard_sounds[event.sound_id] = event
 
     def on_guild_soundboard_sound_update(self, event):
-        if event.guild_id in self.guilds:
+        if self.config.cache_soundboard and event.guild_id in self.guilds:
             self.guilds[event.guild_id].soundboard_sounds[event.sound_id] = event
 
     def on_guild_soundboard_sound_delete(self, event):
@@ -592,6 +641,6 @@ class State:
             del self.guilds[event.guild_id].soundboard_sounds[event.sound_id]
 
     def on_guild_soundboard_sounds_update(self, event):
-        if event.guild_id in self.guilds:
+        if self.config.cache_soundboard and event.guild_id in self.guilds:
             for sound in event.soundboard_sounds:
                 self.guilds[event.guild_id].soundboard_sounds[sound.sound_id] = sound
