@@ -480,6 +480,40 @@ class MessageInteraction(SlottedModel):
     member = Field(GuildMember)
 
 
+class MessagePollTypes:
+    DEFAULT = 1
+
+
+class MessagePollMedia(SlottedModel):
+    text = Field(text)
+    emoji = Field(Emoji)
+
+
+class MessagePollAnswer(SlottedModel):
+    answer_id = Field(int)
+    poll_media = Field(MessagePollMedia)
+
+
+class MessagePollResultCounts(SlottedModel):
+    count = Field(int)
+    id = Field(int)
+    me_voted = Field(bool)
+
+
+class MessagePollResults(SlottedModel):
+    answer_counts = ListField(MessagePollResultCounts)
+    is_finalized = Field(bool)
+
+
+class MessagePoll(SlottedModel):
+    allow_multiselect = Field(bool)
+    answers = ListField(text)
+    expiry = Field(datetime)
+    layout_type = Field(enum(MessagePollTypes))
+    question = Field(MessagePollMedia)
+    results = Field(MessagePollResults)
+
+
 class _Message(SlottedModel):
     """
     Represents a Message created within a Channel on Discord.
@@ -558,6 +592,7 @@ class _Message(SlottedModel):
     # _thread = Field(Thread, alias='thread', create=False)  # fix this
     components = ListField(MessageComponent)
     sticker_items = ListField(StickerItem)
+    poll = Field(MessagePoll, create=False)
 
     def __repr__(self):
         return '<Message id={} channel_id={}>'.format(self.id, self.channel_id)
