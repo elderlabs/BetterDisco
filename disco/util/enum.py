@@ -46,7 +46,7 @@ class EnumAttr(object):
         return self.index >= other
 
     def __repr__(self):
-        return '<EnumAttr {}>'.format(self.name)
+        return f'<EnumAttr name={self.name} value={self.value}>'
 
     def __str__(self):
         return self.name

@@ -199,10 +199,8 @@ def enum(typ):
             return None
 
         for k, v in get_enum_members(typ):
-            if isinstance(data, str) and k == data.upper():
-                return v
-            elif k == data or v == data:  # perhaps separate and return inverse?
-                return k
+            if data in (k, v):
+                return EnumAttr(data, k.upper(), v, v)
 
         return None
     return _f
