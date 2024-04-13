@@ -514,6 +514,9 @@ class BitsetValue:
                 yield k
 
     def __repr__(self):
+        return str(self.value)
+
+    def __str__(self):
         if not self.value:
             return 'NONE'
         return ', '.join(i for i in self.__iter__())

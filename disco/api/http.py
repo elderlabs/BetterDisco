@@ -284,7 +284,7 @@ class APIException(Exception):
             if 'code' in data:
                 self.code = data['code']
                 self.errors = data.get('errors', {})
-                self.msg = '{} ({} - {})'.format(data['message'], self.code, self.errors)
+                self.msg = '{} ({}{})'.format(data['message'], self.code, f' - {self.errors}' if self.errors else '')
             elif len(data) == 1:
                 key, value = list(data.items())[0]
                 if not isinstance(value, str):
