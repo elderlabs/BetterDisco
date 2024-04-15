@@ -4,7 +4,7 @@ from time import perf_counter as time_perf_counter, time
 from collections import namedtuple as collections_namedtuple
 from websocket import WebSocketConnectionClosedException, WebSocketTimeoutException
 
-from disco.gateway.encoding import ENCODERS
+from disco.gateway.encoding.json import JSONEncoder
 from disco.gateway.packets import OPCode
 from disco.types.base import cached_property
 from disco.util.emitter import Emitter
@@ -55,7 +55,8 @@ class VoiceClient(LoggingClass):
     VOICE_GATEWAY_VERSION = 7
 
     SUPPORTED_MODES = {
-        # 'aead_aes256_gcm_rtpsize',
+        'aead_aes256_gcm_rtpsize',
+        'aead_xchacha20_poly1305_rtpsize',
         'xsalsa20_poly1305_lite_rtpsize',
         'xsalsa20_poly1305_lite',
         'xsalsa20_poly1305_suffix',
@@ -69,7 +70,7 @@ class VoiceClient(LoggingClass):
         self.server_id = server_id
         self.channel_id = None
         self.is_dm = is_dm
-        self.encoder = ENCODERS[encoder]
+        self.encoder = encoder or JSONEncoder
         self.max_reconnects = max_reconnects
         self.video_enabled = False
         self.media = None

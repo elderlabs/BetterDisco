@@ -5,11 +5,12 @@ from gevent import spawn as gevent_spawn, Timeout as GeventTimeout
 from warnings import warn as warnings_warn
 
 try:
-    from nacl.secret import SecretBox, Aead
+    from nacl.secret import SecretBox
     from nacl.utils import random as nacl_random
 except ImportError:
     warnings_warn('nacl is not installed, voice support is disabled')
 
+from disco.util.crypto import AEScrypt
 from disco.util.enum import Enum
 from disco.util.logging import LoggingClass
 
@@ -113,23 +114,26 @@ class UDPVoiceClient(LoggingClass):
     def setup_encryption(self, encryption_key):
         if 'xsalsa20' in self.vc.mode:
             self._secret_box = SecretBox(encryption_key)
-        elif self.vc.mode == 'aead_xchacha20_poly1305_rtpsize':
-            self._secret_box = Aead(encryption_key)
+        elif self.vc.mode in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
+            self._secret_box = AEScrypt(encryption_key, self.vc.mode)
 
     def send_frame(self, frame, sequence=None, timestamp=None, incr_timestamp=None):
         # Pack the RTC header into our buffer (a list of numbers)
-        struct_pack_into('>H', self._rtp_audio_header, 2, sequence or self.sequence)
-        struct_pack_into('>I', self._rtp_audio_header, 4, timestamp or self.timestamp)
-        struct_pack_into('>i', self._rtp_audio_header, 8, self.vc.ssrc_audio)
+        struct_pack_into('>H', self._rtp_audio_header, 2, sequence or self.sequence)  # BE, unsigned short
+        struct_pack_into('>I', self._rtp_audio_header, 4, timestamp or self.timestamp)  # BE, unsigned int
+        struct_pack_into('>i', self._rtp_audio_header, 8, self.vc.ssrc_audio)  # BE, int
 
-        nonce = bytearray(24)  # for reference, 192-bits is 24 bytes
+        if self.vc.mode == 'aead_aes256_gcm_rtpsize':
+            nonce = bytearray(12)  # 96-bits
+        else:
+            nonce = bytearray(24)  # 192-bits is 24 bytes
 
         if self.vc.mode in ('xsalsa20_poly1305_lite', 'xsalsa20_poly1305_lite_rtpsize', 'aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
             # Use an incrementing number as a nonce, only first 4 bytes of the nonce is padded on
             self._nonce += 1
             if self._nonce > MAX_UINT32:
                 self._nonce = 0
-            struct_pack_into('>I', nonce, 0, self._nonce)
+            struct_pack_into('>I', nonce, 0, self._nonce)  # BE, unsigned int
             nonce_padding = nonce[:4]
         elif self.vc.mode == 'xsalsa20_poly1305_suffix':
             # Generate a nonce
@@ -140,15 +144,15 @@ class UDPVoiceClient(LoggingClass):
             nonce[:12] = self._rtp_audio_header
             nonce_padding = None
         else:
-            raise Exception('The voice mode, {}, isn\'t supported.'.format(self.vc.mode))
+            raise Exception('Voice mode `{}` is not supported.'.format(self.vc.mode))
 
         # Encrypt the payload with the nonce
         if self.vc.mode in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
-            payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce), aad=b'')  # TODO
+            payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce), aad=bytes(self._rtp_audio_header))
         else:
             payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce))
-        if 'aead_aes256_gcm' not in self.vc.mode:
-            payload = payload.ciphertext
+
+        payload = payload.ciphertext
 
         # Pad the payload with the nonce, if applicable
         if nonce_padding:
@@ -248,7 +252,10 @@ class UDPVoiceClient(LoggingClass):
                     continue
 
                 try:
-                    data = self._secret_box.decrypt(ciphertext=bytes(data[12:]), nonce=bytes(nonce))
+                    if self.vc.mode in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
+                        data = self._secret_box.decrypt(ciphertext=bytes(data[12:]), nonce=bytes(nonce), aad=bytes(rtp))
+                    else:
+                        data = self._secret_box.decrypt(ciphertext=bytes(data[12:]), nonce=bytes(nonce))
                 except Exception:
                     self.log.debug('[{}] [VoiceData] Failed to decode data from ssrc {}'.format(self.vc.channel_id, rtp.ssrc))
                     continue
