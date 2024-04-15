@@ -56,6 +56,7 @@ class VoiceClient(LoggingClass):
 
     SUPPORTED_MODES = {
         'aead_aes256_gcm_rtpsize',
+        'aead_aes256_gcm',
         'aead_xchacha20_poly1305_rtpsize',
         'xsalsa20_poly1305_lite_rtpsize',
         'xsalsa20_poly1305_lite',
@@ -70,7 +71,7 @@ class VoiceClient(LoggingClass):
         self.server_id = server_id
         self.channel_id = None
         self.is_dm = is_dm
-        self.encoder = encoder or JSONEncoder
+        self.encoder = JSONEncoder
         self.max_reconnects = max_reconnects
         self.video_enabled = False
         self.media = None
@@ -164,7 +165,7 @@ class VoiceClient(LoggingClass):
         return self.ssrc + 3
 
     def set_state(self, state):
-        self.log.debug('[{}] state {} -> {}'.format(self.channel_id, self.state, state))
+        self.log.debug('[{}] state {} -> {}'.format(self.channel_id or '-', self.state, state))
         prev_state = self.state
         self.state = state
         self.state_emitter.emit(state, prev_state)
@@ -391,7 +392,7 @@ class VoiceClient(LoggingClass):
             priority=bool(data['speaking'] & SpeakingFlags.PRIORITY),
         )
 
-        self.client.gw.events.emit('VoiceSpeaking', payload)
+        self.client.events.emit('VoiceSpeaking', payload)
 
     def on_message(self, msg):
         try:
@@ -469,7 +470,7 @@ class VoiceClient(LoggingClass):
                 self.log.warning(f'[{self.channel_id}] Session invalidated. Spawning fresh connection to channel.')
                 return self.connect(self.channel_id, mute=self.mute, deaf=self.deaf, video=self.video_enabled)
 
-        wait_time = 0
+        wait_time = (self._reconnects * 5) - 5
 
         self.log.info('[{}] {} in {} second{}'.format(self.channel_id, 'Resuming' if self._identified else 'Reconnecting', wait_time, 's' if wait_time != 1 else ''))
         gevent_sleep(wait_time)
@@ -490,7 +491,7 @@ class VoiceClient(LoggingClass):
             if self.state == VoiceState.CONNECTED:
                 self.log.debug('[{}] Moving to channel {}'.format(self.channel_id, channel_id))
             else:
-                self.log.debug('[{}] Attempting connection to channel id {}'.format(self.channel_id, channel_id))
+                self.log.debug('[{}] Attempting connection to channel id {}'.format(self.channel_id or '-', channel_id))
                 self.set_state(VoiceState.AWAITING_ENDPOINT)
 
         self.set_voice_state(channel_id, **kwargs)
@@ -532,7 +533,7 @@ class VoiceClient(LoggingClass):
         if self.client.state.voice_states.get(self._session_id):
             del self.client.state.voice_states[self._session_id]
 
-        return self.client.gw.events.emit('VoiceDisconnect', self)
+        return self.client.events.emit('VoiceDisconnect', self)
 
     def send_frame(self, *args, **kwargs):
         self.udp.send_frame(*args, **kwargs)

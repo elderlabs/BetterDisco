@@ -6,7 +6,6 @@ from warnings import warn as warnings_warn
 
 try:
     from nacl.secret import SecretBox
-    from nacl.utils import random as nacl_random
 except ImportError:
     warnings_warn('nacl is not installed, voice support is disabled')
 
@@ -114,7 +113,7 @@ class UDPVoiceClient(LoggingClass):
     def setup_encryption(self, encryption_key):
         if 'xsalsa20' in self.vc.mode:
             self._secret_box = SecretBox(encryption_key)
-        elif self.vc.mode in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
+        elif self.vc.mode in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm', 'aead_aes256_gcm_rtpsize'):
             self._secret_box = AEScrypt(encryption_key, self.vc.mode)
 
     def send_frame(self, frame, sequence=None, timestamp=None, incr_timestamp=None):
@@ -123,21 +122,20 @@ class UDPVoiceClient(LoggingClass):
         struct_pack_into('>I', self._rtp_audio_header, 4, timestamp or self.timestamp)  # BE, unsigned int
         struct_pack_into('>i', self._rtp_audio_header, 8, self.vc.ssrc_audio)  # BE, int
 
-        if self.vc.mode == 'aead_aes256_gcm_rtpsize':
+        if self.vc.mode in ('aead_aes256_gcm', 'aead_aes256_gcm_rtpsize'):
             nonce = bytearray(12)  # 96-bits
         else:
             nonce = bytearray(24)  # 192-bits is 24 bytes
 
-        if self.vc.mode in ('xsalsa20_poly1305_lite', 'xsalsa20_poly1305_lite_rtpsize', 'aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
+        if self.vc.mode != 'xsalsa20_poly1305':
             # Use an incrementing number as a nonce, only first 4 bytes of the nonce is padded on
             self._nonce += 1
             if self._nonce > MAX_UINT32:
                 self._nonce = 0
             struct_pack_into('>I', nonce, 0, self._nonce)  # BE, unsigned int
+        if self.vc.mode in ('xsalsa20_poly1305_lite', 'xsalsa20_poly1305_lite_rtpsize', 'aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm', 'aead_aes256_gcm_rtpsize'):
             nonce_padding = nonce[:4]
         elif self.vc.mode == 'xsalsa20_poly1305_suffix':
-            # Generate a nonce
-            nonce = nacl_random(SecretBox.NONCE_SIZE)
             nonce_padding = nonce
         elif self.vc.mode == 'xsalsa20_poly1305':
             # Nonce is the header
@@ -147,7 +145,7 @@ class UDPVoiceClient(LoggingClass):
             raise Exception('Voice mode `{}` is not supported.'.format(self.vc.mode))
 
         # Encrypt the payload with the nonce
-        if self.vc.mode in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
+        if self.vc.mode in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm', 'aead_aes256_gcm_rtpsize'):
             payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce), aad=bytes(self._rtp_audio_header))
         else:
             payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce))
@@ -210,7 +208,7 @@ class UDPVoiceClient(LoggingClass):
                     data=data[8:],
                 )
 
-                self.vc.client.gw.events.emit('RTCPData', payload)
+                self.vc.client.events.emit('RTCPData', payload)
             else:
                 sequence, timestamp, ssrc = struct_unpack_from('>HII', data, 2)  # BE, unsigned short, 2x unsigned int
 
@@ -238,7 +236,11 @@ class UDPVoiceClient(LoggingClass):
                     self.log.debug('[{}] [VoiceData] Received unsupported payload type, {}'.format(self.vc.channel_id, rtp.payload_type))
                     continue
 
-                nonce = bytearray(24)
+                if self.vc.mode in ('aead_aes256_gcm', 'aead_aes256_gcm_rtpsize'):
+                    nonce = bytearray(12)  # 96-bits
+                else:
+                    nonce = bytearray(24)  # 192-bits is 24 bytes
+
                 if self.vc.mode in ('xsalsa20_poly1305_lite', 'xsalsa20_poly1305_lite_rtpsize', 'aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm', 'aead_aes256_gcm_rtpsize'):
                     nonce[:4] = data[-4:]
                     data = data[:-4]
@@ -251,13 +253,22 @@ class UDPVoiceClient(LoggingClass):
                     self.log.debug('[{}] [VoiceData] Unsupported Encryption Mode, {}'.format(self.vc.channel_id, self.vc.mode))
                     continue
 
+                header_size = 12
+                if '_rtpsize' in self.vc.mode:
+                    header_size += (rtp.csrc_count * 4)
+                    if rtp.extension:
+                        header_size += 4
+                    ctxt = data[header_size:]  # plus strip whatever additional bs is before the payload
+                else:
+                    ctxt = data[12:]
+
                 try:
-                    if self.vc.mode in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
-                        data = self._secret_box.decrypt(ciphertext=bytes(data[12:]), nonce=bytes(nonce), aad=bytes(rtp))
+                    if self.vc.mode in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm', 'aead_aes256_gcm_rtpsize'):
+                        data = self._secret_box.decrypt(ciphertext=bytes(ctxt), nonce=bytes(nonce), aad=bytes(data[:header_size]))
                     else:
-                        data = self._secret_box.decrypt(ciphertext=bytes(data[12:]), nonce=bytes(nonce))
-                except Exception:
-                    self.log.debug('[{}] [VoiceData] Failed to decode data from ssrc {}'.format(self.vc.channel_id, rtp.ssrc))
+                        data = self._secret_box.decrypt(ciphertext=bytes(ctxt), nonce=bytes(nonce))
+                except Exception as e:
+                    self.log.debug('[{}] [VoiceData] Failed to decode data from ssrc {}: {} - {}'.format(self.vc.channel_id, rtp.ssrc, e.__class__.__name__, e))
                     continue
 
                 # RFC3550 Section 5.1 (Padding)
@@ -313,7 +324,7 @@ class UDPVoiceClient(LoggingClass):
                     data=data,
                 )
 
-                self.vc.client.gw.events.emit('VoiceData', payload)
+                self.vc.client.events.emit('VoiceData', payload)
 
     def send(self, data):
         self.conn.sendto(data, (self.ip, self.port))
