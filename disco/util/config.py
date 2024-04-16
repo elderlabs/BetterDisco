@@ -1,3 +1,4 @@
+import inspect
 import os
 
 from .serializer import Serializer
@@ -9,7 +10,6 @@ class Config:
             k: getattr(self, k) for k in dir(self.__class__)
         })
 
-        # issue `DeprecationWarning`s
         if hasattr(self.__class__, 'deprecated') and obj:
             for deprecated_key, replacement in self.__class__.deprecated.items():
                 if deprecated_key in obj.keys():
@@ -21,6 +21,21 @@ class Config:
 
         if obj:
             self.__dict__.update(obj)
+            self._parse_nested_config(obj)
+
+    def _parse_nested_config(self, data):
+        try:
+            for key, value in self.__annotations__.items():
+                if issubclass(value, Config):
+                    if key in data:
+                        setattr(self, key, value(obj=data[key]))
+        except AttributeError:
+            for key in dir(self):
+                _attr = getattr(self, key)
+                if key.startswith('__') or not inspect.isclass(_attr):
+                    continue
+                if issubclass(_attr, Config):
+                    setattr(self, key, _attr(obj=data[key]))
 
     def get(self, key, default=None):
         return self.__dict__.get(key, default)
@@ -35,7 +50,10 @@ class Config:
 
         _, ext = os.path.splitext(path)
         Serializer.check_format(ext[1:])
-        inst.__dict__.update(Serializer.loads(ext[1:], data))
+        _data = Serializer.loads(ext[1:], data)
+
+        inst.__dict__.update(_data)
+        inst._parse_nested_config(_data)
         return inst
 
     def from_prefix(self, prefix):
@@ -54,5 +72,13 @@ class Config:
 
         self.__dict__.update(other)
 
-    def to_dict(self):
-        return self.__dict__
+    def to_dict(self, clean=False):
+        result = {}
+        for key, value in self.__dict__.items():
+            if clean and (callable(value) or key.startswith('__')):  # Skip methods and private attributes
+                continue
+            if isinstance(value, Config):
+                result[key] = value.to_dict()
+            else:
+                result[key] = value
+        return result
