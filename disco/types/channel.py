@@ -491,7 +491,7 @@ class Channel(SlottedModel, Permissible):
         """
         self.client.api.channels_typing(self.id)
 
-    def connect(self, *args, **kwargs):
+    def connect(self, video_enabled=False, *args, **kwargs):
         """
         Connect to this channel over voice.
         """
@@ -499,7 +499,7 @@ class Channel(SlottedModel, Permissible):
         assert self.is_voice, 'Cannot connect to a non-voice channel'
 
         server_id = self.guild_id or self.id
-        vc = self.client.state.voice_clients.get(server_id) or VoiceClient(self.client, server_id, is_dm=self.is_dm)
+        vc = self.client.state.voice_clients.get(server_id) or VoiceClient(self.client, server_id, is_dm=self.is_dm, video_enabled=video_enabled)
 
         return vc.connect(self.id, *args, **kwargs)
 

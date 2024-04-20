@@ -11,7 +11,7 @@ with open('README.md') as f:
     f.close()
 
 extras_require = {
-    'voice': ['pynacl>=1.5.0'],
+    'voice': ['pynacl>=1.5.0', 'libnacl>=2.1.0'],
     'http': ['flask>=2.1.1'],
     'yaml': ['pyyaml>=5.3.1'],
     'music': ['yt-dlp>=2022.3.8.2'],

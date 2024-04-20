@@ -14,8 +14,16 @@ from disco.util.enum import Enum
 from disco.util.logging import LoggingClass
 
 AudioCodecs = ('opus',)
+VideoCodecs = ('AV1X', 'H265', 'H264', 'VP8', 'VP9')
 
-RTPPayloadTypes = Enum(OPUS=0x78)
+RTPPayloadTypes = Enum(
+    OPUS=0x78,  # 120
+    # AV1X=0x,  # ?
+    H265=0x65,  # 101
+    H264=0x67,  # 103
+    VP8=0x69,  # 105
+    VP9=0x71,  # 107
+)
 
 RTCPPayloadTypes = Enum(
     SENDER_REPORT=200,
@@ -71,6 +79,15 @@ VoiceData = namedtuple('VoiceData', [
     'data',
 ])
 
+VideoData = namedtuple('VideoData', [
+    'client',
+    'user_id',
+    'payload_type',
+    'rtp',
+    'nonce',
+    'data',
+])
+
 
 class UDPVoiceClient(LoggingClass):
     def __init__(self, vc):
@@ -95,7 +112,9 @@ class UDPVoiceClient(LoggingClass):
 
         # RTP Header
         self._rtp_audio_header = bytearray(12)
+        self._rtp_video_header = bytearray(12)
         self._rtp_audio_header[0] = RTP_HEADER_VERSION
+        self._rtp_video_header[0] = RTP_HEADER_VERSION
 
     def set_audio_codec(self, codec):
         if codec not in AudioCodecs:
@@ -103,7 +122,15 @@ class UDPVoiceClient(LoggingClass):
 
         ptype = RTPPayloadTypes.get(codec)
         self._rtp_audio_header[1] = ptype.value
-        self.log.debug('[{}] Set UDP\'s Audio Codec to {}, RTP payload type {}'.format(self.vc.channel_id, ptype.name, ptype.value))
+        self.log.debug('[{}] Set UDP\'s Audio Codec to {}, RTP payload type {}'.format(self.vc.channel_id, ptype.name.upper(), ptype.value))
+
+    def set_video_codec(self, codec):
+        if codec not in VideoCodecs:
+            raise Exception(f'Unsupported video codec received, {codec}')
+
+        ptype = RTPPayloadTypes.get(codec.lower())
+        self._rtp_video_header[1] = ptype.value
+        self.log.debug('[{}] Set UDP\'s Video Codec to {}, RTP payload type {}'.format(self.vc.channel_id, ptype.name.upper(), ptype.value))
 
     def increment_timestamp(self, by):
         self.timestamp += by
@@ -170,7 +197,7 @@ class UDPVoiceClient(LoggingClass):
 
     def run(self):
         while True:
-            data, addr = self.conn.recvfrom(4096)
+            data, addr = self.conn.recvfrom(1500)  # Max RTP packet length
 
             # Data cannot be less than the bare minimum, just ignore
             if len(data) <= 12:
@@ -311,20 +338,35 @@ class UDPVoiceClient(LoggingClass):
 
                 # RFC3550 Section 5.3: Profile-Specific Modifications to the RTP Header
                 # clients send it sometimes, definitely on fresh connects to a server, dunno what to do here
-                if rtp.marker:
+                # RFC6184: Marker bits are used to signify the last packet of a frame
+                if rtp.marker and payload_type.name == 'opus':
                     self.log.debug('[{}] [VoiceData] Received RTP data with the marker set, skipping'.format(self.vc.channel_id))
                     continue
 
-                payload = VoiceData(
-                    client=self.vc,
-                    user_id=self.vc.audio_ssrcs.get(rtp.ssrc),
-                    payload_type=payload_type.name,
-                    rtp=rtp,
-                    nonce=nonce,
-                    data=data,
-                )
+                if payload_type.name == 'opus':
+                    payload = VoiceData(
+                        client=self.vc,
+                        user_id=self.vc.audio_ssrcs.get(rtp.ssrc),
+                        payload_type=payload_type.name,
+                        rtp=rtp,
+                        nonce=nonce,
+                        data=data,
+                    )
 
-                self.vc.client.events.emit('VoiceData', payload)
+                    # Raw RTP stream data, still needs conversion to be useful
+                    self.vc.client.events.emit('VoiceData', payload)
+                else:
+                    payload = VideoData(
+                        client=self.vc,
+                        user_id=self.vc.video_ssrcs.get(rtp.ssrc),
+                        payload_type=payload_type.name,
+                        rtp=rtp,
+                        nonce=nonce,
+                        data=data,
+                    )
+
+                    # Raw RTP stream data, still needs conversion to be useful
+                    self.vc.client.events.emit('VideoData', payload)
 
     def send(self, data):
         self.conn.sendto(data, (self.ip, self.port))
