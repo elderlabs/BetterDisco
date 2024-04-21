@@ -432,7 +432,7 @@ class _MessageComponent(SlottedModel):
     max_length = Field(int)
     required = Field(bool)
     value = Field(text)
-    channel_types = ListField(ChannelType, cast=int)  # just int if fails
+    channel_types = ListField(enum(ChannelType), cast=int)  # just int if fails
     default_values = ListField(SelectDefaultValue)
 
 
