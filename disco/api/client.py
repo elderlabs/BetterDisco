@@ -146,20 +146,22 @@ class APIClient(LoggingClass):
             channel,
             content=None,
             nonce=None,
+            enforce_nonce=False,
             tts=False,
             attachment=None,
-            attachments=[],
+            attachments=None,
             embed=None,
-            embeds=[],
+            embeds=None,
             flags=0,
-            allowed_mentions={},
-            message_reference={},
-            components={},
-            sticker_ids={},
+            allowed_mentions=None,
+            message_reference=None,
+            components=None,
+            sticker_ids=None,
             sanitize=False):
 
         payload = {
             'nonce': nonce,
+            'enforce_nonce': enforce_nonce,
             'tts': tts,
             'allowed_mentions': {
                 'parse': [],
@@ -228,13 +230,12 @@ class APIClient(LoggingClass):
             r = self.http(Routes.CHANNELS_MESSAGES_CREATE, dict(channel=channel), json=payload)
 
         # Catch API failures
-        # TODO: long-term solution at higher level
         if r:
             return Message.create(self.client, r.json())
         else:
             return self.log.error(f'Failed to send message in channel {channel}')
 
-    def channels_messages_modify(self, channel, message, content=None, embed=None, embeds=[], flags=None, sanitize=False):
+    def channels_messages_modify(self, channel, message, content=None, embed=None, embeds=None, flags=None, sanitize=False, components=None, attachments=None):
         payload = optional(flags=flags)
 
         if content is not None:
@@ -248,17 +249,35 @@ class APIClient(LoggingClass):
             warnings_warn(
                 'embed kwarg has been deprecated, switch to using embeds with a list',
                 DeprecationWarning)
-            payload['embed'] = embed.to_dict()
+            payload['embeds'] = [embed.to_dict()]
 
-        if embeds:
+        if embeds is not None:
             embed_list = []
             for e in embeds:
                 embed_list.append(e.to_dict())
             payload['embeds'] = embed_list
 
-        r = self.http(Routes.CHANNELS_MESSAGES_MODIFY,
-                      dict(channel=channel, message=message),
-                      json=payload)
+        if components is not None:
+            payload['components'] = components
+
+        if attachments is not None:
+            if len(attachments) > 1:
+                files = {
+                    'file{}'.format(idx): tuple(i) for idx, i in enumerate(attachments)
+                }
+            else:
+                files = {
+                    'file': tuple(attachments[0]),
+                }
+
+            r = self.http(
+                Routes.CHANNELS_MESSAGES_MODIFY,
+                dict(channel=channel, message=message),
+                data={'payload_json': json_dumps(payload)},
+                files=files,
+            )
+        else:
+            r = self.http(Routes.CHANNELS_MESSAGES_MODIFY, dict(channel=channel, message=message), json=payload)
         return Message.create(self.client, r.json())
 
     def channels_messages_delete(self, channel, message):

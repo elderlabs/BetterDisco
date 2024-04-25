@@ -29,7 +29,7 @@ class UserFlags(BitsetMap):
     HYPESQUAD_ONLINE_HOUSE_3 = 1 << 8
     PREMIUM_EARLY_SUPPORTER = 1 << 9
     TEAM_PSEUDO_USER = 1 << 10
-    # UNDOCUMENTED = 1 << 11
+    INTERNAL_APPLICATION = 1 << 11
     SYSTEM = 1 << 12
     UNREAD_SYS_MSG = 1 << 13
     BUG_HUNTER_LEVEL_2 = 1 << 14
@@ -39,7 +39,21 @@ class UserFlags(BitsetMap):
     CERTIFIED_MODERATOR = 1 << 18
     BOT_HTTP_INTERACTIONS = 1 << 19
     SPAMMER = 1 << 20
+    DISABLE_PREMIUM = 1 << 21
     ACTIVE_DEVELOPER = 1 << 22
+    HIGH_GLOBAL_RATE_LIMIT = 1 << 33
+    DELETED = 1 << 34
+    DISABLED_SUSPICIOUS_ACTIVITY = 1 << 35
+    SELF_DELETED = 1 << 36
+    # PREMIUM_DISCRIMINATOR = 1 << 37
+    USED_DESKTOP_CLIENT = 1 << 38
+    USED_WEB_CLIENT = 1 << 39
+    USED_MOBILE_CLIENT = 1 << 40
+    DISABLED = 1 << 41
+    VERIFIED_EMAIL = 1 << 43
+    QUARANTINED = 1 << 44
+    COLLABORATOR = 1 << 50
+    RESTRICTED_COLLABORATOR = 1 << 51
 
 
 class UserFlagsValue(BitsetValue):
@@ -53,6 +67,18 @@ class PremiumType:
     BASIC = 3
 
 
+class UserAvatarDecorationData(SlottedModel):
+    asset = Field(text)
+    sku_id = Field(snowflake)
+
+
+class UserClan(SlottedModel):
+    badge = Field(text)
+    identity_enabled = Field(bool)
+    identity_guild_id = Field(snowflake)
+    tags = Field(text)
+
+
 class User(SlottedModel, with_equality('id'), with_hash('id')):
     id = Field(snowflake)
     username = Field(text)
@@ -63,6 +89,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     system = Field(bool, default=False)
     mfa_enabled = Field(bool)
     banner = Field(text)
+    banner_color = Field(text)
     accent_color = Field(str_or_int)
     locale = Field(text)
     verified = Field(bool)
@@ -72,7 +99,9 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     public_flags = Field(UserFlagsValue)
     avatar_decoration = Field(text)
     display_name = Field(text)
-    # avatar_decoration_data = Field(text) ???
+    clan = Field(UserClan)
+    bio = Field(text)
+    avatar_decoration_data = Field(UserAvatarDecorationData)
     # member = Field(GuildMember)
 
     def __str__(self):

@@ -285,9 +285,7 @@ class UDPVoiceClient(LoggingClass):
                     header_size += (rtp.csrc_count * 4)
                     if rtp.extension:
                         header_size += 4
-                    ctxt = data[header_size:]  # plus strip whatever additional bs is before the payload
-                else:
-                    ctxt = data[12:]
+                ctxt = data[header_size:]  # plus strip whatever additional bs is before the payload
 
                 try:
                     if self.vc.mode in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm', 'aead_aes256_gcm_rtpsize'):

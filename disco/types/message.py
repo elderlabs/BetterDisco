@@ -421,7 +421,7 @@ class _MessageComponent(SlottedModel):
     disabled = Field(bool)
     style = Field(int)
     label = Field(text)
-    emoji = Field(Emoji)
+    emoji = Field(Emoji, create=False)
     url = Field(text)
     options = ListField(SelectOption)
     placeholder = Field(text)

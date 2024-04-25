@@ -4,13 +4,10 @@ from gevent import sleep as gevent_sleep, spawn as gevent_spawn
 from gevent.lock import Semaphore as GeventSemaphore
 from gevent.subprocess import PIPE as GEVENT_PIPE, Popen as GeventPopen
 from io import BytesIO
-from struct import calcsize as struct_calcsize
 from types import GeneratorType
 
 from disco.util.metaclass import add_metaclass
 from disco.voice.opus import OpusEncoder
-
-OPUS_HEADER_SIZE = struct_calcsize('<h')
 
 
 class AbstractOpus:
