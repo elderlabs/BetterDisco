@@ -1165,7 +1165,7 @@ class APIClient(LoggingClass):
 
     def interactions_create(self, interaction, token, type, data=None, files=None):
         r = self.http(Routes.INTERACTIONS_CREATE, dict(id=interaction, token=token), json=dict(type=type, data=data), files=files)
-        if r.status_code == 204:
+        if r.status_code == 204 and type != 8:
             rr = self.http(Routes.INTERACTIONS_ORIGINAL_RESPONSE_GET, dict(id=self.client.state.me.id, token=token))
             return InteractionResponse.create(self.client, dict(token=token, type=type, data=data, message=rr.json()))
 
