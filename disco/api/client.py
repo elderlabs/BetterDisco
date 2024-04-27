@@ -257,6 +257,8 @@ class APIClient(LoggingClass):
             for e in embeds:
                 embed_list.append(e.to_dict())
             payload['embeds'] = embed_list
+        else:
+            payload['embeds'] = []
 
         if components:
             component_list = []
@@ -264,6 +266,8 @@ class APIClient(LoggingClass):
                 if type(c) != dict:
                     component_list.append(c.to_dict())
             payload['components'] = component_list
+        else:
+            payload['components'] = []
 
         r = self.http(Routes.CHANNELS_MESSAGES_MODIFY,
                       dict(channel=channel, message=message),
