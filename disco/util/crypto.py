@@ -3,7 +3,7 @@ from warnings import warn as warnings_warn
 try:
     from nacl.utils import EncryptedMessage
 except ImportError:
-    pass
+    warnings_warn('nacl is not installed, voice support is disabled')
 
 try:
     from libnacl import crypto_aead_xchacha20poly1305_ietf_encrypt, crypto_aead_xchacha20poly1305_ietf_decrypt, crypto_aead_aes256gcm_encrypt, crypto_aead_aes256gcm_decrypt

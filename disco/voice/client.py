@@ -68,16 +68,11 @@ class VoiceException(Exception):
 
 
 class VoiceClient(LoggingClass):
-    VOICE_GATEWAY_VERSION = 7
+    VOICE_GATEWAY_VERSION = 8
 
     SUPPORTED_MODES = {
         'aead_aes256_gcm_rtpsize',
-        'aead_aes256_gcm',
         'aead_xchacha20_poly1305_rtpsize',
-        'xsalsa20_poly1305_lite_rtpsize',
-        'xsalsa20_poly1305_lite',
-        'xsalsa20_poly1305_suffix',
-        'xsalsa20_poly1305',
     }
 
     def __init__(self, client, server_id, is_dm=False, max_reconnects=5, encoder='json', video_enabled=False):
@@ -131,6 +126,7 @@ class VoiceClient(LoggingClass):
         self.video_codec = None
         self.transport_id = None
         self.secure_frames_version = None
+        self.seq = -1
 
         # Websocket connection
         self.ws = None
@@ -235,12 +231,12 @@ class VoiceClient(LoggingClass):
                 return
             self._last_heartbeat = time_perf_counter()
 
-            self.send(VoiceOPCode.HEARTBEAT, time())
+            self.send(VoiceOPCode.HEARTBEAT, {'seq_ack': self.seq, 't': int(time())})
             self._heartbeat_acknowledged = False
             gevent_sleep(interval / 1000)
 
     def handle_heartbeat(self, _):
-        self.send(VoiceOPCode.HEARTBEAT, int(time()))
+        self.send(VoiceOPCode.HEARTBEAT, {'seq_ack': self.seq, 't': int(time())})
 
     def handle_heartbeat_acknowledge(self, _):
         self.log.debug('[{}] Received WS HEARTBEAT_ACK'.format(self.channel_id))
@@ -500,6 +496,8 @@ class VoiceClient(LoggingClass):
         try:
             data = self.encoder.decode(msg)
             self.packets.emit(data['op'], data['d'])
+            if 'seq' in data:
+                self.seq = data['seq']
         except Exception:
             self.log.exception('Failed to parse voice gateway message: ')
 
@@ -515,8 +513,10 @@ class VoiceClient(LoggingClass):
                 'server_id': self.server_id,
                 'session_id': self._session_id,
                 'token': self.token,
+                'seq_ack': self.seq,
             })
         else:
+            self.seq = -1
             self.send(VoiceOPCode.IDENTIFY, {
                 'server_id': self.server_id,
                 'user_id': self.user_id,

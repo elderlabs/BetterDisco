@@ -195,13 +195,13 @@ class Bot(LoggingClass):
         # Stores a giant regex matcher for all commands
         self.command_matches_re = None
 
-        # Finally, load all the plugin modules that where passed with the config
+        # Finally, load all the plugin modules that were passed with the config
         for plugin_mod in self.config.plugins:
             self.add_plugin_module(plugin_mod)
 
         # Convert our configured mapping of entities to levels into something
-        #  we can actually use. This ensures IDs are converted properly, and maps
-        #  any level names (e.g. `role_id: admin`) map to their numerical values.
+        # we can actually use. This ensures IDs are converted properly, and maps
+        # any level names (e.g. `role_id: admin`) to their numerical values.
         for entity_id, level in tuple(self.config.levels.items()):
             del self.config.levels[entity_id]
             entity_id = int(entity_id) if str(entity_id).isdigit() else entity_id

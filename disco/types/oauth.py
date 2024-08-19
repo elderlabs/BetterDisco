@@ -46,6 +46,15 @@ class ApplicationFlagsValue(BitsetValue):
     map = ApplicationFlags
 
 
+class ApplicationIntegrationType:
+    GUILD_INSTALL = 0
+    USER_INSTALL = 1
+
+
+class ApplicationIntegrationTypeConfiguration(SlottedModel):
+    oauth2_install_params = Field(ApplicationInstallParams)
+
+
 class Application(SlottedModel):
     id = Field(snowflake)
     name = Field(text)
@@ -67,11 +76,13 @@ class Application(SlottedModel):
     cover_image = Field(text)
     flags = Field(ApplicationFlagsValue)
     approximate_guild_count = Field(int)
+    approximate_user_install_count = Field(int)
     redirect_uris = ListField(str)
     interactions_endpoint_url = Field(str)
     role_connections_verification_url = Field(str)
     tags = ListField(str)
     install_params = Field(ApplicationInstallParams)
+    integration_types_config = Field(dict)  # TODO: this is a dumpster-fire
     custom_install_url = Field(str)
 
     def user_is_owner(self, user):
