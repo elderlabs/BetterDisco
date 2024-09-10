@@ -296,7 +296,7 @@ class GuildMember(SlottedModel):
         """
         return self.nick or self.user.username
 
-    def get_avatar_url(self, fmt=None, size=1024):
+    def get_avatar_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.avatar:
             return self.user.get_avatar_url(fmt, size)
 
@@ -305,7 +305,7 @@ class GuildMember(SlottedModel):
         elif fmt == 'gif' and not self.avatar.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/guilds/{}/users/{}/avatars/{}.{}?size={}'.format(self.guild_id, self.id, self.avatar, fmt, size)
+        return 'https://cdn.discordapp.com/guilds/{}/users/{}/avatars/{}.{}?size={}&quality={}'.format(self.guild_id, self.id, self.avatar, fmt, size, quality)
 
     def get_voice_state(self):
         """
@@ -847,7 +847,7 @@ class Guild(SlottedModel, Permissible):
     def get_voice_regions(self):
         return self.client.api.guilds_voice_regions_list(self.id)
 
-    def get_icon_url(self, fmt=None, size=1024):
+    def get_icon_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.icon:
             return ''
 
@@ -856,7 +856,7 @@ class Guild(SlottedModel, Permissible):
         elif fmt == 'gif' and not self.icon.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}'.format(self.id, self.icon, fmt, size)
+        return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}&quality={}'.format(self.id, self.icon, fmt, size, quality)
 
     def get_vanity_url(self):
         if not self.vanity_url_code:
@@ -864,7 +864,7 @@ class Guild(SlottedModel, Permissible):
 
         return 'https://discord.gg/' + self.vanity_url_code
 
-    def get_splash_url(self, fmt=None, size=1024):
+    def get_splash_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.splash:
             return ''
 
@@ -873,9 +873,9 @@ class Guild(SlottedModel, Permissible):
         elif fmt == 'gif' and not self.splash.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/splashes/{}/{}.{}?size={}'.format(self.id, self.splash, fmt, size)
+        return 'https://cdn.discordapp.com/splashes/{}/{}.{}?size={}&quality={}'.format(self.id, self.splash, fmt, size, quality)
 
-    def get_banner_url(self, fmt=None, size=1024):
+    def get_banner_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.banner:
             return ''
 
@@ -884,7 +884,7 @@ class Guild(SlottedModel, Permissible):
         elif fmt == 'gif' and not self.banner.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/banners/{}/{}.{}?size={}'.format(self.id, self.banner, fmt, size)
+        return 'https://cdn.discordapp.com/banners/{}/{}.{}?size={}&quality={}'.format(self.id, self.banner, fmt, size, quality)
 
     @property
     def icon_url(self):

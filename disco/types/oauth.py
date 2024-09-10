@@ -92,7 +92,7 @@ class Application(SlottedModel):
 
         return any(user_id == member.user.id for member in self.team.members)
 
-    def get_icon_url(self, fmt=None, size=1024):
+    def get_icon_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.icon:
             return ''
 
@@ -101,9 +101,9 @@ class Application(SlottedModel):
         elif fmt == 'gif' and not self.icon.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}'.format(self.id, self.icon, fmt, size)
+        return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}&quality={}'.format(self.id, self.icon, fmt, size, quality)
 
-    def get_cover_image_url(self, fmt=None, size=1024):
+    def get_cover_image_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.cover_image:
             return ''
 
@@ -112,7 +112,7 @@ class Application(SlottedModel):
         elif fmt == 'gif' and not self.cover_image.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/app-icons/{}/{}.{}?size={}'.format(self.id, self.cover_image, fmt, size)
+        return 'https://cdn.discordapp.com/app-icons/{}/{}.{}?size={}&quality={}'.format(self.id, self.cover_image, fmt, size, quality)
 
     @property
     def icon_url(self):

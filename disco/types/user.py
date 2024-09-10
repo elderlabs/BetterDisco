@@ -113,7 +113,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
     def __repr__(self):
         return '<User id={} user={}>'.format(self.id, self)
 
-    def get_avatar_url(self, fmt=None, size=1024):
+    def get_avatar_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.avatar:
             return 'https://cdn.discordapp.com/embed/avatars/{}.png'.format((self.discriminator if self.discriminator else (self.id >> 22)) % len(DefaultAvatars.ALL))
 
@@ -122,9 +122,9 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
         elif fmt == 'gif' and not self.avatar.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/avatars/{}/{}.{}?size={}'.format(self.id, self.avatar, fmt, size)
+        return 'https://cdn.discordapp.com/avatars/{}/{}.{}?size={}&quality={}'.format(self.id, self.avatar, fmt, size, quality)
 
-    def get_banner_url(self, fmt=None, size=1024):
+    def get_banner_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.banner:
             return ''
 
@@ -133,7 +133,7 @@ class User(SlottedModel, with_equality('id'), with_hash('id')):
         elif fmt == 'gif' and not self.banner.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/banners/{}/{}.{}?size={}'.format(self.id, self.avatar, fmt, size)
+        return 'https://cdn.discordapp.com/banners/{}/{}.{}?size={}&quality={}'.format(self.id, self.avatar, fmt, size, quality)
 
     @property
     def default_avatar(self):
