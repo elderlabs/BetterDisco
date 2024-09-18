@@ -1,11 +1,6 @@
 from warnings import warn as warnings_warn
 
 try:
-    from nacl.utils import EncryptedMessage
-except ImportError:
-    warnings_warn('nacl is not installed, voice support is disabled')
-
-try:
     from libnacl import crypto_aead_xchacha20poly1305_ietf_encrypt, crypto_aead_xchacha20poly1305_ietf_decrypt, crypto_aead_aes256gcm_encrypt, crypto_aead_aes256gcm_decrypt
 except ImportError:
     warnings_warn('libnacl is not installed, AES support is disabled')
@@ -13,7 +8,9 @@ except ImportError:
 
 class AEScrypt:
     """
-    BECAUSE PYNACL REFUSES TO DO IT WITH THEIR TERRIBLE SELF-RIGHTEOUS PRACTICES
+    BECAUSE PYNACL REFUSED TO DO IT WITH THEIR TERRIBLE SELF-RIGHTEOUS PRACTICES,
+    BUT IN THIS MODERN AGE, WE NEEDED A GRACEFUL WRAPPER FOR LIBNACL AS PYNACL IS DEAD.
+    LONG LIVE LIBNACL, THE INFINITELY SUPERIOR SUCCESSOR TO PYNACL.
     """
     def __init__(self, key: bytes, ciper: str):
         self._key = key
@@ -25,10 +22,9 @@ class AEScrypt:
 
     def encrypt(self, plaintext: bytes, nonce: bytes, aad: bytes) -> bytes:
         if self.cipher == 'aead_xchacha20_poly1305_rtpsize':
-            payload = crypto_aead_xchacha20poly1305_ietf_encrypt(message=plaintext, aad=aad, nonce=nonce, key=self._key)
+            return crypto_aead_xchacha20poly1305_ietf_encrypt(message=plaintext, aad=aad, nonce=nonce, key=self._key)
         else:
-            payload = crypto_aead_aes256gcm_encrypt(message=plaintext, aad=aad, nonce=nonce, key=self._key)
-        return EncryptedMessage._from_parts(nonce, payload, nonce + payload)
+            return crypto_aead_aes256gcm_encrypt(message=plaintext, aad=aad, nonce=nonce, key=self._key)
 
     def decrypt(self, ciphertext: bytes, nonce: bytes, aad: bytes) -> bytes:
         if self.cipher == 'aead_xchacha20_poly1305_rtpsize':

@@ -157,11 +157,9 @@ class UDPVoiceClient(LoggingClass):
 
         # Encrypt the payload with the nonce
         payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce), aad=bytes(self._rtp_audio_header))
-        payload = payload.ciphertext
 
-        # Pad the payload with the nonce, if applicable
-        if nonce_padding:
-            payload += nonce_padding
+        # Pad the payload with the nonce
+        payload += nonce_padding
 
         # Send the header (sans nonce padding) plus the payload
         self.send(self._rtp_audio_header + payload)
