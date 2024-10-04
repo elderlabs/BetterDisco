@@ -7,11 +7,11 @@ from unicodedata import normalize as unicodedata_normalize
 
 from disco.types.base import (
     BitsetMap, BitsetValue, SlottedModel, Field, ListField, AutoDictField,
-    snowflake, text, datetime, enum, cached_property,
+    snowflake, text, datetime, enum, cached_property, DictField,
 )
-from disco.types.channel import Channel, ChannelMention, ChannelType, Thread
-from disco.types.guild import GuildMember
-from disco.types.oauth import Application
+from disco.types.channel import Channel, ChannelMention, ChannelType, Thread, RoleSubscriptionData
+from disco.types.guild import GuildMember, Role
+from disco.types.oauth import Application, ApplicationIntegrationType
 from disco.types.reactions import Emoji, MessageReaction, StickerItem
 from disco.types.user import User
 from disco.util.paginator import Paginator
@@ -92,6 +92,9 @@ class MessageFlags(BitsetMap):
     FAILED_TO_MENTION_SOME_ROLES_IN_THREAD = 1 << 8
     # UNKNOWN = 1 << 9
     SHOULD_SHOW_LINK_NOT_DISCORD_WARNING = 1 << 10
+    # UNKNOWN = 1 << 11
+    SUPPRESS_NOTIFICATIONS = 1 << 12
+    IS_VOICE_MESSAGE = 1 << 13
 
 
 class MessageFlagValue(BitsetValue):
@@ -479,6 +482,16 @@ class MessageInteraction(SlottedModel):
     member = Field(GuildMember)
 
 
+class MessageInterationMetadata(SlottedModel):
+    id = Field(snowflake)
+    type = Field(enum(_InteractionType))
+    user = Field(User)
+    authorizing_integration_owners = DictField(enum(ApplicationIntegrationType), snowflake)
+    original_response_message_id = Field(snowflake)
+    interacted_message_id = Field(snowflake)
+    triggering_interaction_metadata = Field(dict)
+
+
 class MessagePollTypes:
     DEFAULT = 1
 
@@ -511,6 +524,11 @@ class MessagePoll(SlottedModel):
     layout_type = Field(enum(MessagePollTypes))
     question = Field(MessagePollMedia)
     results = Field(MessagePollResults)
+
+
+class MessageCall(SlottedModel):
+    participants = ListField(snowflake)
+    ended_timestamp = Field(datetime)
 
 
 class _Message(SlottedModel):
@@ -565,7 +583,7 @@ class _Message(SlottedModel):
     id = Field(snowflake)
     channel_id = Field(snowflake)
     guild_id = Field(snowflake)
-    author = Field(User)
+    author = Field(User, create=False)
     member = Field(GuildMember, create=False)
     content = Field(text)
     timestamp = Field(datetime)
@@ -585,13 +603,16 @@ class _Message(SlottedModel):
     activity = Field(MessageActivity, create=False)
     application = Field(Application, create=False)
     application_id = Field(snowflake)
-    message_reference = Field(MessageReference, create=False)
     flags = Field(MessageFlagValue)
-    interaction = Field(MessageInteraction, create=False)
-    # _thread = Field(Thread, alias='thread', create=False)  # fix this
+    message_reference = Field(MessageReference, create=False)
+    interaction_metadata = Field(MessageInterationMetadata, create=False)
+    interaction = Field(MessageInteraction, create=False)  # deprecated
     components = ListField(MessageComponent)
     sticker_items = ListField(StickerItem)
+    position = Field(int)
+    role_subscription_data = Field(RoleSubscriptionData, create=False)
     poll = Field(MessagePoll, create=False)
+    call = Field(MessageCall, create=False)
 
     def __repr__(self):
         return '<Message id={} channel_id={}>'.format(self.id, self.channel_id)
@@ -863,8 +884,23 @@ class _Message(SlottedModel):
         return content
 
 
+class MessageResolvedData(SlottedModel):
+    users = DictField(snowflake, User)
+    members = DictField(snowflake, GuildMember)
+    roles = DictField(snowflake, Role)
+    channels = DictField(snowflake, Channel)
+    messages = DictField(snowflake, _Message)
+    attachments = DictField(snowflake, MessageAttachment)
+
+
+class MessageSnapshot(SlottedModel):
+    message = Field(_Message)
+
+
 class Message(_Message):
+    message_snapshots = ListField(MessageSnapshot, create=False)
     referenced_message = Field(_Message, create=False)
+    resolved = Field(MessageResolvedData)
 
 
 class MessageTable:
