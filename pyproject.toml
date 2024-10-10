@@ -1,0 +1,59 @@
+[project]
+name = "betterdisco-py"
+description = "A Discord API library, written in Python, for those that like to dance. [QUEUE COWBOY BEBOP THEME]"
+version = "2024.10.10"
+requires-python = ">= 3.9"
+license = {text = "MIT License"}
+readme = {file = "README.md", content-type = "text/markdown"}
+keywords = ["discord", "disco", "disco-py", "bdisco",]
+dynamic = ["dependencies",]
+
+authors = [
+    {name = "Andrei Zbikowski"},
+]
+maintainers = [
+    {name = "The BetterDisco Team"},
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+]
+
+[project.optional-dependencies]
+all = ["betterdisco-py[http,performance,sharding,voice,yaml]"]
+http = ["flask >= 3.0.3",]
+performance = ["erlpack >= 1.0.0", "isal >= 1.7.0", "regex >= 2024.7.24", "pylibyaml >= 0.1.0", "ujson >= 5.10.0", "wsaccel >= 0.6.6",]
+redis = ["redis >= 5.0.8", "hiredis >= 3.0.0",]
+sharding = ["gipc >= 1.6.0", "dill >= 0.3.8",]
+voice = ["libnacl >= 2.1.0",]
+yaml = ["pyyaml >= 6.0.2",]
+
+[project.urls]
+Repository = "https://github.com/elderlabs/BetterDisco.git"
+
+[build-system]
+requires = ["setuptools >= 75.1.0", "wheel >= 0.44.0",]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+dependencies = {file = "requirements.txt"}
+
+[tool.setuptools.packages.find]
+include = ["disco*",]
+namespaces = false

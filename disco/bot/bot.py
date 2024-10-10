@@ -208,6 +208,9 @@ class Bot(LoggingClass):
             level = int(level) if str(level).isdigit() else get_enum_value_by_name(CommandLevels, level)
             self.config.levels[entity_id] = level
 
+    def __repr__(self):
+        return f'<DiscoBot bot_id={self.client.state.me.id} shard_id={self.client.config.shard_id}>'
+
     @classmethod
     def from_cli(cls, *plugins):
         """
@@ -577,7 +580,7 @@ class Bot(LoggingClass):
             self.add_plugin(plugin, config)
 
         if not loaded:
-            raise Exception(f'Could not find any plugins to load within module {path}')
+            self.log.error(f'Could not find plugins to load within module {path}')
 
     def load_plugin_config(self, cls):
         name = cls.__name__.lower()

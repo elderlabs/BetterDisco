@@ -140,6 +140,9 @@ class State:
         self.listeners = []
         self.bind()
 
+    def __repr__(self):
+        return f'<DiscoState bot_id={self.me.id} shard_id={self.client.config.shard_id}>'
+
     def unbind(self):
         """
         Unbinds all bound event listeners for this state object.
@@ -172,7 +175,7 @@ class State:
         self.me.inplace_update(event.user)
 
     def on_message_create(self, event):
-        if self.config.cache_users and event.message.author.id not in self.users:
+        if self.config.cache_users and event.message.author.id not in self.users and not event.message.webhook_id:
             self.users[event.message.author.id] = event.message.author
 
         if self.config.sync_guild_members and event.message.member:

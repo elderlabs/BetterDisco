@@ -69,6 +69,9 @@ class APIClient(LoggingClass):
 
         self._captures = local()
 
+    def __repr__(self):
+        return '<Disco APIClient{}>'.format(f' shard_id={self.client.config.shard_id}' if self.client else '')
+
     def _after_requests(self, response):
         if not hasattr(self._captures, 'responses'):
             return

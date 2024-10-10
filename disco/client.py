@@ -111,6 +111,9 @@ class Client(LoggingClass):
                                                localf=lambda: self.manhole_locals)
             self.manhole.start()
 
+    def __repr__(self):
+        return '<DiscoClient{}{}>'.format(f' bot_id={self.state.me.id}' if self.state and self.state.me else '', f' shard_id={self.config.shard_id}')
+
     def update_presence(self, status, game=None, afk=False, since=0.0):
         """
         Updates the current client's presence.

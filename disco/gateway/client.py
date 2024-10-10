@@ -1,7 +1,7 @@
 from gevent import sleep as gevent_sleep, spawn as gevent_spawn
 from gevent.event import Event as GeventEvent
 from platform import system as platform_system
-from time import perf_counter as time_perf_counter, perf_counter_ns as time_perf_counter_ns
+from time import time, perf_counter_ns as time_perf_counter_ns
 from websocket import ABNF, WebSocketConnectionClosedException, WebSocketTimeoutException
 from zlib import decompress as zlib_decompress, decompressobj as zlib_decompressobj
 
@@ -76,6 +76,9 @@ class GatewayClient(LoggingClass):
         self._last_heartbeat = 0
         self.latency = -1
 
+    def __repr__(self):
+        return f'<GatewayClient shard_id={self.client.config.shard_id} endpoint={self._cached_gateway_url}>'
+
     def send(self, op, data):
         if not self.ws.is_closed:
             self.limiter.check()
@@ -98,7 +101,7 @@ class GatewayClient(LoggingClass):
                 self.ws.close(status=1000)
                 self.client.gw.on_close(0, 'HEARTBEAT failure')
                 return
-            self._last_heartbeat = time_perf_counter()
+            self._last_heartbeat = time()
 
             self._send(OPCode.HEARTBEAT, self.seq)
             self._heartbeat_acknowledged = False
@@ -125,7 +128,7 @@ class GatewayClient(LoggingClass):
     def handle_heartbeat_acknowledge(self, _):
         self.log.debug('Received HEARTBEAT_ACK')
         self._heartbeat_acknowledged = True
-        self.latency = float('{:.2f}'.format((time_perf_counter() - self._last_heartbeat) * 1000))
+        self.latency = self.ws.last_pong_tm and float('{:.2f}'.format((self.ws.last_pong_tm - self.ws.last_ping_tm) * 1000))
 
     def handle_reconnect(self, _):
         self.log.warning('Received RECONNECT request; resuming')
@@ -175,7 +178,7 @@ class GatewayClient(LoggingClass):
         self.ws.emitter.on('on_close', self.on_close)
         self.ws.emitter.on('on_message', self.on_message)
 
-        self.ws.run_forever()
+        self.ws.run_forever(ping_interval=60, ping_timeout=5)
 
     def on_message(self, msg):
         if self.zlib_stream_enabled:
