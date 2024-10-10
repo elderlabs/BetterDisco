@@ -366,7 +366,7 @@ class UDPVoiceClient(LoggingClass):
                 return None, None
 
             # Read IP and port
-            ip = str(data[8:]).split('\x00', 1)[0]
+            ip = str(data[8:].split(b'\x00', 1)[0], "utf=8")
             port = struct_unpack('<H', data[-2:])[0]  # little endian, unsigned short
 
         # Spawn read thread so we don't max buffers
