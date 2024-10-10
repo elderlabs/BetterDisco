@@ -1,5 +1,5 @@
 from gevent import sleep as gevent_sleep, spawn as gevent_spawn
-from time import perf_counter as time_perf_counter, time
+from time import time
 
 from collections import namedtuple as namedtuple
 from websocket import WebSocketConnectionClosedException, WebSocketTimeoutException
@@ -87,6 +87,9 @@ class VoiceClient(LoggingClass):
         self.video_enabled = video_enabled
         self.media = None
 
+        self.deaf = False
+        self.mute = False
+
         self.proxy = None
 
         # Set the VoiceClient in the state's voice clients
@@ -117,7 +120,7 @@ class VoiceClient(LoggingClass):
         self.ip = None
         self.port = None
         self.enc_modes = None
-        self.experiments = None
+        self.experiments = []
         # self.streams = None
         self.sdp = None
         self.mode = None
@@ -125,6 +128,7 @@ class VoiceClient(LoggingClass):
         self.audio_codec = None
         self.video_codec = None
         self.transport_id = None
+        self.keyframe_interval = None
         self.secure_frames_version = None
         self.seq = -1
 
@@ -137,6 +141,8 @@ class VoiceClient(LoggingClass):
         self._heartbeat_acknowledged = True
         self._identified = False
         self._safe_reconnect_state = False
+        self._creation_time = time()
+        self._ws_creation_time = None
 
         # Latency
         self._last_heartbeat = 0
@@ -147,11 +153,8 @@ class VoiceClient(LoggingClass):
         self.video_ssrcs = {}
         self.rtx_ssrcs = {}
 
-        self.deaf = False
-        self.mute = False
-
     def __repr__(self):
-        return '<VoiceClient guild_id={} channel_id={}>'.format(self.server_id, self.channel_id)
+        return f'<VoiceClient guild_id={self.server_id} channel_id={self.channel_id} endpoint={self.endpoint}>'
 
     @cached_property
     def guild(self):
@@ -219,7 +222,7 @@ class VoiceClient(LoggingClass):
         self.ws.emitter.on('on_error', self.on_error)
         self.ws.emitter.on('on_close', self.on_close)
         self.ws.emitter.on('on_message', self.on_message)
-        self.ws.run_forever()
+        self.ws.run_forever(ping_interval=60, ping_timeout=5)
 
     def heartbeat_task(self, interval):
         while True:
@@ -229,7 +232,7 @@ class VoiceClient(LoggingClass):
                 self.ws.close(status=4000)
                 self.on_close(0, 'HEARTBEAT failure')
                 return
-            self._last_heartbeat = time_perf_counter()
+            self._last_heartbeat = time()
 
             self.send(VoiceOPCode.HEARTBEAT, {'seq_ack': self.seq, 't': int(time())})
             self._heartbeat_acknowledged = False
@@ -241,7 +244,7 @@ class VoiceClient(LoggingClass):
     def handle_heartbeat_acknowledge(self, _):
         self.log.debug('[{}] Received WS HEARTBEAT_ACK'.format(self.channel_id))
         self._heartbeat_acknowledged = True
-        self.latency = float('{:.2f}'.format((time_perf_counter() - self._last_heartbeat) * 1000))
+        self.latency = self.ws.last_pong_tm and float('{:.2f}'.format((self.ws.last_pong_tm - self.ws.last_ping_tm) * 1000))
 
     def set_speaking(self, voice=False, soundshare=False, priority=False, delay=0):
         value = SpeakingFlags.NONE
@@ -302,12 +305,14 @@ class VoiceClient(LoggingClass):
         self.video_codec = data['video_codec']
         if 'media_session_id' in data.keys():
             self.transport_id = data['media_session_id']
+        if 'keyframe_interval' in data.keys():
+            self.keyframe_interval = data['keyframe_interval']
 
         # Set the UDP's RTP Audio Header's Payload Type
-        self.udp.set_audio_codec(data['audio_codec'])
+        # self.udp.set_audio_codec(data['audio_codec'])  # bypass because the audio codec will always be opus
 
     def on_voice_hello(self, packet):
-        self.log.info('[{}] Received Voice HELLO payload, starting heartbeater'.format(self.channel_id))
+        self.log.info('[{}] Received HELLO payload, starting heartbeater'.format(self.channel_id))
         self._heartbeat_task = gevent_spawn(self.heartbeat_task, packet['heartbeat_interval'])
         self.set_state(VoiceState.AUTHENTICATED)
 
@@ -349,7 +354,7 @@ class VoiceClient(LoggingClass):
             codecs.append({
                 'name': codec,
                 'payload_type': RTPPayloadTypes.get(codec).value,
-                'priority': idx,
+                'priority': 1000 + idx,
                 'type': 'audio',
             })
 
@@ -362,7 +367,7 @@ class VoiceClient(LoggingClass):
                         'encode': False,
                         'name': codec,
                         'payload_type': ptype.value,
-                        'priority': idx,
+                        'priority': 1000 * idx,
                         'rtxPayloadType': ptype.value + 1,
                         'type': 'video',
                     })
@@ -376,7 +381,7 @@ class VoiceClient(LoggingClass):
                 'mode': self.mode,
             },
             'codecs': codecs,
-            'experiments': [],
+            'experiments': self.experiments,
         })
         self.send(VoiceOPCode.CLIENT_CONNECT, {
             'audio_ssrc': self.ssrc,
@@ -396,17 +401,19 @@ class VoiceClient(LoggingClass):
 
         self.mode = sdp['mode']  # UDP-only, does not apply to webRTC
         self.audio_codec = sdp['audio_codec']
-        if self.video_enabled:
-            self.video_codec = sdp['video_codec']
         self.transport_id = sdp['media_session_id']  # analytics
         self.secure_frames_version = sdp['secure_frames_version']
-        # self.sdp = sdp['sdp']  # webRTC only
-        # self.keyframe_interval = sdp['keyframe_interval']
+        if 'sdp' in sdp.keys():
+            self.sdp = sdp['sdp']  # webRTC only
 
         # Set the UDP's RTP Audio Header's Payload Type
         self.udp.set_audio_codec(sdp['audio_codec'])
+
         if self.video_enabled:
+            self.video_codec = sdp['video_codec']
             self.udp.set_video_codec(sdp['video_codec'])
+        if 'keyframe_interval' in sdp.keys():
+            self.keyframe_interval = sdp['keyframe_interval']
 
         # Create a secret box for encryption/decryption
         self.udp.setup_encryption(bytes(bytearray(sdp['secret_key'])))  # UDP only
@@ -496,10 +503,10 @@ class VoiceClient(LoggingClass):
         try:
             data = self.encoder.decode(msg)
             self.packets.emit(data['op'], data['d'])
-            if 'seq' in data:
+            if 'seq' in data.keys():
                 self.seq = data['seq']
         except Exception:
-            self.log.exception('Failed to parse voice gateway message: ')
+            self.log.error('Failed to parse voice gateway message: ')
 
     def on_error(self, error):
         if isinstance(error, WebSocketTimeoutException):
@@ -600,8 +607,9 @@ class VoiceClient(LoggingClass):
 
         if not self.state_emitter.once(VoiceState.CONNECTED, timeout=timeout):
             self.disconnect()
-            raise VoiceException('Failed to connect to voice', self)
+            self.log.error(f'[{self.channel_id}] Failed to connect to voice')
         else:
+            self._ws_creation_time = time()
             return self
 
     def disconnect(self):

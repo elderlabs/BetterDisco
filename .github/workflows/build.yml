@@ -1,80 +1,93 @@
-name: Dance
+name: DANCE
 
 on:
   push:
     branches:
       - main
-
-permissions:
-  contents: read
+    path:
+      - 'disco/**'
+  workflow_dispatch:
 
 jobs:
   build:
-
+    name: Build
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.x"
-      - name: Install Dependencies
-        run: |
-          python -m pip install --no-cache-dir --upgrade pip
-          python -m pip install --no-cache-dir --upgrade build
-      - name: Build binary wheel and source tarball
-        run: python -m build
-      - name: Store distribution packages
-        uses: actions/upload-artifact@v3
-        with:
-          name: python-package-distributions
-          path: dist/
+    - name: Pull Repository
+      uses: actions/checkout@v4
+    - name: Setup Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install Dependencies
+      run: |
+        python -m pip install --no-cache-dir --upgrade pip
+        python -m pip install --no-cache-dir --upgrade setuptools
+        python -m pip install --no-cache-dir --upgrade wheel
+        python -m pip install --no-cache-dir --upgrade -r requirements.txt
+        python -m pip install --no-cache-dir --upgrade build
+    - name: Build Wheel and Tarball Packages
+      run: python3 -m build
+    - name: Store distribution packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+
   publish:
+    name: Publish
     needs:
-      - build
+    - build
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/betterdisco
+      url: https://pypi.org/p/betterdisco-py
     permissions:
       id-token: write
+
     steps:
-    - name: Download distributions
-      uses: actions/download-artifact@v3
+    - name: Download Distributions
+      uses: actions/download-artifact@v4
       with:
         name: python-package-distributions
         path: dist/
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        skip-existing: true
+
   github-release:
-    name: >-
-      Sign with Sigstore, upload to GitHub Releases
+    name: Sign and Release
     needs:
-    - publish-to-pypi
+    - build
     runs-on: ubuntu-latest
+
     permissions:
-      contents: write
-      id-token: write
+      contents: write  # IMPORTANT: mandatory for making GitHub Releases
+      id-token: write  # IMPORTANT: mandatory for sigstore
+
     steps:
-    - name: Download distributions
-      uses: actions/download-artifact@v3
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - uses: actions/download-artifact@v4
       with:
         name: python-package-distributions
         path: dist/
-    - name: Sign dists with Sigstore
-      uses: sigstore/gh-action-sigstore-python@v1.2.3
+    - name: Sign
+      uses: sigstore/gh-action-sigstore-python@v2.1.1
       with:
-        inputs: >-
+        inputs: |
           ./dist/*.tar.gz
           ./dist/*.whl
-    - name: Create GitHub Release
+    - name: Create Release
       env:
         GITHUB_TOKEN: ${{ github.token }}
-      run: >-
+      run: |
         gh release create '${{ github.ref_name }}' --repo '${{ github.repository }}' --notes ""
-    - name: Upload artifact signatures to GitHub Releases
+    - name: Upload Release
       env:
         GITHUB_TOKEN: ${{ github.token }}
-      run: >-
+      run: |
         gh release upload '${{ github.ref_name }}' dist/** --repo '${{ github.repository }}'
