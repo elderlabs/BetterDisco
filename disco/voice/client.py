@@ -185,7 +185,7 @@ class VoiceClient(LoggingClass):
         return self.ssrc + 3
 
     def set_state(self, state):
-        self.log.debug('[{}] state {} -> {}'.format(self.channel_id or '-', self.state, state))
+        self.log.info('[{}] state {} -> {}'.format(self.channel_id or '-', self.state, state))
         prev_state = self.state
         self.state = state
         self.state_emitter.emit(state, prev_state)
@@ -333,7 +333,7 @@ class VoiceClient(LoggingClass):
         for mode in self.enc_modes:
             if mode in self.SUPPORTED_MODES:
                 self.mode = mode
-                self.log.debug('[{}] Selected mode {}'.format(self.channel_id, mode))
+                self.log.info('[{}] Selected mode {}'.format(self.channel_id, mode))
                 break
         else:
             raise Exception('Failed to find a supported voice mode')

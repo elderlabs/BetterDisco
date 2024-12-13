@@ -3,7 +3,11 @@ from gevent.event import Event as GeventEvent
 from platform import system as platform_system
 from time import time, perf_counter_ns as time_perf_counter_ns
 from websocket import ABNF, WebSocketConnectionClosedException, WebSocketTimeoutException
-from zlib import decompress as zlib_decompress, decompressobj as zlib_decompressobj
+
+try:
+    from isal.isal_zlib import decompress as zlib_decompress, decompressobj as zlib_decompressobj
+except ImportError:
+    from zlib import decompress as zlib_decompress, decompressobj as zlib_decompressobj
 
 from disco.gateway.packets import OPCode, RECV, SEND
 from disco.gateway.events import GatewayEvent

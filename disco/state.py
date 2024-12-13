@@ -53,6 +53,7 @@ class StateConfig(Config):
         to batch requests using the underlying `GatewayClient.request_guild_members`
         interface.
     """
+    message_create = True
     track_messages = False
     track_messages_size = 100
 
@@ -101,16 +102,7 @@ class State:
     messages : Optional[dict(snowflake, deque)]
         Mapping of channel ids to dequeue containing `StackMessage` objects.
     """
-    EVENTS = [
-        'Ready', 'UserUpdate', 'MessageCreate', 'ChannelCreate', 'ChannelDelete', 'ChannelTopicUpdate', 'ChannelUpdate',
-        'GuildCreate', 'GuildDelete', 'GuildUpdate', 'GuildEmojisUpdate', 'GuildMemberAdd', 'GuildMemberRemove',
-        'GuildMembersChunk', 'GuildMemberUpdate', 'GuildRoleCreate', 'GuildRoleDelete', 'GuildRoleUpdate',
-        'GuildScheduledEventCreate', 'GuildScheduledEventDelete', 'GuildScheduledEventUpdate',
-        'GuildSoundboardSoundCreate', 'GuildSoundboardSoundDelete', 'GuildSoundboardSoundUpdate', 'GuildStickersUpdate',
-        'PresenceUpdate', 'StageInstanceCreate', 'StageInstanceDelete', 'StageInstanceUpdate', 'ThreadCreate',
-        'ThreadDelete', 'ThreadListSync', 'ThreadUpdate', 'VoiceChannelStatusUpdate', 'VoiceServerUpdate',
-        'VoiceStateUpdate',
-    ]
+    EVENTS = ['Ready', 'UserUpdate', 'GuildCreate', 'GuildDelete', 'GuildUpdate', 'VoiceServerUpdate']
 
     def __init__(self, client, config):
         self.client = client
@@ -134,7 +126,40 @@ class State:
         # If message tracking is enabled, listen to those events
         if self.config.track_messages:
             self.messages = DefaultHashMap(lambda: deque(maxlen=self.config.track_messages_size))
-            self.EVENTS += ['MessageDelete', 'MessageDeleteBulk']
+            self.EVENTS += ['MessageDelete', 'MessageDeleteBulk',]
+
+        if self.config.message_create:
+            self.EVENTS += ['MessageCreate',]
+
+        if self.config.sync_guild_members:
+            self.EVENTS += ['GuildMemberAdd', 'GuildMemberRemove', 'GuildMembersChunk', 'GuildMemberUpdate', 'PresenceUpdate',]
+
+        if self.config.cache_channels or self.config.cache_dm_channels:
+            self.EVENTS += ['ChannelCreate', 'ChannelDelete', 'ChannelTopicUpdate', 'ChannelUpdate', 'VoiceChannelStatusUpdate',]
+
+        if self.config.cache_threads:
+            self.EVENTS += ['ThreadCreate', 'ThreadDelete', 'ThreadListSync', 'ThreadUpdate',]
+
+        if self.config.cache_roles:
+            self.EVENTS += ['GuildRoleCreate', 'GuildRoleDelete', 'GuildRoleUpdate',]
+
+        if self.config.cache_voice_states:
+            self.EVENTS += ['VoiceStateUpdate',]
+
+        if self.config.cache_emojis:
+            self.EVENTS += ['GuildEmojisUpdate',]
+
+        if self.config.cache_stickers:
+            self.EVENTS += ['GuildStickersUpdate',]
+
+        if self.config.cache_soundboard:
+            self.EVENTS += ['GuildSoundboardSoundCreate', 'GuildSoundboardSoundDelete', 'GuildSoundboardSoundUpdate',]
+
+        if self.config.cache_scheduled_events:
+            self.EVENTS += ['GuildScheduledEventCreate', 'GuildScheduledEventDelete', 'GuildScheduledEventUpdate',]
+
+        if self.config.cache_stage_instances:
+            self.EVENTS += ['StageInstanceCreate', 'StageInstanceDelete', 'StageInstanceUpdate',]
 
         # The bound listener objects
         self.listeners = []
