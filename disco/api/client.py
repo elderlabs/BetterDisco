@@ -462,14 +462,14 @@ class APIClient(LoggingClass):
                 }
 
             r = self.http(
-                Routes.CHANNELS_THREAD_START,
+                Routes.CHANNELS_THREAD_CREATE,
                 dict(channel=channel),
                 data={'payload_json': json.dumps(payload)},
                 files=files,
                 headers=_reason_header(reason)
             )
         else:
-            r = self.http(Routes.CHANNELS_THREAD_START, dict(channel=channel), json=payload, headers=_reason_header(reason))
+            r = self.http(Routes.CHANNELS_THREAD_CREATE, dict(channel=channel), json=payload, headers=_reason_header(reason))
 
         # Catch API failures
         # TODO: long-term solution at higher level
