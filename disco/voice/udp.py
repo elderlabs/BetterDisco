@@ -1,22 +1,23 @@
-import struct
-import socket
-import gevent
-import warnings
-
 from collections import namedtuple
+from struct import pack_into as struct_pack_into, unpack_from as struct_unpack_from, unpack as struct_unpack
+from socket import socket, gethostbyname as socket_gethostbyname, AF_INET as SOCKET_AF_INET, SOCK_DGRAM as SOCKET_SOCK_DGRAM
+from gevent import spawn as gevent_spawn, Timeout as GeventTimeout
 
-try:
-    import nacl.secret
-    import nacl.utils
-except ImportError:
-    warnings.warn('nacl is not installed, voice support is disabled')
-
+from disco.util.crypto import AEScrypt
 from disco.util.enum import Enum
 from disco.util.logging import LoggingClass
 
 AudioCodecs = ('opus',)
+VideoCodecs = ('AV1X', 'H265', 'H264', 'VP8', 'VP9')
 
-RTPPayloadTypes = Enum(OPUS=0x78)
+RTPPayloadTypes = Enum(
+    OPUS=0x78,  # 120
+    # AV1X=0x,  # ?
+    H265=0x65,  # 101
+    H264=0x67,  # 103
+    VP8=0x69,  # 105
+    VP9=0x71,  # 107
+)
 
 RTCPPayloadTypes = Enum(
     SENDER_REPORT=200,
@@ -72,6 +73,15 @@ VoiceData = namedtuple('VoiceData', [
     'data',
 ])
 
+VideoData = namedtuple('VideoData', [
+    'client',
+    'user_id',
+    'payload_type',
+    'rtp',
+    'nonce',
+    'data',
+])
+
 
 class UDPVoiceClient(LoggingClass):
     def __init__(self, vc):
@@ -96,7 +106,9 @@ class UDPVoiceClient(LoggingClass):
 
         # RTP Header
         self._rtp_audio_header = bytearray(12)
+        self._rtp_video_header = bytearray(12)
         self._rtp_audio_header[0] = RTP_HEADER_VERSION
+        self._rtp_video_header[0] = RTP_HEADER_VERSION
 
     def set_audio_codec(self, codec):
         if codec not in AudioCodecs:
@@ -104,7 +116,15 @@ class UDPVoiceClient(LoggingClass):
 
         ptype = RTPPayloadTypes.get(codec)
         self._rtp_audio_header[1] = ptype.value
-        self.log.debug('[{}] Set UDP\'s Audio Codec to {}, RTP payload type {}'.format(self.vc.channel_id, ptype.name, ptype.value))
+        self.log.debug('[{}] Set UDP\'s Audio Codec to {}, RTP payload type {}'.format(self.vc.channel_id, ptype.name.upper(), ptype.value))
+
+    def set_video_codec(self, codec):
+        if codec not in VideoCodecs:
+            raise Exception(f'Unsupported video codec received, {codec}')
+
+        ptype = RTPPayloadTypes.get(codec.lower())
+        self._rtp_video_header[1] = ptype.value
+        self.log.debug('[{}] Set UDP\'s Video Codec to {}, RTP payload type {}'.format(self.vc.channel_id, ptype.name.upper(), ptype.value))
 
     def increment_timestamp(self, by):
         self.timestamp += by
@@ -112,48 +132,34 @@ class UDPVoiceClient(LoggingClass):
             self.timestamp = 0
 
     def setup_encryption(self, encryption_key):
-        if 'xsalsa20' in self.vc.mode:
-            self._secret_box = nacl.secret.SecretBox(encryption_key)
-        elif self.vc.mode == 'aead_xchacha20_poly1305_rtpsize':
-            self._secret_box = nacl.secret.Aead(encryption_key)
+        self._secret_box = AEScrypt(encryption_key, self.vc.mode)
 
     def send_frame(self, frame, sequence=None, timestamp=None, incr_timestamp=None):
         # Pack the RTC header into our buffer (a list of numbers)
-        struct.pack_into('>H', self._rtp_audio_header, 2, sequence or self.sequence)
-        struct.pack_into('>I', self._rtp_audio_header, 4, timestamp or self.timestamp)
-        struct.pack_into('>i', self._rtp_audio_header, 8, self.vc.ssrc_audio)
+        struct_pack_into('>H', self._rtp_audio_header, 2, sequence or self.sequence)  # BE, unsigned short
+        struct_pack_into('>I', self._rtp_audio_header, 4, timestamp or self.timestamp)  # BE, unsigned int
+        struct_pack_into('>i', self._rtp_audio_header, 8, self.vc.ssrc_audio)  # BE, int
 
-        nonce = bytearray(24)  # for reference, 192-bits is 24 bytes
-
-        if self.vc.mode in ('xsalsa20_poly1305_lite', 'xsalsa20_poly1305_lite_rtpsize', 'aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
-            # Use an incrementing number as a nonce, only first 4 bytes of the nonce is padded on
-            self._nonce += 1
-            if self._nonce > MAX_UINT32:
-                self._nonce = 0
-            struct.pack_into('>I', nonce, 0, self._nonce)
-            nonce_padding = nonce[:4]
-        elif self.vc.mode == 'xsalsa20_poly1305_suffix':
-            # Generate a nonce
-            nonce = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE)
-            nonce_padding = nonce
-        elif self.vc.mode == 'xsalsa20_poly1305':
-            # Nonce is the header
-            nonce[:12] = self._rtp_audio_header
-            nonce_padding = None
+        if self.vc.mode == 'aead_aes256_gcm_rtpsize':
+            nonce = bytearray(12)  # 96-bits
         else:
-            raise Exception('The voice mode, {}, isn\'t supported.'.format(self.vc.mode))
+            nonce = bytearray(24)  # 192-bits is 24 bytes
+
+        # Use an incrementing number as a nonce, only first 4 bytes of the nonce is padded on
+        self._nonce += 1
+        if self._nonce > MAX_UINT32:
+            self._nonce = 0
+        struct_pack_into('>I', nonce, 0, self._nonce)  # BE, unsigned int
+        nonce_padding = nonce[:4]
+
+        if self.vc.mode not in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
+            raise Exception(f'Voice mode `{self.vc.mode}` is not supported.')
 
         # Encrypt the payload with the nonce
-        if self.vc.mode in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
-            payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce), aad=b'')  # TODO
-        else:
-            payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce))
-        if 'aead_aes256_gcm' not in self.vc.mode:
-            payload = payload.ciphertext
+        payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce), aad=bytes(self._rtp_audio_header))
 
-        # Pad the payload with the nonce, if applicable
-        if nonce_padding:
-            payload += nonce_padding
+        # Pad the payload with the nonce
+        payload += nonce_padding
 
         # Send the header (sans nonce padding) plus the payload
         self.send(self._rtp_audio_header + payload)
@@ -169,18 +175,18 @@ class UDPVoiceClient(LoggingClass):
 
     def run(self):
         while True:
-            data, addr = self.conn.recvfrom(4096)
+            data, addr = self.conn.recvfrom(1500)  # Max RTP packet length
 
             # Data cannot be less than the bare minimum, just ignore
             if len(data) <= 12:
                 self.log.debug('[{}] [VoiceData] Received voice data under 13 bytes'.format(self.vc.channel_id))
                 continue
 
-            first, second = struct.unpack_from('>BB', data)
+            first, second = struct_unpack_from('>BB', data)  # big-endian, 2x unsigned chars
 
             payload_type = RTCPPayloadTypes.get(second)
             if payload_type:
-                length, ssrc = struct.unpack_from('>HI', data, 2)
+                length, ssrc = struct_unpack_from('>HI', data, 2)  # BE, unsigned short, unsigned int
 
                 rtcp = RTCPHeader(
                     version=first >> 6,
@@ -207,9 +213,9 @@ class UDPVoiceClient(LoggingClass):
                     data=data[8:],
                 )
 
-                self.vc.client.gw.events.emit('RTCPData', payload)
+                self.vc.client.events.emit('RTCPData', payload)
             else:
-                sequence, timestamp, ssrc = struct.unpack_from('>HII', data, 2)
+                sequence, timestamp, ssrc = struct_unpack_from('>HII', data, 2)  # BE, unsigned short, 2x unsigned int
 
                 rtp = RTPHeader(
                     version=first >> 6,
@@ -235,42 +241,47 @@ class UDPVoiceClient(LoggingClass):
                     self.log.debug('[{}] [VoiceData] Received unsupported payload type, {}'.format(self.vc.channel_id, rtp.payload_type))
                     continue
 
-                nonce = bytearray(24)
-                if self.vc.mode in ('xsalsa20_poly1305_lite', 'xsalsa20_poly1305_lite_rtpsize', 'aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm', 'aead_aes256_gcm_rtpsize'):
-                    nonce[:4] = data[-4:]
-                    data = data[:-4]
-                elif self.vc.mode == 'xsalsa20_poly1305_suffix':
-                    nonce[:24] = data[-24:]
-                    data = data[:-24]
-                elif self.vc.mode == 'xsalsa20_poly1305':
-                    nonce[:12] = data[:12]
+                if self.vc.mode == 'aead_aes256_gcm_rtpsize':
+                    nonce = bytearray(12)  # 96-bits
                 else:
-                    self.log.debug('[{}] [VoiceData] Unsupported Encryption Mode, {}'.format(self.vc.channel_id, self.vc.mode))
+                    nonce = bytearray(24)  # 192-bits is 24 bytes
+
+                nonce[:4] = data[-4:]
+                data = data[:-4]
+
+                if self.vc.mode not in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
+                    self.log.debug(f'[{self.vc.channel_id}] [VoiceData] Unsupported Encryption Mode, {self.vc.mode}')
                     continue
 
+                header_size = 12
+                header_size += (rtp.csrc_count * 4)
+                if rtp.extension:
+                    header_size += 4
+                ctxt = data[header_size:]  # plus strip whatever additional bs is before the payload
+
                 try:
-                    data = self._secret_box.decrypt(ciphertext=bytes(data[12:]), nonce=bytes(nonce))
-                except Exception:
-                    self.log.debug('[{}] [VoiceData] Failed to decode data from ssrc {}'.format(self.vc.channel_id, rtp.ssrc))
+                    data = self._secret_box.decrypt(ciphertext=bytes(ctxt), nonce=bytes(nonce), aad=bytes(data[:header_size]))
+                except Exception as e:
+                    self.log.debug('[{}] [VoiceData] Failed to decode data from ssrc {}: {} - {}'.format(self.vc.channel_id, rtp.ssrc, e.__class__.__name__, e))
                     continue
 
                 # RFC3550 Section 5.1 (Padding)
                 if rtp.padding:
-                    padding_amount, = struct.unpack_from('>B', data[:-1])
+                    padding_amount, = struct_unpack_from('>B', data[:-1])  # BE, unsigned char
                     data = data[-padding_amount:]
 
                 if rtp.extension:
                     # RFC5285 Section 4.2: One-Byte Header
-                    rtp_extension_header = struct.unpack_from('>BB', data)
+                    rtp_extension_header = struct_unpack_from('>BB', data)  # BE, 2x unsigned char
                     if rtp_extension_header == RTP_EXTENSION_ONE_BYTE:
                         data = data[2:]
 
-                        fields_amount, = struct.unpack_from('>H', data)
+                        fields_amount, = struct_unpack_from('>H', data)  # BE, unsigned short
                         fields = []
 
                         offset = 4
                         for i in range(fields_amount):
-                            first_byte, = struct.unpack_from('>B', data[:offset])
+                            first_byte, = struct_unpack_from('>B', data[:offset])  # BE, unsigned char
                             offset += 1
 
                             rtp_extension_identifier = first_byte & 0xF
@@ -294,20 +305,35 @@ class UDPVoiceClient(LoggingClass):
 
                 # RFC3550 Section 5.3: Profile-Specific Modifications to the RTP Header
                 # clients send it sometimes, definitely on fresh connects to a server, dunno what to do here
-                if rtp.marker:
+                # RFC6184: Marker bits are used to signify the last packet of a frame
+                if rtp.marker and payload_type.name == 'opus':
                     self.log.debug('[{}] [VoiceData] Received RTP data with the marker set, skipping'.format(self.vc.channel_id))
                     continue
 
-                payload = VoiceData(
-                    client=self.vc,
-                    user_id=self.vc.audio_ssrcs.get(rtp.ssrc),
-                    payload_type=payload_type.name,
-                    rtp=rtp,
-                    nonce=nonce,
-                    data=data,
-                )
+                if payload_type.name == 'opus':
+                    payload = VoiceData(
+                        client=self.vc,
+                        user_id=self.vc.audio_ssrcs.get(rtp.ssrc),
+                        payload_type=payload_type.name,
+                        rtp=rtp,
+                        nonce=nonce,
+                        data=data,
+                    )
 
-                self.vc.client.gw.events.emit('VoiceData', payload)
+                    # Raw RTP stream data, still needs conversion to be useful
+                    self.vc.client.events.emit('VoiceData', payload)
+                else:
+                    payload = VideoData(
+                        client=self.vc,
+                        user_id=self.vc.video_ssrcs.get(rtp.ssrc),
+                        payload_type=payload_type.name,
+                        rtp=rtp,
+                        nonce=nonce,
+                        data=data,
+                    )
+
+                    # Raw RTP stream data, still needs conversion to be useful
+                    self.vc.client.events.emit('VideoData', payload)
 
     def send(self, data):
         self.conn.sendto(data, (self.ip, self.port))
@@ -318,33 +344,33 @@ class UDPVoiceClient(LoggingClass):
         return
 
     def connect(self, host, port, timeout=10, addrinfo=None):
-        self.ip = socket.gethostbyname(host)
+        self.ip = socket_gethostbyname(host)
         self.port = port
 
-        self.conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.conn = socket(SOCKET_AF_INET, SOCKET_SOCK_DGRAM)
 
         if addrinfo:
             ip, port = addrinfo
         else:
             # Send discovery packet
             packet = bytearray(74)
-            struct.pack_into('>H', packet, 0, 1)
-            struct.pack_into('>H', packet, 2, 70)
-            struct.pack_into('>I', packet, 4, self.vc.ssrc)
+            struct_pack_into('>H', packet, 0, 1)  # BE, unsigned short
+            struct_pack_into('>H', packet, 2, 70)  # BE, unsigned short
+            struct_pack_into('>I', packet, 4, self.vc.ssrc)  # BE, unsigned int
             self.send(packet)
 
             # Wait for a response
             try:
-                data, addr = gevent.spawn(lambda: self.conn.recvfrom(74)).get(timeout=timeout)
-            except gevent.Timeout:
+                data, addr = gevent_spawn(lambda: self.conn.recvfrom(74)).get(timeout=timeout)
+            except GeventTimeout:
                 return None, None
 
             # Read IP and port
-            ip = str(data[8:]).split('\x00', 1)[0]
-            port = struct.unpack('<H', data[-2:])[0]
+            ip = str(data[8:].split(b'\x00', 1)[0], "utf=8")
+            port = struct_unpack('<H', data[-2:])[0]  # little endian, unsigned short
 
         # Spawn read thread so we don't max buffers
         self.connected = True
-        self._run_task = gevent.spawn(self.run)
+        self._run_task = gevent_spawn(self.run)
 
         return ip, port

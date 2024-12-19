@@ -1,8 +1,8 @@
 try:
-    import ujson as json
+    from ujson import dumps as json_dumps
 except ImportError:
-    import json
-import warnings
+    from json import dumps as json_dumps
+from warnings import warn as warnings_warn
 
 from contextlib import contextmanager
 from gevent.local import local
@@ -69,6 +69,9 @@ class APIClient(LoggingClass):
         self.token = token
 
         self._captures = local()
+
+    def __repr__(self):
+        return '<Disco APIClient{}>'.format(f' shard_id={self.client.config.shard_id}' if self.client else '')
 
     def _after_requests(self, response):
         if not hasattr(self._captures, 'responses'):
@@ -147,20 +150,22 @@ class APIClient(LoggingClass):
             channel,
             content=None,
             nonce=None,
+            enforce_nonce=False,
             tts=False,
             attachment=None,
-            attachments=[],
+            attachments=None,
             embed=None,
-            embeds=[],
+            embeds=None,
             flags=0,
-            allowed_mentions={},
-            message_reference={},
-            components={},
-            sticker_ids={},
+            allowed_mentions=None,
+            message_reference=None,
+            components=None,
+            sticker_ids=None,
             sanitize=False):
 
         payload = {
             'nonce': nonce,
+            'enforce_nonce': enforce_nonce,
             'tts': tts,
             'allowed_mentions': {
                 'parse': [],
@@ -171,7 +176,7 @@ class APIClient(LoggingClass):
 
         if attachment:
             attachments = [attachment]
-            warnings.warn(
+            warnings_warn(
                 'attachment kwarg has been deprecated, switch to using attachments with a list',
                 DeprecationWarning)
 
@@ -183,7 +188,7 @@ class APIClient(LoggingClass):
             payload['content'] = content
 
         if embed:
-            warnings.warn(
+            warnings_warn(
                 'embed kwarg has been deprecated, switch to using embeds with a list',
                 DeprecationWarning)
             payload['embeds'] = [embed.to_dict()]
@@ -222,14 +227,13 @@ class APIClient(LoggingClass):
             r = self.http(
                 Routes.CHANNELS_MESSAGES_CREATE,
                 dict(channel=channel),
-                data={'payload_json': json.dumps(payload)},
+                data={'payload_json': json_dumps(payload)},
                 files=files,
             )
         else:
             r = self.http(Routes.CHANNELS_MESSAGES_CREATE, dict(channel=channel), json=payload)
 
         # Catch API failures
-        # TODO: long-term solution at higher level
         if r:
             return Message.create(self.client, r.json())
         else:
@@ -247,12 +251,12 @@ class APIClient(LoggingClass):
             payload['content'] = content
 
         if embed:
-            warnings.warn(
+            warnings_warn(
                 'embed kwarg has been deprecated, switch to using embeds with a list',
                 DeprecationWarning)
-            payload['embed'] = embed.to_dict()
+            payload['embeds'] = [embed.to_dict()]
 
-        if embeds:
+        if embeds is not None:
             embed_list = []
             for e in embeds:
                 embed_list.append(e.to_dict())
@@ -1210,7 +1214,7 @@ class APIClient(LoggingClass):
 
         if attachment:
             files = [attachment]
-            warnings.warn(
+            warnings_warn(
                 'attachment kwarg has been deprecated, switch to using attachments with a list',
                 DeprecationWarning)
 
@@ -1221,7 +1225,7 @@ class APIClient(LoggingClass):
             embeds = embed_list
         if embed:
             embeds = [embed.to_dict()]
-            warnings.warn(
+            warnings_warn(
                 'embed kwarg has been deprecated, switch to using embeds with a list',
                 DeprecationWarning)
 
@@ -1255,7 +1259,7 @@ class APIClient(LoggingClass):
             embeds = embed_list
         if embed:
             embeds = [embed.to_dict()]
-            warnings.warn(
+            warnings_warn(
                 'embed kwarg has been deprecated, switch to using embeds with a list',
                 DeprecationWarning)
 

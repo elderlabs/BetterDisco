@@ -1,7 +1,7 @@
 from disco.types.base import SlottedModel, Field, ListField, snowflake, text, enum, DictField, BitsetMap, BitsetValue
 from disco.types.permissions import PermissionValue
-from disco.types.user import User
 from disco.util.snowflake import to_snowflake
+from disco.types.user import User
 
 
 class TeamMembershipState:
@@ -46,6 +46,15 @@ class ApplicationFlagsValue(BitsetValue):
     map = ApplicationFlags
 
 
+class ApplicationIntegrationType:
+    GUILD_INSTALL = 0
+    USER_INSTALL = 1
+
+
+class ApplicationIntegrationTypeConfiguration(SlottedModel):
+    oauth2_install_params = Field(ApplicationInstallParams)
+
+
 class Application(SlottedModel):
     id = Field(snowflake)
     name = Field(text)
@@ -67,11 +76,13 @@ class Application(SlottedModel):
     cover_image = Field(text)
     flags = Field(ApplicationFlagsValue)
     approximate_guild_count = Field(int)
+    approximate_user_install_count = Field(int)
     redirect_uris = ListField(str)
     interactions_endpoint_url = Field(str)
     role_connections_verification_url = Field(str)
     tags = ListField(str)
     install_params = Field(ApplicationInstallParams)
+    integration_types_config = Field(dict)  # TODO: this is a dumpster-fire
     custom_install_url = Field(str)
 
     def user_is_owner(self, user):
@@ -81,7 +92,7 @@ class Application(SlottedModel):
 
         return any(user_id == member.user.id for member in self.team.members)
 
-    def get_icon_url(self, fmt=None, size=1024):
+    def get_icon_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.icon:
             return ''
 
@@ -90,9 +101,9 @@ class Application(SlottedModel):
         elif fmt == 'gif' and not self.icon.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}'.format(self.id, self.icon, fmt, size)
+        return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}&quality={}'.format(self.id, self.icon, fmt, size, quality)
 
-    def get_cover_image_url(self, fmt=None, size=1024):
+    def get_cover_image_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.cover_image:
             return ''
 
@@ -101,7 +112,7 @@ class Application(SlottedModel):
         elif fmt == 'gif' and not self.cover_image.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/app-icons/{}/{}.{}?size={}'.format(self.id, self.cover_image, fmt, size)
+        return 'https://cdn.discordapp.com/app-icons/{}/{}.{}?size={}&quality={}'.format(self.id, self.cover_image, fmt, size, quality)
 
     @property
     def icon_url(self):

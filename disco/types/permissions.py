@@ -49,6 +49,9 @@ class Permissions(BitsetMap):
     CREATE_EVENTS = 1 << 44
     USE_EXTERNAL_SOUNDS = 1 << 45
     SEND_VOICE_MESSAGES = 1 << 46
+    USE_CLYDE_AI = 1 << 47
+    SET_VOICE_CHANNEL_STATUS = 1 << 48
+    SEND_POLLS = 1 << 49
 
 
 class PermissionValue(BitsetValue):

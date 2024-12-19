@@ -1,4 +1,5 @@
-from collections import OrderedDict
+from collections import OrderedDict as CollectionsOrderedDict
+
 from disco.util.metaclass import with_metaclass
 
 
@@ -45,7 +46,7 @@ class EnumAttr(object):
         return self.index >= other
 
     def __repr__(self):
-        return '<EnumAttr {}>'.format(self.name)
+        return f'<EnumAttr name={self.name} value={self.value}>'
 
     def __str__(self):
         return self.name
@@ -97,7 +98,7 @@ def Enum(*args, **kwargs):
     class _T(with_metaclass(BaseEnumMeta)):
         pass
 
-    _T._attrs = OrderedDict()
+    _T._attrs = CollectionsOrderedDict()
 
     if args:
         enumer = enumerate

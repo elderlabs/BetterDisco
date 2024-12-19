@@ -16,7 +16,7 @@ class VoiceState(SlottedModel):
     request_to_speak_timestamp = Field(datetime)
 
     def __repr__(self):
-        return f'<VoiceState session_id={self.session_id}>'
+        return f'<VoiceState session_id={self.session_id} channel_id={self.channel_id}>'
 
     @cached_property
     def guild(self):
@@ -24,7 +24,9 @@ class VoiceState(SlottedModel):
 
     @property
     def channel(self):
-        return self.client.state.channels.get(self.channel_id)
+        if self.client.state.config.cache_channels:
+            return self.client.state.channels.get(self.channel_id)
+        return self.client.api.channels_get(self.channel_id)
 
     @cached_property
     def user(self):

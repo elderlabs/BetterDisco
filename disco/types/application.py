@@ -226,7 +226,7 @@ class Interaction(SlottedModel):
         return Paginator(
             self.client.api.channels_messages_reactions_get,
             'after',
-            self.channel_id,
+            self.channel.id,
             self.id,
             emoji,
             *args,

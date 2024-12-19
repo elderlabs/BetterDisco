@@ -1,7 +1,7 @@
 try:
-    import ujson as json
+    from ujson import dumps as json_dumps, loads as json_loads
 except ImportError:
-    import json
+    from json import dumps as json_dumps, loads as json_loads
 
 from disco.gateway.encoding.base import BaseEncoder
 
@@ -11,8 +11,8 @@ class JSONEncoder(BaseEncoder):
 
     @staticmethod
     def encode(obj):
-        return json.dumps(obj)
+        return json_dumps(obj)
 
     @staticmethod
     def decode(obj):
-        return json.loads(obj)
+        return json_loads(obj)

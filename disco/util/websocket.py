@@ -5,7 +5,7 @@ from disco.util.emitter import Emitter
 from disco.util.logging import LoggingClass
 
 
-class Websocket(LoggingClass, websocket.WebSocketApp):
+class Websocket(LoggingClass, WebSocketApp):
     """
     A utility class which wraps the functionality of :class:`websocket.WebSocketApp`
     changing its behavior to better conform with standard style across disco.

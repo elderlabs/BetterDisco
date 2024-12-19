@@ -1,14 +1,14 @@
 try:
-    import regex as re
+    from regex import compile as re_compile
 except ImportError:
-    import re
+    from re import compile as re_compile
 
 from disco.types.base import SlottedModel, Field, snowflake, cached_property, enum, DictField, text
 from disco.types.channel import Channel
 from disco.types.user import User
 
 
-WEBHOOK_URL_RE = re.compile(r'/api/webhooks/(\d+)/(.[^/]+)')
+WEBHOOK_URL_RE = re_compile(r'/api/webhooks/(\d+)/(.[^/]+)')
 
 
 class WebhookTypes:

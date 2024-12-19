@@ -1,8 +1,6 @@
 from disco.api.http import APIException
 from disco.types.integration import Integration
 from disco.types.webhook import Webhook
-from disco.util.paginator import Paginator
-from disco.util.snowflake import to_snowflake
 from disco.types.base import (
     SlottedModel, Field, ListField, AutoDictField, snowflake, text, enum, datetime,
     cached_property, BitsetMap, BitsetValue,
@@ -13,6 +11,8 @@ from disco.types.channel import Channel, ChannelType, StageInstance, PermissionO
     Thread
 from disco.types.reactions import Emoji, Sticker, StickerFormatTypes
 from disco.types.permissions import PermissionValue, Permissions, Permissible
+from disco.util.paginator import Paginator
+from disco.util.snowflake import to_snowflake
 
 
 class MFALevel:
@@ -301,7 +301,7 @@ class GuildMember(SlottedModel):
         """
         return self.nick or self.user.username
 
-    def get_avatar_url(self, fmt=None, size=1024):
+    def get_avatar_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.avatar:
             return self.user.get_avatar_url(fmt, size)
 
@@ -310,7 +310,7 @@ class GuildMember(SlottedModel):
         elif fmt == 'gif' and not self.avatar.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/guilds/{}/users/{}/avatars/{}.{}?size={}'.format(self.guild_id, self.id, self.avatar, fmt, size)
+        return 'https://cdn.discordapp.com/guilds/{}/users/{}/avatars/{}.{}?size={}&quality={}'.format(self.guild_id, self.id, self.avatar, fmt, size, quality)
 
     def get_voice_state(self):
         """
@@ -516,6 +516,10 @@ class GuildVoiceState(VoiceState):
     member = Field(GuildMember)
 
 
+class InventorySettings(SlottedModel):
+    is_emoji_pack_collectible = Field(bool)
+
+
 class Guild(SlottedModel, Permissible):
     """
     A guild object.
@@ -645,7 +649,7 @@ class Guild(SlottedModel, Permissible):
     hub_type = Field(text)
     # application_command_counts = Field(None)
     soundboard_sounds = AutoDictField(GuildSoundboardSound, 'sound_id')
-    inventory_settings = Field(text)
+    inventory_settings = Field(InventorySettings)
     incidents_data = Field(text)
     version = Field(int)
 
@@ -754,11 +758,16 @@ class Guild(SlottedModel, Permissible):
 
         if user not in self.members:
             try:
-                self.members[user] = self.client.api.guilds_members_get(self.id, user)
+                member = self.client.api.guilds_members_get(self.id, user)
             except APIException:
                 return
 
-        return self.members.get(user)
+            if self.client.state.config.sync_guild_members:
+                self.members[user] = member
+        else:
+            member = self.members[user]
+
+        return member
 
     def get_prune_count(self, days=None):
         return self.client.api.guilds_prune_count_get(self.id, days=days)
@@ -859,7 +868,7 @@ class Guild(SlottedModel, Permissible):
     def get_voice_regions(self):
         return self.client.api.guilds_voice_regions_list(self.id)
 
-    def get_icon_url(self, fmt=None, size=1024):
+    def get_icon_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.icon:
             return ''
 
@@ -868,7 +877,7 @@ class Guild(SlottedModel, Permissible):
         elif fmt == 'gif' and not self.icon.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}'.format(self.id, self.icon, fmt, size)
+        return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}&quality={}'.format(self.id, self.icon, fmt, size, quality)
 
     def get_vanity_url(self):
         if not self.vanity_url_code:
@@ -876,7 +885,7 @@ class Guild(SlottedModel, Permissible):
 
         return 'https://discord.gg/' + self.vanity_url_code
 
-    def get_splash_url(self, fmt=None, size=1024):
+    def get_splash_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.splash:
             return ''
 
@@ -885,9 +894,9 @@ class Guild(SlottedModel, Permissible):
         elif fmt == 'gif' and not self.splash.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/splashes/{}/{}.{}?size={}'.format(self.id, self.splash, fmt, size)
+        return 'https://cdn.discordapp.com/splashes/{}/{}.{}?size={}&quality={}'.format(self.id, self.splash, fmt, size, quality)
 
-    def get_banner_url(self, fmt=None, size=1024):
+    def get_banner_url(self, fmt=None, size=1024, quality='lossless'):
         if not self.banner:
             return ''
 
@@ -896,7 +905,7 @@ class Guild(SlottedModel, Permissible):
         elif fmt == 'gif' and not self.banner.startswith('a_'):
             fmt = 'webp'
 
-        return 'https://cdn.discordapp.com/banners/{}/{}.{}?size={}'.format(self.id, self.banner, fmt, size)
+        return 'https://cdn.discordapp.com/banners/{}/{}.{}?size={}&quality={}'.format(self.id, self.banner, fmt, size, quality)
 
     @property
     def icon_url(self):

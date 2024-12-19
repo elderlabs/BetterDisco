@@ -1,18 +1,17 @@
 try:
-    import regex as re
+    from regex import sub as re_sub
 except ImportError:
-    import re
-import functools
-import unicodedata
+    from re import sub as re_sub
+from functools import partial as functools_partial
+from unicodedata import normalize as unicodedata_normalize
 
 from disco.types.base import (
     BitsetMap, BitsetValue, SlottedModel, Field, ListField, AutoDictField,
-    snowflake, text, datetime, enum, cached_property,
+    snowflake, text, datetime, enum, cached_property, DictField,
 )
-# from disco.types.application import InteractionType
-from disco.types.channel import Channel, ChannelMention, ChannelType, Thread
-from disco.types.guild import GuildMember
-from disco.types.oauth import Application
+from disco.types.channel import Channel, ChannelMention, ChannelType, Thread, RoleSubscriptionData
+from disco.types.guild import GuildMember, Role
+from disco.types.oauth import Application, ApplicationIntegrationType
 from disco.types.reactions import Emoji, MessageReaction, StickerItem
 from disco.types.user import User
 from disco.util.paginator import Paginator
@@ -93,6 +92,9 @@ class MessageFlags(BitsetMap):
     FAILED_TO_MENTION_SOME_ROLES_IN_THREAD = 1 << 8
     # UNKNOWN = 1 << 9
     SHOULD_SHOW_LINK_NOT_DISCORD_WARNING = 1 << 10
+    # UNKNOWN = 1 << 11
+    SUPPRESS_NOTIFICATIONS = 1 << 12
+    IS_VOICE_MESSAGE = 1 << 13
 
 
 class MessageFlagValue(BitsetValue):
@@ -422,7 +424,7 @@ class _MessageComponent(SlottedModel):
     disabled = Field(bool)
     style = Field(int)
     label = Field(text)
-    emoji = Field(Emoji, default=None)
+    emoji = Field(Emoji, create=False)
     url = Field(text)
     options = ListField(SelectOption)
     placeholder = Field(text)
@@ -480,6 +482,55 @@ class MessageInteraction(SlottedModel):
     member = Field(GuildMember)
 
 
+class MessageInterationMetadata(SlottedModel):
+    id = Field(snowflake)
+    type = Field(enum(_InteractionType))
+    user = Field(User)
+    authorizing_integration_owners = DictField(enum(ApplicationIntegrationType), snowflake)
+    original_response_message_id = Field(snowflake)
+    interacted_message_id = Field(snowflake)
+    triggering_interaction_metadata = Field(dict)
+
+
+class MessagePollTypes:
+    DEFAULT = 1
+
+
+class MessagePollMedia(SlottedModel):
+    text = Field(text)
+    emoji = Field(Emoji)
+
+
+class MessagePollAnswer(SlottedModel):
+    answer_id = Field(int)
+    poll_media = Field(MessagePollMedia)
+
+
+class MessagePollResultCounts(SlottedModel):
+    count = Field(int)
+    id = Field(int)
+    me_voted = Field(bool)
+
+
+class MessagePollResults(SlottedModel):
+    answer_counts = ListField(MessagePollResultCounts)
+    is_finalized = Field(bool)
+
+
+class MessagePoll(SlottedModel):
+    allow_multiselect = Field(bool)
+    answers = ListField(text)
+    expiry = Field(datetime)
+    layout_type = Field(enum(MessagePollTypes))
+    question = Field(MessagePollMedia)
+    results = Field(MessagePollResults)
+
+
+class MessageCall(SlottedModel):
+    participants = ListField(snowflake)
+    ended_timestamp = Field(datetime)
+
+
 class _Message(SlottedModel):
     """
     Represents a Message created within a Channel on Discord.
@@ -532,7 +583,7 @@ class _Message(SlottedModel):
     id = Field(snowflake)
     channel_id = Field(snowflake)
     guild_id = Field(snowflake)
-    author = Field(User)
+    author = Field(User, create=False)
     member = Field(GuildMember, create=False)
     content = Field(text)
     timestamp = Field(datetime)
@@ -552,12 +603,16 @@ class _Message(SlottedModel):
     activity = Field(MessageActivity, create=False)
     application = Field(Application, create=False)
     application_id = Field(snowflake)
-    message_reference = Field(MessageReference, create=False)
     flags = Field(MessageFlagValue)
-    interaction = Field(MessageInteraction, create=False)
-    # _thread = Field(Thread, alias='thread', create=False)  # fix this
+    message_reference = Field(MessageReference, create=False)
+    interaction_metadata = Field(MessageInterationMetadata, create=False)
+    interaction = Field(MessageInteraction, create=False)  # deprecated
     components = ListField(MessageComponent)
     sticker_items = ListField(StickerItem)
+    position = Field(int)
+    role_subscription_data = Field(RoleSubscriptionData, create=False)
+    poll = Field(MessagePoll, create=False)
+    call = Field(MessageCall, create=False)
 
     def __repr__(self):
         return '<Message id={} channel_id={}>'.format(self.id, self.channel_id)
@@ -815,16 +870,16 @@ class _Message(SlottedModel):
         content = self.content
 
         if user_replace:
-            replace_user = functools.partial(replace, self.mentions.get, user_replace)
-            content = re.sub('(<@!?([0-9]+)>)', replace_user, content)
+            replace_user = functools_partial(replace, self.mentions.get, user_replace)
+            content = re_sub('(<@!?([0-9]+)>)', replace_user, content)
 
         if role_replace:
-            replace_role = functools.partial(replace, lambda v: (self.guild and self.guild.roles.get(v)), role_replace)
-            content = re.sub('(<@&([0-9]+)>)', replace_role, content)
+            replace_role = functools_partial(replace, lambda v: (self.guild and self.guild.roles.get(v)), role_replace)
+            content = re_sub('(<@&([0-9]+)>)', replace_role, content)
 
         if channel_replace:
-            replace_channel = functools.partial(replace, self.client.state.channels.get, channel_replace)
-            content = re.sub('(<#([0-9]+)>)', replace_channel, content)
+            replace_channel = functools_partial(replace, self.client.state.channels.get, channel_replace)
+            content = re_sub('(<#([0-9]+)>)', replace_channel, content)
 
         return content
 
@@ -848,8 +903,24 @@ class _Message(SlottedModel):
         """
         return self.client.api.channels_messages_threads_create(self.channel_id, self.id, name, auto_archive_duration, rate_limit_per_user, *args, **kwargs)
 
+
+class MessageResolvedData(SlottedModel):
+    users = DictField(snowflake, User)
+    members = DictField(snowflake, GuildMember)
+    roles = DictField(snowflake, Role)
+    channels = DictField(snowflake, Channel)
+    messages = DictField(snowflake, _Message)
+    attachments = DictField(snowflake, MessageAttachment)
+
+
+class MessageSnapshot(SlottedModel):
+    message = Field(_Message)
+
+
 class Message(_Message):
+    message_snapshots = ListField(MessageSnapshot, create=False)
     referenced_message = Field(_Message, create=False)
+    resolved = Field(MessageResolvedData)
 
 
 class MessageTable:
@@ -864,7 +935,7 @@ class MessageTable:
 
     def recalculate_size_index(self, cols):
         for idx, col in enumerate(cols):
-            size = len(unicodedata.normalize('NFC', col))
+            size = len(unicodedata_normalize('NFC', col))
             if idx not in self.size_index or size > self.size_index[idx]:
                 self.size_index[idx] = size
 

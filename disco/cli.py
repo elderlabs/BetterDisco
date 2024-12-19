@@ -2,14 +2,14 @@
 The CLI module is a small utility that can be used as an easy entry point for
 creating and running bots/clients.
 """
-from gevent import monkey; monkey.patch_all()
+from gevent.monkey import patch_all as monkey_patch_all; monkey_patch_all()
 
-import os
+from os import path as os_path
 import logging
-import argparse
+from argparse import ArgumentParser
 
 
-parser = argparse.ArgumentParser()
+parser = ArgumentParser()
 
 # Command line specific arguments
 parser.add_argument('--run-bot', help='Run a disco bot on this client', action='store_true', default=False)
@@ -62,9 +62,9 @@ def disco_main(run=False):
     if args.config:
         config = ClientConfig.from_file(args.config)
     else:
-        if os.path.exists('config.json'):
+        if os_path.exists('config.json'):
             config = ClientConfig.from_file('config.json')
-        elif os.path.exists('config.yaml'):
+        elif os_path.exists('config.yaml'):
             config = ClientConfig.from_file('config.yaml')
         else:
             config = ClientConfig()
@@ -73,7 +73,7 @@ def disco_main(run=False):
         if getattr(args, arg_key) is not None:
             setattr(config, config_key, getattr(args, arg_key))
 
-    # Setup the auto-sharder
+    # Set up the auto-sharder
     if args.shard_auto:
         from disco.gateway.sharder import AutoSharder
         AutoSharder(config).run()

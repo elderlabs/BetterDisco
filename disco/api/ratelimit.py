@@ -1,6 +1,7 @@
-import gevent
-import math
-import time
+from gevent import sleep as gevent_sleep, spawn as gevent_spawn
+from gevent.event import Event as GeventEvent
+from math import ceil as math_ceil
+from time import time
 
 from disco.util.logging import LoggingClass
 
@@ -56,7 +57,7 @@ class RouteState(LoggingClass):
         trigger the rate limit.
         """
 
-        if self.remaining - 1 < 0 and time.time() <= self.reset_time:
+        if self.remaining - 1 < 0 and time() <= self.reset_time:
             return True
 
         return False
@@ -71,7 +72,7 @@ class RouteState(LoggingClass):
             return
 
         self.remaining = int(response.headers.get('X-RateLimit-Remaining'))
-        self.reset_time = math.ceil(float((response.headers.get('X-RateLimit-Reset'))))
+        self.reset_time = math_ceil(float((response.headers.get('X-RateLimit-Reset'))))
 
     def wait(self, timeout=None):
         """
@@ -86,21 +87,21 @@ class RouteState(LoggingClass):
         if self.event.is_set():
             return 0
 
-        start = time.time()
+        start = time()
         self.event.wait()
-        return time.time() - start
+        return time() - start
 
     def cooldown(self):
         """
         Waits for the current route to be cooled-down (aka waiting until reset time).
         """
-        if self.reset_time - time.time() < 0:
+        if self.reset_time - time() < 0:
             raise Exception('Cannot cooldown for negative time period; check clock sync')
 
-        self.event = gevent.event.Event()
-        delay = (self.reset_time - time.time()) + .5
+        self.event = GeventEvent()
+        delay = (self.reset_time - time()) + .5
         self.log.debug('Cooling down bucket %s for %s seconds', self, delay)
-        gevent.sleep(delay)
+        gevent_sleep(delay)
         self.event.set()
         self.event = None
         return delay
@@ -147,7 +148,7 @@ class RateLimiter(LoggingClass):
                 return self.states[route].wait()
 
             if self.states[route].next_will_ratelimit:
-                return gevent.spawn(self.states[route].cooldown).get()
+                return gevent_spawn(self.states[route].cooldown).get()
 
         return 0
 

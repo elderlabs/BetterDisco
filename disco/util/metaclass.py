@@ -2,7 +2,7 @@
 # Copyright (c) Benjamin Peterson
 # MIT License
 
-import types
+from types import resolve_bases as types_resolve_bases
 
 
 def with_metaclass(meta, *bases):
@@ -13,7 +13,7 @@ def with_metaclass(meta, *bases):
     class metaclass(type):
 
         def __new__(cls, name, this_bases, d):
-            resolved_bases = types.resolve_bases(bases)
+            resolved_bases = types_resolve_bases(bases)
             if resolved_bases is not bases:
                 d['__orig_bases__'] = bases
             return meta(name, resolved_bases, d)

@@ -1,6 +1,6 @@
-from disco.types.user import User
 from disco.types.base import SlottedModel, text, Field, snowflake, enum, datetime, ListField, str_or_int
 from disco.types.oauth import Application
+from disco.types.user import User
 
 
 class IntegrationAccount(SlottedModel):

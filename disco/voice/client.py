@@ -1,7 +1,7 @@
-import gevent
-import time
+from gevent import sleep as gevent_sleep, spawn as gevent_spawn
+from time import time
 
-from collections import namedtuple
+from collections import namedtuple as namedtuple
 from websocket import WebSocketConnectionClosedException, WebSocketTimeoutException
 
 from disco.gateway.encoding import ENCODERS
@@ -11,7 +11,7 @@ from disco.util.emitter import Emitter
 from disco.util.logging import LoggingClass
 from disco.util.websocket import Websocket
 from disco.voice.packets import VoiceOPCode
-from disco.voice.udp import AudioCodecs, RTPPayloadTypes, UDPVoiceClient
+from disco.voice.udp import AudioCodecs, RTPPayloadTypes, UDPVoiceClient, VideoCodecs
 
 
 class SpeakingFlags:
@@ -45,6 +45,22 @@ VoiceSpeaking = namedtuple('VoiceSpeaking', [
 ])
 
 
+VideoStream = namedtuple('VideoStream', [
+    'client',
+    'user_id',
+    'streams',
+    'video_ssrc',
+    'audio_ssrc',
+])
+
+
+VoiceUser = namedtuple('VoiceUser', [
+    'user_id',
+    'flags',
+    'platform',
+])
+
+
 class VoiceException(Exception):
     def __init__(self, msg, client):
         self.voice_client = client
@@ -52,27 +68,29 @@ class VoiceException(Exception):
 
 
 class VoiceClient(LoggingClass):
-    VOICE_GATEWAY_VERSION = 7
+    VOICE_GATEWAY_VERSION = 8
 
     SUPPORTED_MODES = {
-         # 'aead_xchacha20_poly1305_rtpsize',
-         'xsalsa20_poly1305',
-         'xsalsa20_poly1305_lite',
-         'xsalsa20_poly1305_lite_rtpsize',
-         'xsalsa20_poly1305_suffix',
+        'aead_aes256_gcm_rtpsize',
+        'aead_xchacha20_poly1305_rtpsize',
     }
 
-    def __init__(self, client, server_id, is_dm=False, max_reconnects=5, encoder='json'):
+    def __init__(self, client, server_id, is_dm=False, max_reconnects=5, encoder='json', video_enabled=False):
         super(VoiceClient, self).__init__()
 
         self.client = client
         self.server_id = server_id
         self.channel_id = None
         self.is_dm = is_dm
-        self.encoder = ENCODERS[encoder]
+        self.encoder = ENCODERS[encoder]  # Discord's erlpack doesn't seem supported here
         self.max_reconnects = max_reconnects
-        self.video_enabled = False
+        self.video_enabled = video_enabled
         self.media = None
+
+        self.deaf = False
+        self.mute = False
+
+        self.proxy = None
 
         # Set the VoiceClient in the state's voice clients
         self.client.state.voice_clients[self.server_id] = self
@@ -88,6 +106,8 @@ class VoiceClient(LoggingClass):
         self.packets.on(VoiceOPCode.RESUMED, self.on_voice_resumed)
         self.packets.on(VoiceOPCode.CLIENT_DISCONNECT, self.on_voice_client_disconnect)
         self.packets.on(VoiceOPCode.CODECS, self.on_voice_codecs)
+        if self.video_enabled:
+            self.packets.on(VoiceOPCode.VIDEO, self.on_video)
 
         # State + state change emitter
         self.state = VoiceState.DISCONNECTED
@@ -100,14 +120,17 @@ class VoiceClient(LoggingClass):
         self.ip = None
         self.port = None
         self.enc_modes = None
-        self.experiments = None
-        self.streams = None
+        self.experiments = []
+        # self.streams = None
         self.sdp = None
         self.mode = None
         self.udp = None
         self.audio_codec = None
         self.video_codec = None
         self.transport_id = None
+        self.keyframe_interval = None
+        self.secure_frames_version = None
+        self.seq = -1
 
         # Websocket connection
         self.ws = None
@@ -118,6 +141,8 @@ class VoiceClient(LoggingClass):
         self._heartbeat_acknowledged = True
         self._identified = False
         self._safe_reconnect_state = False
+        self._creation_time = time()
+        self._ws_creation_time = None
 
         # Latency
         self._last_heartbeat = 0
@@ -125,9 +150,11 @@ class VoiceClient(LoggingClass):
 
         # SSRCs
         self.audio_ssrcs = {}
+        self.video_ssrcs = {}
+        self.rtx_ssrcs = {}
 
     def __repr__(self):
-        return '<VoiceClient guild_id={} channel_id={}>'.format(self.server_id, self.channel_id)
+        return f'<VoiceClient guild_id={self.server_id} channel_id={self.channel_id} endpoint={self.endpoint}>'
 
     @cached_property
     def guild(self):
@@ -158,7 +185,7 @@ class VoiceClient(LoggingClass):
         return self.ssrc + 3
 
     def set_state(self, state):
-        self.log.debug('[{}] state {} -> {}'.format(self.channel_id, self.state, state))
+        self.log.info('[{}] state {} -> {}'.format(self.channel_id or '-', self.state, state))
         prev_state = self.state
         self.state = state
         self.state_emitter.emit(state, prev_state)
@@ -195,7 +222,7 @@ class VoiceClient(LoggingClass):
         self.ws.emitter.on('on_error', self.on_error)
         self.ws.emitter.on('on_close', self.on_close)
         self.ws.emitter.on('on_message', self.on_message)
-        self.ws.run_forever()
+        self.ws.run_forever(ping_interval=60, ping_timeout=5)
 
     def heartbeat_task(self, interval):
         while True:
@@ -205,19 +232,19 @@ class VoiceClient(LoggingClass):
                 self.ws.close(status=4000)
                 self.on_close(0, 'HEARTBEAT failure')
                 return
-            self._last_heartbeat = time.perf_counter()
+            self._last_heartbeat = time()
 
-            self.send(VoiceOPCode.HEARTBEAT, time.time())
+            self.send(VoiceOPCode.HEARTBEAT, {'seq_ack': self.seq, 't': int(time())})
             self._heartbeat_acknowledged = False
-            gevent.sleep(interval / 1000)
+            gevent_sleep(interval / 1000)
 
     def handle_heartbeat(self, _):
-        self.send(VoiceOPCode.HEARTBEAT, time.time())
+        self.send(VoiceOPCode.HEARTBEAT, {'seq_ack': self.seq, 't': int(time())})
 
     def handle_heartbeat_acknowledge(self, _):
         self.log.debug('[{}] Received WS HEARTBEAT_ACK'.format(self.channel_id))
         self._heartbeat_acknowledged = True
-        self.latency = float('{:.2f}'.format((time.perf_counter() - self._last_heartbeat) * 1000))
+        self.latency = self.ws.last_pong_tm and float('{:.2f}'.format((self.ws.last_pong_tm - self.ws.last_ping_tm) * 1000))
 
     def set_speaking(self, voice=False, soundshare=False, priority=False, delay=0):
         value = SpeakingFlags.NONE
@@ -259,23 +286,34 @@ class VoiceClient(LoggingClass):
             self.log.debug('[{}] dropping because WS is closed OP {} (data = {})'.format(self.channel_id, op, data))
 
     def on_voice_client_disconnect(self, data):
+        user_id = int(data['user_id'])
         for ssrc in self.audio_ssrcs.keys():
-            if self.audio_ssrcs[ssrc] == int(data['user_id']):
+            if self.audio_ssrcs[ssrc] == user_id:
                 del self.audio_ssrcs[ssrc]
                 break
+
+        payload = VoiceUser(
+            user_id=user_id,
+            flags=None,
+            platform=None,
+        )
+
+        self.client.events.emit('VoiceUserLeave', payload)
 
     def on_voice_codecs(self, data):
         self.audio_codec = data['audio_codec']
         self.video_codec = data['video_codec']
         if 'media_session_id' in data.keys():
             self.transport_id = data['media_session_id']
+        if 'keyframe_interval' in data.keys():
+            self.keyframe_interval = data['keyframe_interval']
 
         # Set the UDP's RTP Audio Header's Payload Type
-        self.udp.set_audio_codec(data['audio_codec'])
+        # self.udp.set_audio_codec(data['audio_codec'])  # bypass because the audio codec will always be opus
 
     def on_voice_hello(self, packet):
-        self.log.info('[{}] Received Voice HELLO payload, starting heartbeater'.format(self.channel_id))
-        self._heartbeat_task = gevent.spawn(self.heartbeat_task, packet['heartbeat_interval'])
+        self.log.info('[{}] Received HELLO payload, starting heartbeater'.format(self.channel_id))
+        self._heartbeat_task = gevent_spawn(self.heartbeat_task, packet['heartbeat_interval'])
         self.set_state(VoiceState.AUTHENTICATED)
 
     def on_voice_ready(self, data):
@@ -283,17 +321,19 @@ class VoiceClient(LoggingClass):
         self.set_state(VoiceState.CONNECTING)
         self.ssrc = data['ssrc']
         self.audio_ssrcs[self.ssrc] = self.client.state.me.id
+        if self.video_enabled:
+            self.video_ssrcs[self.ssrc + 1] = self.client.state.me.id
+            self.rtx_ssrcs[self.ssrc + 2] = self.client.state.me.id
         self.ip = data['ip']
         self.port = data['port']
         self.enc_modes = data['modes']
         self.experiments = data['experiments']
-        self.streams = data['streams']
         self._identified = True
 
         for mode in self.enc_modes:
             if mode in self.SUPPORTED_MODES:
                 self.mode = mode
-                self.log.debug('[{}] Selected mode {}'.format(self.channel_id, mode))
+                self.log.info('[{}] Selected mode {}'.format(self.channel_id, mode))
                 break
         else:
             raise Exception('Failed to find a supported voice mode')
@@ -313,10 +353,24 @@ class VoiceClient(LoggingClass):
         for idx, codec in enumerate(AudioCodecs):
             codecs.append({
                 'name': codec,
-                'type': 'audio',
-                'priority': (idx + 1) * 1000,
                 'payload_type': RTPPayloadTypes.get(codec).value,
+                'priority': 1000 + idx,
+                'type': 'audio',
             })
+
+        if self.video_enabled:
+            for idx, codec in enumerate(VideoCodecs):
+                ptype = RTPPayloadTypes.get(codec.lower())
+                if ptype:
+                    codecs.append({
+                        'decode': True,
+                        'encode': False,
+                        'name': codec,
+                        'payload_type': ptype.value,
+                        'priority': 1000 * idx,
+                        'rtxPayloadType': ptype.value + 1,
+                        'type': 'video',
+                    })
 
         self.log.debug('[{}] IP discovery completed ({}:{}), sending SELECT_PROTOCOL'.format(self.channel_id, ip, port))
         self.send(VoiceOPCode.SELECT_PROTOCOL, {
@@ -327,7 +381,7 @@ class VoiceClient(LoggingClass):
                 'mode': self.mode,
             },
             'codecs': codecs,
-            'experiments': [],
+            'experiments': self.experiments,
         })
         self.send(VoiceOPCode.CLIENT_CONNECT, {
             'audio_ssrc': self.ssrc,
@@ -347,13 +401,19 @@ class VoiceClient(LoggingClass):
 
         self.mode = sdp['mode']  # UDP-only, does not apply to webRTC
         self.audio_codec = sdp['audio_codec']
-        self.video_codec = sdp['video_codec']
         self.transport_id = sdp['media_session_id']  # analytics
-        # self.sdp = sdp['sdp']  # webRTC only
-        # self.keyframe_interval = sdp['keyframe_interval']
+        self.secure_frames_version = sdp['secure_frames_version']
+        if 'sdp' in sdp.keys():
+            self.sdp = sdp['sdp']  # webRTC only
 
         # Set the UDP's RTP Audio Header's Payload Type
         self.udp.set_audio_codec(sdp['audio_codec'])
+
+        if self.video_enabled:
+            self.video_codec = sdp['video_codec']
+            self.udp.set_video_codec(sdp['video_codec'])
+        if 'keyframe_interval' in sdp.keys():
+            self.keyframe_interval = sdp['keyframe_interval']
 
         # Create a secret box for encryption/decryption
         self.udp.setup_encryption(bytes(bytearray(sdp['secret_key'])))  # UDP only
@@ -385,14 +445,68 @@ class VoiceClient(LoggingClass):
             priority=bool(data['speaking'] & SpeakingFlags.PRIORITY),
         )
 
-        self.client.gw.events.emit('VoiceSpeaking', payload)
+        self.client.events.emit('VoiceSpeaking', payload)
+
+    def on_client_connect(self, data):
+        user_id = int(data['user_id'])
+
+        payload = VoiceUser(
+            user_id=user_id,
+            flags=data['flags'],
+            platform=None,
+        )
+
+        self.client.events.emit('VoiceUserJoin', payload)
+
+    def on_platform(self, data):
+        user_id = int(data['user_id'])
+
+        payload = VoiceUser(
+            user_id=user_id,
+            flags=None,
+            platform=data['platform'],
+        )
+
+        self.client.events.emit('VoiceUserPlatform', payload)
+
+    def on_video(self, data):
+        user_id = int(data['user_id'])
+        video_ssrc = data['video_ssrc']
+
+        if video_ssrc:
+            self.video_ssrcs[data['video_ssrc']] = user_id
+            self.rtx_ssrcs[video_ssrc + 1] = user_id
+        else:
+            for ssrc, uid in self.video_ssrcs.items():
+                if uid == user_id:
+                    del self.video_ssrcs[ssrc]
+                    break
+            for ssrc, uid in self.rtx_ssrcs.items():
+                if uid == user_id:
+                    del self.rtx_ssrcs[ssrc]
+                    break
+
+        payload = VideoStream(
+            client=self,
+            user_id=user_id,
+            streams=data['streams'],
+            video_ssrc=video_ssrc,
+            audio_ssrc=data['audio_ssrc'],
+        )
+
+        if data['video_ssrc']:
+            self.client.events.emit('VideoStreamStart', payload)
+        else:
+            self.client.events.emit('VideoStreamEnd', payload)
 
     def on_message(self, msg):
         try:
             data = self.encoder.decode(msg)
             self.packets.emit(data['op'], data['d'])
+            if 'seq' in data.keys():
+                self.seq = data['seq']
         except Exception:
-            self.log.exception('Failed to parse voice gateway message: ')
+            self.log.error('Failed to parse voice gateway message: ')
 
     def on_error(self, error):
         if isinstance(error, WebSocketTimeoutException):
@@ -406,8 +520,10 @@ class VoiceClient(LoggingClass):
                 'server_id': self.server_id,
                 'session_id': self._session_id,
                 'token': self.token,
+                'seq_ack': self.seq,
             })
         else:
+            self.seq = -1
             self.send(VoiceOPCode.IDENTIFY, {
                 'server_id': self.server_id,
                 'user_id': self.user_id,
@@ -417,7 +533,7 @@ class VoiceClient(LoggingClass):
             })
 
     def on_close(self, code=None, reason=None):
-        gevent.sleep(0.001)
+        gevent_sleep(0.001)
         if self.media:
             self.media.pause()
         self.log.info('[{}] WS Closed: {}{}({})'.format(self.channel_id, f'[{code}] ' if code else '', f'{reason} ' if reason else '', self._reconnects))
@@ -455,14 +571,18 @@ class VoiceClient(LoggingClass):
                 self.udp.disconnect()
 
             # every other code is a failure, except these
-            if code not in (1001, 4009, 4015) and not self._safe_reconnect_state:
+            if code not in (1001, 4006, 4009, 4015) and not self._safe_reconnect_state:
                 self.log.warning('[{}] Session unexpectedly terminated. Not reconnecting.'.format(self.channel_id))
                 return self.disconnect()
 
-        wait_time = 0
+            if code == 4006 or (code == 0 and 'HEARTBEAT' in reason):
+                self.log.warning(f'[{self.channel_id}] Session invalidated. Spawning fresh connection to channel.')
+                return self.connect(self.channel_id, mute=self.mute, deaf=self.deaf, video=self.video_enabled)
+
+        wait_time = (self._reconnects * 5) - 5
 
         self.log.info('[{}] {} in {} second{}'.format(self.channel_id, 'Resuming' if self._identified else 'Reconnecting', wait_time, 's' if wait_time != 1 else ''))
-        gevent.sleep(wait_time)
+        gevent_sleep(wait_time)
         self.connect_and_run()
 
     def connect(self, channel_id, timeout=10, **kwargs):
@@ -480,15 +600,16 @@ class VoiceClient(LoggingClass):
             if self.state == VoiceState.CONNECTED:
                 self.log.debug('[{}] Moving to channel {}'.format(self.channel_id, channel_id))
             else:
-                self.log.debug('[{}] Attempting connection to channel id {}'.format(self.channel_id, channel_id))
+                self.log.debug('[{}] Attempting connection to channel id {}'.format(self.channel_id or '-', channel_id))
                 self.set_state(VoiceState.AWAITING_ENDPOINT)
 
         self.set_voice_state(channel_id, **kwargs)
 
         if not self.state_emitter.once(VoiceState.CONNECTED, timeout=timeout):
             self.disconnect()
-            raise VoiceException('Failed to connect to voice', self)
+            self.log.error(f'[{self.channel_id}] Failed to connect to voice')
         else:
+            self._ws_creation_time = time()
             return self
 
     def disconnect(self):
@@ -500,6 +621,7 @@ class VoiceClient(LoggingClass):
 
         try:
             self.media.now_playing.source.proc.kill()
+            self.media.now_playing.source = None
         except:
             pass
 
@@ -521,7 +643,7 @@ class VoiceClient(LoggingClass):
         if self.client.state.voice_states.get(self._session_id):
             del self.client.state.voice_states[self._session_id]
 
-        return self.client.gw.events.emit('VoiceDisconnect', self)
+        return self.client.events.emit('VoiceDisconnect', self)
 
     def send_frame(self, *args, **kwargs):
         self.udp.send_frame(*args, **kwargs)

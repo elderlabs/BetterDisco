@@ -1,4 +1,4 @@
-import operator
+from operator import attrgetter as operator_attrgetter
 
 
 class Paginator:
@@ -11,7 +11,7 @@ class Paginator:
         self.args = args
         self.kwargs = kwargs
 
-        self._key = kwargs.pop('key', operator.attrgetter('id'))
+        self._key = kwargs.pop('key', operator_attrgetter('id'))
         self._bulk = kwargs.pop('bulk', False)
         self._sort_key_value = kwargs.pop(self.sort_key, None)
         self._buffer = []

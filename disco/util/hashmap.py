@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict as collections_defaultdict
 
 
 class HashMap(dict):
@@ -42,5 +42,5 @@ class HashMap(dict):
         return map(predicate, self.values())
 
 
-class DefaultHashMap(defaultdict, HashMap):
+class DefaultHashMap(collections_defaultdict, HashMap):
     pass

@@ -1,12 +1,12 @@
 try:
-    import regex as re
+    from regex import compile as re_compile
 except ImportError:
-    import re
-import copy
+    from re import compile as re_compile
+from copy import copy
 from disco.util.sanitize import S
 
 # Regex which splits out argument parts
-PARTS_RE = re.compile(r'([<\[{])((?:[\w:|.\d])+)(?:[>\]}])')
+PARTS_RE = re_compile(r'([<\[{])((?:[\w:|.\d])+)(?:[>\]}])')
 
 BOOL_OPTS = {
     'yes': True,
@@ -116,7 +116,7 @@ class ArgumentSet:
     """
     def __init__(self, args=None, custom_types=None):
         self.args = args or []
-        self.types = copy.copy(TYPE_MAP)
+        self.types = copy(TYPE_MAP)
         self.types.update(custom_types or {})
 
     @classmethod
