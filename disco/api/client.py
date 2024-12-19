@@ -464,7 +464,7 @@ class APIClient(LoggingClass):
             r = self.http(
                 Routes.CHANNELS_THREAD_CREATE,
                 dict(channel=channel),
-                data={'payload_json': json.dumps(payload)},
+                data={'payload_json': json_dumps(payload)},
                 files=files,
                 headers=_reason_header(reason)
             )
