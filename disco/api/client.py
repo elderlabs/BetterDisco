@@ -206,7 +206,15 @@ class APIClient(LoggingClass):
             payload['message_reference'] = message_reference
 
         if components:
-            payload['components'] = components
+            component_list = []
+            for c in components:
+                if type(c) != dict:
+                    component_list.append(c.to_dict())
+                elif type(c) == dict:
+                    component_list.append(c)
+            payload['components'] = component_list
+        else:
+            payload['components'] = []
 
         if sticker_ids:
             payload['sticker_ids'] = sticker_ids
@@ -269,6 +277,8 @@ class APIClient(LoggingClass):
             for c in components:
                 if type(c) != dict:
                     component_list.append(c.to_dict())
+                elif type(c) == dict:
+                    component_list.append(c)
             payload['components'] = component_list
         else:
             payload['components'] = []
