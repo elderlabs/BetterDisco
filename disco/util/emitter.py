@@ -41,7 +41,7 @@ class Event:
 
 
 class EmitterSubscription:
-    def __init__(self, events, callback, priority=Priority.NONE, conditional=None, metadata=None, max_queue_size=8096):
+    def __init__(self, events, callback, priority=Priority.NONE, conditional=None, metadata=None, max_queue_size=8192):
         self.events = events
         self.callback = callback
         self.priority = priority
@@ -119,12 +119,12 @@ class Emitter(LoggingClass):
             try:
                 listener(*args, **kwargs)
             except Exception as e:
-                self.log.warning('BEFORE {} event handler `{}` raised {}: {}'.format(
+                raise Exception('BEFORE {} event handler `{}` raised {}: {}'.format(
                     name,
-                    listener.callback.__name__,
+                    hasattr(listener.callback, '__name__') and listener.callback.__name__ or listener.callback.func.__name__,
                     e.__class__.__name__,
                     e,
-                ))
+                )) from e
 
         # Next execute all AFTER handlers sequentially
         for listener in self.event_handlers[Priority.AFTER].get(name, []):
@@ -132,12 +132,12 @@ class Emitter(LoggingClass):
                 listener(*args, **kwargs)
             except Exception as e:
                 if not e.__class__.__name__ == 'WebSocketConnectionClosedException':
-                    self.log.warning('AFTER {} event handler `{}` raised {}: {}'.format(
+                    raise Exception('AFTER {} event handler `{}` raised {}: {}'.format(
                         name,
-                        listener.callback.__name__,
+                        hasattr(listener.callback, '__name__') and listener.callback.__name__ or listener.callback.func.__name__,
                         e.__class__.__name__,
                         e,
-                    ))
+                    )) from e
 
         # Next enqueue all sequential handlers. This just puts stuff into a queue
         #  without blocking, so we don't have to worry too much
@@ -146,24 +146,24 @@ class Emitter(LoggingClass):
                 # TODO: find an error catch for this, will die silently on-error
                 listener(*args, **kwargs)
             except Exception as e:
-                self.log.warning('SEQUENTIAL {} event handler `{}` raised: {}'.format(
+                raise Exception('SEQUENTIAL {} event handler `{}` raised: {}'.format(
                     name,
-                    listener.callback.__name__,
+                    hasattr(listener.callback, '__name__') and listener.callback.__name__ or listener.callback.func.__name__,
                     e.__class__.__name__,
                     e,
-                ))
+                )) from e
 
         # Finally just spawn for everything else
         for listener in self.event_handlers[Priority.NONE].get(name, []):
             try:
                 gevent_spawn(listener, *args, **kwargs)
             except Exception as e:
-                self.log.warning('{} event handler `{}` raised {}: {}'.format(
+                raise Exception('{} event handler `{}` raised {}: {}'.format(
                     name,
                     listener.callback.__name__,
                     e.__class__.__name__,
                     e,
-                ))
+                )) from e
 
     def on(self, *args, **kwargs):
         return EmitterSubscription(args[:-1], args[-1], **kwargs).attach(self)
