@@ -112,6 +112,7 @@ class Routes:
     GUILDS_BANS_DELETE = (HTTPMethod.DELETE, GUILDS + '/bans/{user}')
     GUILDS_BANS_GET = (HTTPMethod.GET, GUILDS + '/bans/{user}')
     GUILDS_BANS_LIST = (HTTPMethod.GET, GUILDS + '/bans')
+    GUILDS_BASIC_GET = (HTTPMethod.GET, GUILDS + '/basic')
     GUILDS_CHANNELS_CREATE = (HTTPMethod.POST, GUILDS + '/channels')
     GUILDS_CHANNELS_LIST = (HTTPMethod.GET, GUILDS + '/channels')
     GUILDS_CHANNELS_MODIFY = (HTTPMethod.PATCH, GUILDS + '/channels')

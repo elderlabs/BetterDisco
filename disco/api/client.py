@@ -17,7 +17,8 @@ from disco.types.application import InteractionCallbackData, ApplicationCommand,
 from disco.types.user import User
 from disco.types.message import Message
 from disco.types.oauth import Application
-from disco.types.guild import Guild, GuildMember, GuildBan, GuildWidgetSettings, PruneCount, Role, GuildEmoji, AuditLogEntry, Integration, DiscoveryRequirements, GuildPreview
+from disco.types.guild import Guild, GuildMember, GuildBan, GuildWidgetSettings, PruneCount, Role, GuildEmoji, \
+    AuditLogEntry, Integration, DiscoveryRequirements, GuildPreview, GuildWidget
 from disco.types.channel import Channel, Thread
 from disco.types.invite import Invite
 from disco.types.voice import VoiceRegion
@@ -404,6 +405,14 @@ class APIClient(LoggingClass):
         r = self.http(Routes.GUILDS_CREATE, json=payload)
         return Guild.create(self.client, r.json())
 
+    def guilds_basic_get(self, guild):
+        r = self.http(Routes.GUILDS_BASIC_GET, dict(guild=guild))
+        return Guild.create(self.client, r.json())
+
+    def guilds_preview_get(self, guild):
+        r = self.http(Routes.GUILDS_PREVIEW_GET, dict(guild=guild))
+        return Guild.create(self.client, r.json())
+
     def guilds_channels_list(self, guild):
         r = self.http(Routes.GUILDS_CHANNELS_LIST, dict(guild=guild))
         return Channel.create_hash(self.client, 'id', r.json(), guild_id=guild)
@@ -632,6 +641,10 @@ class APIClient(LoggingClass):
         r = self.http(Routes.GUILDS_VANITY_URL_GET, dict(guild=guild))
         return Invite.create(self.client, r.json())
 
+    def guilds_widget_get(self, guild):
+        r = self.http(Routes.GUILDS_WIDGET_GET, dict(guild=guild))
+        return GuildWidget.create(self.client, r.json())
+
     def guilds_widget_settings_get(self, guild):
         r = self.http(Routes.GUILDS_WIDGET_SETTINGS_GET, dict(guild=guild))
         return GuildWidgetSettings.create(self.client, r.json())
@@ -677,10 +690,6 @@ class APIClient(LoggingClass):
             Routes.GUILDS_EMOJIS_DELETE,
             dict(guild=guild, emoji=emoji),
             headers=_reason_header(reason))
-
-    def guilds_preview_get(self, guild):
-        r = self.http(Routes.GUILDS_PREVIEW_GET, dict(guild=guild))
-        return GuildPreview.create(self.client, r.json())
 
     def guilds_auditlogs_list(self, guild, before=None, user_id=None, action_type=None, limit=50):
         r = self.http(Routes.GUILDS_AUDIT_LOGS_LIST, dict(guild=guild), params=optional(
