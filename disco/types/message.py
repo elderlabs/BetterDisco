@@ -95,6 +95,7 @@ class MessageFlags(BitsetMap):
     # UNKNOWN = 1 << 11
     SUPPRESS_NOTIFICATIONS = 1 << 12
     IS_VOICE_MESSAGE = 1 << 13
+    IS_COMPONENTS_V2 = 1 << 15
 
 
 class MessageFlagValue(BitsetValue):
@@ -390,6 +391,13 @@ class ComponentTypes:
     ROLE_SELECT = 6
     MENTIONABLE_SELECT = 7
     CHANNEL_SELECT = 8
+    SECTION = 9
+    TEXT_DISPLAY = 10
+    THUMBNAIL = 11
+    MEDIA_GALLERY = 12
+    FILE = 13
+    SEPARATOR = 14
+    CONTAINER = 17
 
 
 class ButtonStyles:
@@ -398,6 +406,7 @@ class ButtonStyles:
     SUCCESS = 3
     DANGER = 4
     LINK = 5
+    PREMIUM = 6
 
 
 class TextInputStyles:
@@ -416,6 +425,21 @@ class SelectOption(SlottedModel):
     description = Field(text)
     emoji = Field(Emoji, default=None)
     default = Field(bool)
+
+
+class UnfurledMediaItem(SlottedModel):
+    url = Field(text)
+
+
+class MediaGalleryItem(SlottedModel):
+    media = Field(UnfurledMediaItem)
+    description = Field(text)
+    spoiler = Field(bool)
+
+
+class SeparatorSpacingSize:
+    SMALL = 1
+    LARGE = 2
 
 
 class _MessageComponent(SlottedModel):
@@ -442,15 +466,135 @@ class MessageComponent(_MessageComponent):
     components = ListField(_MessageComponent)
 
 
-class ActionRow(SlottedModel):
-    type = Field(int, default=1)
-    components = ListField(MessageComponent)
+class BaseComponent(SlottedModel):
+    type = Field(enum(ComponentTypes))
+    id = Field(int)
+
+    # Needed to change object out during json conversion, lazily loaded.
+    _component_sub_classes = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls is BaseComponent:
+            # Build subclass dict once.
+            if not cls._component_sub_classes:
+                cls.build_class_map()
+
+            if len(args) != 0:
+                _type = args[0].get('type')
+                subclass = cls._component_sub_classes.get(_type)
+                if subclass:
+                    return super(SlottedModel, subclass).__new__(subclass)
+        return super().__new__(cls)
+
+
+    # TODO: better method than a for loop?
+    @classmethod
+    def build_class_map(cls):
+        cls._component_sub_classes = {}
+        # Build map of ClassName:ClassObj of all subclasses of BaseComponent
+        subclasses = {subcls.__name__.replace("Component", ""): subcls for subcls in cls.__subclasses__()}
+        # Iterate over all ComponentTypes to match.
+        for attr, value in vars(ComponentTypes).items():
+            # Disregard all junk attributes
+            if attr.startswith('_') or not isinstance(value, int):
+                continue
+            # Match string formatting TEXT_DISPLAY -> TextDisplay
+            title_type = attr.title().replace('_', '')
+            # There are too many select menu, so I've put them all into one
+            if "Select" in title_type:
+                mapped_class = subclasses.get("SelectMenu")
+            else:
+                mapped_class = subclasses.get(title_type)
+            if mapped_class:
+                cls._component_sub_classes[value] = mapped_class
+
+
+class ActionRow(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.ACTION_ROW)
+    components = ListField(BaseComponent)
 
     def add_component(self, *args, **kwargs):
         if len(args) == 1:
             return self.components.append(*args)
         else:
-            return self.components.append(MessageComponent(*args, **kwargs))
+            return self.components.append(BaseComponent(*args, **kwargs))
+
+
+class ButtonComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.BUTTON)
+    style = Field(enum(ButtonStyles), cast=int)
+    label = Field(text)
+    emoji = Field(Emoji, create=False)
+    custom_id = Field(text)
+    sku_id = Field(snowflake)
+    url = Field(text)
+    disabled = Field(bool)
+
+
+class SelectMenuComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.STRING_SELECT)
+    custom_id = Field(text)
+    options = ListField(SelectOption)
+    channel_types = ListField(enum(ChannelType), cast=int)  # just int if fails
+    placeholder = Field(text)
+    default_values = Field(SelectDefaultValue)
+    min_values = Field(int)
+    max_values = Field(int)
+    disabled = Field(bool)
+
+
+class TextInputComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.TEXT_INPUT)
+    custom_id = Field(text)
+    style = Field(enum(TextInputStyles), cast=int)
+    label = Field(text)
+    min_length = Field(int)
+    max_length = Field(int)
+    required = Field(bool)
+    value = Field(text)
+    placeholder = Field(text)
+
+
+class SectionComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.SECTION)
+    components = ListField(BaseComponent)
+    accessory = Field(BaseComponent)
+
+
+class TextDisplayComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.TEXT_DISPLAY)
+    content = Field(text)
+
+
+class ThumbnailComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.THUMBNAIL)
+    media = Field(UnfurledMediaItem)
+    description = Field(text)
+    spoiler = Field(bool)
+
+
+class MediaGalleryComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.MEDIA_GALLERY)
+    items = ListField(MediaGalleryItem)
+
+
+class SeparatorComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.SEPARATOR)
+    divider = Field(bool)
+    spacing = Field(enum(SeparatorSpacingSize), cast=int)
+
+
+class FileComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.FILE)
+    file = Field(UnfurledMediaItem)
+    spoiler = Field(bool)
+
+
+class ContainerComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.CONTAINER)
+    accent_color = Field(int)
+    spoiler = Field(bool)
+    components = ListField(BaseComponent)
 
 
 class MessageModal(SlottedModel):
@@ -607,7 +751,7 @@ class _Message(SlottedModel):
     message_reference = Field(MessageReference, create=False)
     interaction_metadata = Field(MessageInterationMetadata, create=False)
     interaction = Field(MessageInteraction, create=False)  # deprecated
-    components = ListField(MessageComponent)
+    components = ListField(BaseComponent)
     sticker_items = ListField(StickerItem)
     position = Field(int)
     role_subscription_data = Field(RoleSubscriptionData, create=False)

@@ -1,5 +1,6 @@
 build/
 dist/
+betterdisco*.egg-info/
 disco*.egg-info/
 storage.db
 storage.json
