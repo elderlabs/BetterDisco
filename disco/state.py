@@ -221,7 +221,7 @@ class State:
             elif isinstance(channel, Channel):
                 if self.config.cache_dm_channels and channel.is_dm and event.message.channel_id not in self.dms:
                     self.dms[event.message.channel_id] = channel
-                elif self.config.cache_channels:
+                elif self.config.cache_channels and not channel.is_dm:
                     self.channels[event.message.channel_id] = channel
                     self.guilds[event.message.guild_id].channels[event.message.channel_id] = channel
 
