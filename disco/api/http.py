@@ -1,4 +1,5 @@
 from gevent import sleep as gevent_sleep
+from math import ceil as math_ceil
 from random import randint as random_randint
 from requests import Session as RequestsSession, __version__ as requests_version, ConnectionError, Timeout
 from platform import python_version
@@ -418,6 +419,11 @@ class HTTPClient(LoggingClass):
                     self.log.warning('Request to `{}` failed with code {}, retrying after {}s'.format(
                         url, r.status_code, backoff,
                     ))
+                elif r.status_code == 429:
+                    self.log.warning('Request to `{}` failed with code {}, retrying after {}s'.format(
+                        url, r.status_code, r.json()["retry_after"],
+                    ))
+                    backoff = math_ceil(r.json()["retry_after"])
                 else:
                     self.log.warning('Request to `{}` failed with code {}, retrying after {}s ({})'.format(
                         url, r.status_code, backoff, str(r.content, "utf=8"),

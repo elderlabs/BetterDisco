@@ -713,6 +713,13 @@ class _Message(SlottedModel):
         """
         return self.client.api.channels_messages_delete(self.channel_id, self.id)
 
+    def publish(self):
+        """
+        Publish this message.
+        """
+        assert self.channel.is_announcement
+        return self.channel.publish_message(self)
+
     def set_embeds_suppressed(self, state):
         """
         Toggle this message's embed suppression.
