@@ -21,7 +21,7 @@ ZLIB_SUFFIX = b'\x00\x00\xff\xff'
 
 
 class GatewayClient(LoggingClass):
-    GATEWAY_VERSION = 9
+    GATEWAY_VERSION = 10
 
     def __init__(self, client, max_reconnects=5, encoder='json', zlib_stream_enabled=True, ipc=None):
         super(GatewayClient, self).__init__()

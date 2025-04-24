@@ -863,18 +863,10 @@ class IntegrationDelete(GatewayEvent):
 
 
 @wraps_model(Interaction)
-@attach('guild_id', ('member', 'guild_id'))
 class InteractionCreate(GatewayEvent):
     """
-    Sent whenever a /command is sent to your application.
+    Sent when a user uses an Application Command or Message Component.
     """
-    app_permissions = Field(PermissionValue)
-    channel = Field(Channel)
-    entitlement_sku_ids = ListField(int)
-    entitlements = ListField(str)
-    guild = Field(Guild, create=False)
-    recipients = ListField(User)
-    interaction = Field(Interaction)
 
 
 @wraps_model(ApplicationCommand)

@@ -13,12 +13,15 @@ from disco.types.integration import UserConnection
 from disco.util.functional import optional
 from disco.util.logging import LoggingClass
 from disco.util.sanitize import S
-from disco.types.application import InteractionCallbackData, ApplicationCommand, GuildApplicationCommandPermissions, Interaction, InteractionResponse
+from disco.types.application import InteractionCallbackData, ApplicationCommand, GuildApplicationCommandPermissions, \
+    Interaction, InteractionResponse, InteractionFollowupMessage
 from disco.types.automoderation import AutoModerationRule
 from disco.types.user import User
 from disco.types.message import Message
 from disco.types.oauth import Application
-from disco.types.guild import Guild, GuildMember, GuildBan, GuildWidgetSettings, PruneCount, Role, GuildEmoji, AuditLogEntry, Integration, DiscoveryRequirements, GuildPreview, GuildEmbed,GuildScheduledEvent, GuildScheduledEventUser
+from disco.types.guild import Guild, GuildMember, GuildBan, GuildWidgetSettings, PruneCount, Role, GuildEmoji, \
+    AuditLogEntry, Integration, DiscoveryRequirements, GuildPreview, GuildEmbed, GuildScheduledEvent, \
+    GuildScheduledEventUser, GuildWidget
 from disco.types.channel import Channel, Thread, ThreadMember
 from disco.types.invite import Invite
 from disco.types.voice import VoiceRegion
@@ -424,7 +427,7 @@ class APIClient(LoggingClass):
 
         if attachment:
             attachments = [attachment]
-            warnings.warn(
+            warnings_warn(
                 'attachment kwarg has been deprecated, switch to using attachments with a list',
                 DeprecationWarning)
 
@@ -438,7 +441,7 @@ class APIClient(LoggingClass):
             payload['message']['content'] = None
 
         if embed:
-            warnings.warn(
+            warnings_warn(
                 'embed kwarg has been deprecated, switch to using embeds with a list',
                 DeprecationWarning)
             payload['message']['embeds'] = [embed.to_dict()]
@@ -994,7 +997,7 @@ class APIClient(LoggingClass):
             before=before,
             after=after,
         ))
-        return GuildScheduledEventUserObject.create_map(self.client, r.json())
+        return GuildScheduledEventUser.create_map(self.client, r.json())
 
     def guilds_scheduled_event_delete(self, guild, event):
         return self.http(Routes.GUILDS_EVENTS_DELETE, dict(guild=guild, event=event))
@@ -1191,8 +1194,8 @@ class APIClient(LoggingClass):
             rr = self.http(Routes.INTERACTIONS_ORIGINAL_RESPONSE_GET, dict(id=self.client.state.me.id, token=token))
             return InteractionResponse.create(self.client, dict(token=token, type=type, data=data, message=rr.json()))
 
-    def interactions_edit(self, application, token, data=None):
-        r = self.http(Routes.INTERACTIONS_MODIFY, dict(id=application, token=token), json=data)
+    def interactions_edit(self, application, token, data=None, files=None):
+        r = self.http(Routes.INTERACTIONS_MODIFY, dict(id=application, token=token), json=data, files=files)
         if r.status_code == 200:
             return InteractionResponse.create(self.client, r.json())
 
@@ -1208,7 +1211,7 @@ class APIClient(LoggingClass):
                   embeds=[],
                   allowed_mentions={'parse':[], 'users':[], 'roles':[]},
                   flags=0,
-                  components={},
+                  components=[],
                   attachment=None,
                   attachments=[],
                   sanitize=False,
@@ -1247,6 +1250,15 @@ class APIClient(LoggingClass):
                 'embed kwarg has been deprecated, switch to using embeds with a list',
                 DeprecationWarning)
 
+        if components:
+            component_list = []
+            for c in components:
+                if isinstance(c, dict):
+                    component_list.append(c)
+                else:
+                    component_list.append(c.to_dict())
+            components = component_list
+
         return self.interactions_create(interaction, token, type, data={
             'tts': tts,
             'content': content,
@@ -1262,13 +1274,27 @@ class APIClient(LoggingClass):
                   content=None,
                   embed=None,
                   embeds=[],
-                  components={},
-                  sanitize=False):
+                  allowed_mentions={},
+                  components=[],
+                  sanitize=False,
+                  attachments=[],
+                  poll=None):
         if content is not None:
             if self.token in content:
                 content = 'The bot\'s token would have been exposed in this message and has been removed for safety.'
             if sanitize:
                 content = S(content)
+
+        files = {}
+        if attachments:
+            if len(attachments) > 1:
+                files = {
+                    'file{}'.format(idx): tuple(i) for idx, i in enumerate(attachments)
+                }
+            else:
+                files = {
+                    'file': tuple(attachments[0]),
+                }
 
         if embeds:
             embed_list = []
@@ -1281,11 +1307,21 @@ class APIClient(LoggingClass):
                 'embed kwarg has been deprecated, switch to using embeds with a list',
                 DeprecationWarning)
 
+        if components:
+            component_list = []
+            for c in components:
+                if isinstance(c, dict):
+                    component_list.append(c)
+                else:
+                    component_list.append(c.to_dict())
+            components = component_list
+
         return self.interactions_edit(application, token, data={
             'content': content,
             'embeds': embeds,
+            'allowed_mentions': allowed_mentions,
             'components': components
-        })
+        }, files=files)
 
     def interactions_delete_reply(self, application, token):
         self.http(Routes.INTERACTIONS_DELETE, dict(id=application, token=token))
@@ -1294,33 +1330,124 @@ class APIClient(LoggingClass):
         r = self.http(Routes.INTERACTIONS_ORIGINAL_RESPONSE_GET, dict(id=application, token=token))
         return Interaction.create(self.client, r.json())
 
-    def interactions_followup_create(self, application, token, content=None, username=None, avatar_url=None, tts=None, file=None, embeds=None, payload_json=None, allowed_mentions=None, components=None, flags=None):
-        r = self.http(Routes.INTERACTIONS_FOLLOWUP_CREATE, dict(id=application, token=token), json=optional(
+    def interactions_followup_create(self,
+                                     token,
+                                     content=None,
+                                     sanitize=False,
+                                     tts=None,
+                                     attachments=None,
+                                     embeds=None,
+                                     allowed_mentions=None,
+                                     components=None,
+                                     flags=None,
+                                     thread_name=None,
+                                     applied_tags=None,
+                                     poll=None):
+
+        if content is not None:
+            if self.token in content:
+                content = 'The bot\'s token would have been exposed in this message and has been removed for safety.'
+            if sanitize:
+                content = S(content)
+
+        files = {}
+        if attachments:
+            if len(attachments) > 1:
+                files = {
+                    'file{}'.format(idx): tuple(i) for idx, i in enumerate(attachments)
+                }
+            else:
+                files = {
+                    'file': tuple(attachments[0]),
+                }
+
+        if embeds:
+            embed_list = []
+            for e in embeds:
+                embed_list.append(e.to_dict())
+            embeds = embed_list
+
+        if components:
+            component_list = []
+            for c in components:
+                if isinstance(c, dict):
+                    component_list.append(c)
+                else:
+                    component_list.append(c.to_dict())
+            components = component_list
+
+        if poll and not isinstance(poll, dict):
+            poll = poll.to_dict()
+
+        r = self.http(Routes.INTERACTIONS_FOLLOWUP_CREATE, dict(id=self.client.state.me.id, token=token), json=optional(
             content=content,
-            username=username,
-            avatar_url=avatar_url,
             tts=tts,
             embeds=embeds,
-            file=file,
-            payload_json=payload_json,
             allowed_mentions=allowed_mentions,
             components=components,
-            flags=flags
-        ))
-        return InteractionCallbackData.create(self.client, r.json())
+            flags=flags,
+            thread_name=thread_name,
+            applied_tags=applied_tags,
+            poll=poll
+        ), files=files)
+        return InteractionFollowupMessage.create(self.client, dict(r.json(), token=token))
 
-    def interactions_followup_edit(self, application, token, message, content=None, embeds=None, file=None, payload_json=None, allowed_mentions=None, attachments=None, components=None, flags=None):
-        r = self.http(Routes.INTERACTIONS_FOLLOWUP_MODIFY, dict(id=application, token=token, message=message), json=optional(
+    def interactions_followup_edit(self,
+                                   token,
+                                   message,
+                                   content=None,
+                                   sanitize=False,
+                                   embeds=None,
+                                   allowed_mentions=None,
+                                   components=None,
+                                   attachments=None,
+                                   flags=None,
+                                   poll=None):
+
+        if content is not None:
+            if self.token in content:
+                content = 'The bot\'s token would have been exposed in this message and has been removed for safety.'
+            if sanitize:
+                content = S(content)
+
+        files = {}
+        if attachments:
+            if len(attachments) > 1:
+                files = {
+                    'file{}'.format(idx): tuple(i) for idx, i in enumerate(attachments)
+                }
+            else:
+                files = {
+                    'file': tuple(attachments[0]),
+                }
+
+        if embeds:
+            embed_list = []
+            for e in embeds:
+                embed_list.append(e.to_dict())
+            embeds = embed_list
+
+        if components:
+            component_list = []
+            for c in components:
+                if isinstance(c, dict):
+                    component_list.append(c)
+                else:
+                    component_list.append(c.to_dict())
+            components = component_list
+
+        if poll and not isinstance(poll, dict):
+            poll = poll.to_dict()
+
+        r = self.http(Routes.INTERACTIONS_FOLLOWUP_MODIFY, dict(id=self.client.state.me.id, token=token, message=message), json=optional(
             content=content,
             embeds=embeds,
-            file=file,
-            payload_json=payload_json,
             allowed_mentions=allowed_mentions,
-            attachments=attachments,
             components=components,
-            flags=flags  # ephemeral == 64
-        ))
-        return InteractionCallbackData.create(self.client, r.json())
+            flags=flags,
+            poll=poll
+        ), files=files)
+        return InteractionFollowupMessage.create(self.client, dict(r.json(), token=token))
 
-    def interactions_followup_delete(self, application, token, message):
-        return self.http(Routes.INTERACTIONS_FOLLOWUP_DELETE, dict(id=application, token=token, message=message))
+    def interactions_followup_delete(self, token, message):
+        return self.http(Routes.INTERACTIONS_FOLLOWUP_DELETE, dict(id=self.client.state.me.id, token=token, message=message))

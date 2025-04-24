@@ -18,6 +18,17 @@ from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
 
 
+def component(data):
+    if isinstance(data, dict) and data.get("type"):
+        base_class = BaseComponent._get_component_subclass(data.get("type"))
+        if not base_class:
+            raise TypeError(f"Component Subclass for Type {data['type']} not found.")
+        return base_class.create(client=None, data=data)
+    else:
+        if BaseComponent in data.__class__.__bases__:
+            return data
+
+
 class MessageType:
     DEFAULT = 0
     RECIPIENT_ADD = 1
@@ -467,40 +478,28 @@ class MessageComponent(_MessageComponent):
 
 
 class BaseComponent(SlottedModel):
-    type = Field(enum(ComponentTypes))
+    type = Field(enum(ComponentTypes), cast=int)
     id = Field(int)
 
-    # Needed to change object out during json conversion, lazily loaded.
     _component_sub_classes = None
 
-    def __new__(cls, *args, **kwargs):
+    @classmethod
+    def _get_component_subclass(cls, _type):
         if cls is BaseComponent:
-            # Build subclass dict once.
             if not cls._component_sub_classes:
                 cls.build_class_map()
+            subclass = cls._component_sub_classes.get(_type)
+            if subclass:
+                return subclass
 
-            if len(args) != 0:
-                _type = args[0].get('type')
-                subclass = cls._component_sub_classes.get(_type)
-                if subclass:
-                    return super(SlottedModel, subclass).__new__(subclass)
-        return super().__new__(cls)
-
-
-    # TODO: better method than a for loop?
     @classmethod
     def build_class_map(cls):
         cls._component_sub_classes = {}
-        # Build map of ClassName:ClassObj of all subclasses of BaseComponent
         subclasses = {subcls.__name__.replace("Component", ""): subcls for subcls in cls.__subclasses__()}
-        # Iterate over all ComponentTypes to match.
         for attr, value in vars(ComponentTypes).items():
-            # Disregard all junk attributes
             if attr.startswith('_') or not isinstance(value, int):
                 continue
-            # Match string formatting TEXT_DISPLAY -> TextDisplay
             title_type = attr.title().replace('_', '')
-            # There are too many select menu, so I've put them all into one
             if "Select" in title_type:
                 mapped_class = subclasses.get("SelectMenu")
             else:
@@ -511,13 +510,16 @@ class BaseComponent(SlottedModel):
 
 class ActionRow(BaseComponent):
     type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.ACTION_ROW)
-    components = ListField(BaseComponent)
+    components = ListField(component)
 
     def add_component(self, *args, **kwargs):
-        if len(args) == 1:
-            return self.components.append(*args)
+        if len(args) >= 2:
+            self.components += args
+            return
+        elif "type" in kwargs:
+            return self.components.append(component(kwargs))
         else:
-            return self.components.append(BaseComponent(*args, **kwargs))
+            self.components.append(*args)
 
 
 class ButtonComponent(BaseComponent):
@@ -557,8 +559,17 @@ class TextInputComponent(BaseComponent):
 
 class SectionComponent(BaseComponent):
     type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.SECTION)
-    components = ListField(BaseComponent)
-    accessory = Field(BaseComponent)
+    components = ListField(component)
+    accessory = Field(component)
+
+    def add_component(self, *args, **kwargs):
+        if len(args) >= 2:
+            self.components += args
+            return
+        elif "type" in kwargs:
+            return self.components.append(component(kwargs))
+        else:
+            self.components.append(*args)
 
 
 class TextDisplayComponent(BaseComponent):
@@ -594,9 +605,19 @@ class ContainerComponent(BaseComponent):
     type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.CONTAINER)
     accent_color = Field(int)
     spoiler = Field(bool)
-    components = ListField(BaseComponent)
+    components = ListField(component)
+
+    def add_component(self, *args, **kwargs):
+        if len(args) >= 2:
+            self.components += args
+            return
+        elif "type" in kwargs:
+            return self.components.append(component(kwargs))
+        else:
+            self.components.append(*args)
 
 
+# TODO: Fix Message Modals
 class MessageModal(SlottedModel):
     title = Field(text)
     custom_id = Field(text)
@@ -751,7 +772,7 @@ class _Message(SlottedModel):
     message_reference = Field(MessageReference, create=False)
     interaction_metadata = Field(MessageInterationMetadata, create=False)
     interaction = Field(MessageInteraction, create=False)  # deprecated
-    components = ListField(BaseComponent)
+    components = ListField(component)
     sticker_items = ListField(StickerItem)
     position = Field(int)
     role_subscription_data = Field(RoleSubscriptionData, create=False)

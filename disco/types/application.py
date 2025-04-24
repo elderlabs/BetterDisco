@@ -1,7 +1,10 @@
-from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property, DictField, str_or_int, BitsetMap, BitsetValue
+from disco.types.base import SlottedModel, Field, snowflake, text, enum, ListField, cached_property, DictField, \
+    str_or_int, BitsetMap, BitsetValue, datetime
 from disco.types.channel import Channel, ChannelType
-from disco.types.guild import GuildMember, Role
-from disco.types.message import MessageEmbed, AllowedMentions, Message, MessageComponent, SelectOption, MessageAttachment
+from disco.types.guild import GuildMember, Role, Guild
+from disco.types.message import MessageEmbed, AllowedMentions, Message, MessageAttachment, component, MessageFlags, \
+    MessagePoll, MessageFlagValue
+from disco.types.permissions import PermissionValue
 from disco.types.reactions import Emoji
 from disco.types.user import User
 from disco.util.paginator import Paginator
@@ -85,7 +88,7 @@ class InteractionData(SlottedModel):
     values = ListField(text, create=False)
     target_id = Field(snowflake)
     guild_id = Field(snowflake)
-    components = ListField(MessageComponent)
+    components = ListField(component)
 
 
 class ApplicationCommand(SlottedModel):
@@ -116,6 +119,30 @@ class ApplicationCommandPermissions(SlottedModel):
     permission = Field(bool)
 
 
+class EntitlementType:
+    PURCHASE = 1
+    PREMIUM_SUBSCRIPTION = 2
+    DEVELOPER_GIFT = 3
+    TEST_MODE_PURCHASE = 4
+    FREE_PURCHASE = 5
+    USER_GIFT = 6
+    PREMIUM_PURCHASE = 7
+    APPLICATION_SUBSCRIPTION = 8
+
+
+class Entitlement(SlottedModel):
+    id = Field(snowflake)
+    sku_id = Field(snowflake)
+    application_id = Field(snowflake)
+    user_id = Field(snowflake)
+    type = Field(enum(EntitlementType))
+    deleted = Field(bool)
+    starts_at = Field(datetime)
+    ends_at = Field(datetime)
+    guild_id = Field(snowflake)
+    consumed = Field(bool)
+
+
 class GuildApplicationCommandPermissions(SlottedModel):
     id = Field(snowflake)
     application_id = Field(snowflake)
@@ -131,21 +158,33 @@ class InteractionType:
     MODAL_SUBMIT = 5
 
 
+class InteractionContextType:
+    GUILD = 0
+    BOT_DM = 1
+    PRIVATE_CHANNEL = 2
+
+
 class Interaction(SlottedModel):
     id = Field(snowflake)
     application_id = Field(snowflake)
     type = Field(enum(InteractionType))
     data = Field(InteractionData)
-    guild_id = Field(snowflake)
+    guild = Field(Guild, create=False)
+    channel = Field(Channel)
     channel_id = Field(snowflake)
     member = Field(GuildMember, create=False)
     user = Field(User, create=False)
     token = Field(text)
     version = Field(int)
     message = Field(Message, create=False)
-    locale = Field(str)
-    guild_locale = Field(str)
-    recipients = ListField(User)
+    app_permissions = Field(PermissionValue)
+    locale = Field(text)
+    guild_locale = Field(text)
+    entitlements = ListField(Entitlement)
+    entitlement_sku_ids = ListField(int)
+    authorizing_integration_owners = DictField(text, int)
+    context = Field(enum(InteractionContextType))
+    attachment_size_limit = Field(int)
 
     def __repr__(self):
         return '<Interaction id={} channel_id={}>'.format(self.id, self.channel_id)
@@ -185,14 +224,14 @@ class Interaction(SlottedModel):
         return self.channel.delete_pin(self)
 
     def reply(self, type=4, choices=None, modal=None, *args, **kwargs):
-        if type is 9:
+        if type == InteractionCallbackType.MODAL:
             if not modal:
                 raise Exception("Modal not passed to method.")
             if isinstance(modal, dict):
                 return self.client.api.interactions_create(self.id, self.token, type, data=modal)
             else:
                 return self.client.api.interactions_create(self.id, self.token, type, data=modal.to_dict())
-        elif type is 8:
+        elif type == InteractionCallbackType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT:
 
             if not choices:
                 raise Exception("Choices not passed to method.")
@@ -203,9 +242,12 @@ class Interaction(SlottedModel):
                 else:
                     parsed.append(choice.to_dict())
 
-            return self.client.api.interactions_create(self.id, self.token, 8, data={"choices": parsed})
+            return self.client.api.interactions_create(self.id, self.token, type, data={"choices": parsed})
         else:
             return self.client.api.interactions_create_reply(self.id, self.token, type=type, *args, **kwargs)
+
+    def followup(self, *args, **kwargs):
+        return self.client.api.interactions_followup_create(self.token, *args, **kwargs)
 
     def reply_modal(self, modal):
         raise Exception("Deprecated: Please use event.reply(type=InteractionCallbackType.MODAL, modal=MODAL)")
@@ -268,14 +310,7 @@ class InteractionCallbackType:
     APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8
     MODAL = 9
     PREMIUM_REQUIRED = 10
-
-
-class InteractionResponseFlags(BitsetMap):
-    EPHEMERAL = 1 << 6
-
-
-class InteractionResponseFlagsValue(BitsetValue):
-    map = InteractionResponseFlags
+    LAUNCH_ACTIVITY = 12
 
 
 class InteractionCallbackData(SlottedModel):
@@ -283,9 +318,10 @@ class InteractionCallbackData(SlottedModel):
     content = Field(text)
     embeds = ListField(MessageEmbed)
     allowed_mentions = Field(AllowedMentions)
-    flags = Field(InteractionResponseFlagsValue)
-    components = ListField(MessageComponent)
-
+    flags = Field(MessageFlagValue)
+    components = ListField(component)
+    attachments = ListField(MessageAttachment)
+    poll = Field(MessagePoll)
 
 class InteractionResponse(Interaction):
     type = Field(enum(InteractionCallbackType))
@@ -296,3 +332,14 @@ class InteractionResponse(Interaction):
 
     def __int__(self):
         return self.id
+
+
+class InteractionFollowupMessage(Message):
+    token = Field(text)
+
+    def edit(self, *args, **kwargs):
+        self.client.api.interactions_followup_edit(self.token, self.id, *args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        self.client.api.interactions_followup_delete(self.token, self.id)
+
