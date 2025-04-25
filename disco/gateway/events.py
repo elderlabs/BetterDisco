@@ -1,8 +1,11 @@
-from disco.types.application import ApplicationCommand, Interaction, ApplicationCommandPermissions
-from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, snowflake, datetime, text, str_or_int
+from disco.types.application import ApplicationCommand, Interaction, ApplicationCommandPermissions, Entitlement
+from disco.types.auditlog import AuditLogEntry
+from disco.types.automoderation import AutoModerationAction, AutoModerationTriggerTypes
+from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, snowflake, datetime, text, str_or_int, \
+    enum
 from disco.types.channel import Channel, PermissionOverwrite, ThreadMember, StageInstance, Thread
-from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration, GuildEntitlement, AuditLogEntry, \
-    AutoModerationRule, AutoModerationActionExecute, GuildScheduledEvent, GuildSoundboardSound, GuildVoiceState
+from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration, \
+    AutoModerationRule, GuildScheduledEvent, GuildSoundboardSound, GuildVoiceState
 from disco.types.invite import Invite
 from disco.types.permissions import PermissionValue
 from disco.types.reactions import Emoji, Sticker
@@ -1117,9 +1120,18 @@ class AutoModerationRuleDelete(GatewayEvent):
     guild_id = Field(snowflake)
 
 
-@wraps_model(AutoModerationActionExecute)
 class AutoModerationActionExecution(GatewayEvent):
     guild_id = Field(snowflake)
+    action = Field(AutoModerationAction)
+    rule_id = Field(snowflake)
+    rule_trigger_type = Field(enum(AutoModerationTriggerTypes))
+    user_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    message_id = Field(snowflake)
+    alert_system_message_id = Field(snowflake)
+    content = Field(text)
+    matched_keyword = Field(text)
+    matched_content = Field(text)
 
 
 class AutoModerationMentionRaidDetection(GatewayEvent):
@@ -1133,17 +1145,17 @@ class GuildAuditLogEntryCreate(GatewayEvent):
     guild_id = Field(snowflake)
 
 
-@wraps_model(GuildEntitlement)
+@wraps_model(Entitlement)
 class EntitlementCreate(GatewayEvent):
     guild_id = Field(snowflake)
 
 
-@wraps_model(GuildEntitlement)
+@wraps_model(Entitlement)
 class EntitlementUpdate(GatewayEvent):
     guild_id = Field(snowflake)
 
 
-@wraps_model(GuildEntitlement)
+@wraps_model(Entitlement)
 class EntitlementDelete(GatewayEvent):
     guild_id = Field(snowflake)
 
@@ -1179,8 +1191,16 @@ class GuildSoundboardSoundsUpdate(GatewayEvent):
 
 
 class MessagePollVoteAdd(GatewayEvent):
-    pass
+    user_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    message_id = Field(snowflake)
+    guild_id = Field(snowflake)
+    answer_id = Field(int)
 
 
 class MessagePollVoteRemove(GatewayEvent):
-    pass
+    user_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    message_id = Field(snowflake)
+    guild_id = Field(snowflake)
+    answer_id = Field(int)

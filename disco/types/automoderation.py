@@ -1,39 +1,45 @@
 from disco.types.base import SlottedModel, text, Field, snowflake, ListField, enum, cached_property
 
 
-class KeywordPresetTypes(object):
+class KeywordPresetTypes:
     PROFANITY = 1
     SEXUAL_CONTENT = 2
     SLURS = 3
 
 
-class EventType(object):
+class AutoModerationEventType:
     MESSAGE_SEND = 1
+    MESSAGE_UPDATE = 2
 
 
-class TriggerTypes(object):
+class AutoModerationTriggerTypes:
     KEYWORD = 1
     SPAM = 3
     KEYWORD_PRESET = 4
     MENTION_SPAM = 5
+    MEMBER_PROFILE = 6
 
 
-class AutoModerationActionType(object):
+class AutoModerationActionType:
     BLOCK_MESSAGE = 1
     SEND_ALERT_MESSAGE = 2
     TIMEOUT = 3
+    BLOCK_MEMBER_INTERACTION = 4
 
 
 class TriggerMetaData(SlottedModel):
     keyword_filter = ListField(text)
+    regex_patterns = ListField(text)
     presets = ListField(enum(KeywordPresetTypes))
     allow_list = ListField(text)
     mention_total_limit = Field(int)
+    mention_raid_protection_enabled = Field(bool)
 
 
 class AutoModerationActionMetaData(SlottedModel):
     channel_id = Field(snowflake)
     duration_seconds = Field(int)
+    custom_message = Field(text)
 
     @property
     def channel(self):
@@ -53,8 +59,8 @@ class AutoModerationRule(SlottedModel):
     guild_id = Field(snowflake)
     name = Field(text)
     creator_id = Field(snowflake)
-    event_type = Field(enum(EventType))
-    trigger_type = Field(enum(TriggerTypes))
+    event_type = Field(enum(AutoModerationEventType))
+    trigger_type = Field(enum(AutoModerationTriggerTypes))
     trigger_metadata = Field(TriggerMetaData)
     actions = ListField(AutoModerationAction)
     enabled = Field(bool)
