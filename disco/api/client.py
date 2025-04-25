@@ -9,18 +9,19 @@ from gevent.local import local
 from urllib.parse import quote
 
 from disco.api.http import Routes, HTTPClient
-from disco.types.integration import UserConnection
 from disco.util.functional import optional
 from disco.util.logging import LoggingClass
 from disco.util.sanitize import S
 from disco.types.application import InteractionCallbackData, ApplicationCommand, GuildApplicationCommandPermissions, \
     Interaction, InteractionResponse, InteractionFollowupMessage
 from disco.types.automoderation import AutoModerationRule
+from disco.types.auditlog import AuditLogEntry
+from disco.types.integration import UserConnection, Integration
 from disco.types.user import User
 from disco.types.message import Message
 from disco.types.oauth import Application
 from disco.types.guild import Guild, GuildMember, GuildBan, GuildWidgetSettings, PruneCount, Role, GuildEmoji, \
-    AuditLogEntry, Integration, DiscoveryRequirements, GuildPreview, GuildEmbed, GuildScheduledEvent, \
+    DiscoveryRequirements, GuildPreview, GuildEmbed, GuildScheduledEvent, \
     GuildScheduledEventUser, GuildWidget
 from disco.types.channel import Channel, Thread, ThreadMember
 from disco.types.invite import Invite

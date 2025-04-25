@@ -1,11 +1,12 @@
 from disco.types.application import ApplicationCommand, Interaction, ApplicationCommandPermissions, Entitlement
 from disco.types.auditlog import AuditLogEntry
-from disco.types.automoderation import AutoModerationAction, AutoModerationTriggerTypes
+from disco.types.automoderation import AutoModerationAction, AutoModerationTriggerTypes, AutoModerationRule
 from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, snowflake, datetime, text, str_or_int, \
     enum
 from disco.types.channel import Channel, PermissionOverwrite, ThreadMember, StageInstance, Thread
-from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, Integration, \
-    AutoModerationRule, GuildScheduledEvent, GuildSoundboardSound, GuildVoiceState
+from disco.types.guild import Guild, GuildMember, Role, GuildEmoji, \
+    GuildScheduledEvent, GuildSoundboardSound, GuildVoiceState
+from disco.types.integration import Integration
 from disco.types.invite import Invite
 from disco.types.permissions import PermissionValue
 from disco.types.reactions import Emoji, Sticker
