@@ -66,15 +66,16 @@ class InteractionDataResolved(SlottedModel):
     attachments = DictField(snowflake, MessageAttachment)
 
 
-class _InteractionDataOption(SlottedModel):
+def interaction_option(data):
+    return InteractionDataOption.create(data=data, client=None)
+
+
+class InteractionDataOption(SlottedModel):
+    options = ListField(interaction_option, create=False)
     name = Field(text)
     type = Field(int)
     value = Field(str_or_int)
     focused = Field(bool)
-
-
-class InteractionDataOption(_InteractionDataOption):
-    options = ListField(_InteractionDataOption)
 
 
 class InteractionData(SlottedModel):
@@ -82,13 +83,13 @@ class InteractionData(SlottedModel):
     name = Field(text)
     type = Field(enum(ApplicationCommandTypes))
     resolved = Field(InteractionDataResolved, create=False)
-    options = ListField(InteractionDataOption, create=False)
+    options = ListField(interaction_option, create=False)
     custom_id = Field(text)
     component_type = Field(int)
     values = ListField(text, create=False)
     target_id = Field(snowflake)
     guild_id = Field(snowflake)
-    components = ListField(component)
+    components = ListField(component, create=False)
 
 
 class ApplicationCommand(SlottedModel):
@@ -169,6 +170,7 @@ class Interaction(SlottedModel):
     application_id = Field(snowflake)
     type = Field(enum(InteractionType))
     data = Field(InteractionData)
+    guild_id = Field(snowflake)
     guild = Field(Guild, create=False)
     channel = Field(Channel)
     channel_id = Field(snowflake)
@@ -192,30 +194,36 @@ class Interaction(SlottedModel):
     def __int__(self):
         return self.id
 
-    @cached_property
-    def channel(self):
-        if self.guild_id:
-            if self.channel_id in self.client.state.threads:
-                return self.client.state.threads.get(self.channel_id)
-            elif self.channel_id in self.client.state.channels:
-                return self.client.state.channels.get(self.channel_id)
-        elif self.channel_id in self.client.state.dms:
-            return self.client.state.dms[self.channel_id]
-        return self.client.api.channels_get(self.channel_id)
+    # TODO: REMOVE. Interaction object gives a partial channel and partial guild object. Depending on context and use case, you won't be able to pull these from state OR the api.
+    # @cached_property
+    # def channel(self):
+    #     if self.guild_id:
+    #         if self.channel_id in self.client.state.threads:
+    #             return self.client.state.threads.get(self.channel_id)
+    #         elif self.channel_id in self.client.state.channels:
+    #             return self.client.state.channels.get(self.channel_id)
+    #     elif self.channel_id in self.client.state.dms:
+    #         return self.client.state.dms[self.channel_id]
+    #     elif self.context == InteractionContextType.PRIVATE_CHANNEL:
+    #         return self._channel
+    #     return self.client.api.channels_get(self.channel_id)
 
     @cached_property
     def thread(self):
         if self.channel_id in self.client.state.threads:
             return self.client.state.threads.get(self.channel_id)
 
-    @cached_property
-    def guild(self):
-        if self.channel.is_dm:
-            return
-        if self.guild_id:
-            return self.client.state.guilds.get(self.guild_id)
-        elif self.channel and self.channel.guild:
-            return self.channel.guild
+    # TODO: REMOVE. Interaction object gives a partial channel and partial guild object. Depending on context and use case, you won't be able to pull these from state OR the api.
+    # @cached_property
+    # def guild(self):
+    #     if self.context != InteractionContextType.GUILD:
+    #         return
+    #     if self.channel.is_dm:
+    #         return
+    #     if self.guild_id:
+    #         return self.client.state.guilds.get(self.guild_id)
+    #     elif self.channel and self.channel.guild:
+    #         return self.channel.guild
 
     def pin(self):
         return self.channel.create_pin(self)
