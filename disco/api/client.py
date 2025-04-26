@@ -1196,7 +1196,10 @@ class APIClient(LoggingClass):
             return InteractionResponse.create(self.client, dict(token=token, type=type, data=data, message=rr.json()))
 
     def interactions_edit(self, application, token, data=None, files=None):
-        r = self.http(Routes.INTERACTIONS_MODIFY, dict(id=application, token=token), json=data, files=files)
+        if files:
+            r = self.http(Routes.INTERACTIONS_MODIFY, dict(id=application, token=token), data={'payload_json': json_dumps(data)}, files=files)
+        else:
+            r = self.http(Routes.INTERACTIONS_MODIFY, dict(id=application, token=token), json=data, files=files)
         if r.status_code == 200:
             return InteractionResponse.create(self.client, r.json())
 
@@ -1440,14 +1443,20 @@ class APIClient(LoggingClass):
         if poll and not isinstance(poll, dict):
             poll = poll.to_dict()
 
-        r = self.http(Routes.INTERACTIONS_FOLLOWUP_MODIFY, dict(id=self.client.state.me.id, token=token, message=message), json=optional(
+        data = optional(
             content=content,
             embeds=embeds,
             allowed_mentions=allowed_mentions,
             components=components,
             flags=flags,
             poll=poll
-        ), files=files)
+        )
+
+        if files:
+            r = self.http(Routes.INTERACTIONS_FOLLOWUP_MODIFY,
+                          dict(id=self.client.state.me.id, token=token, message=message), data={'payload_json': json_dumps(data)}, files=files)
+        else:
+            r = self.http(Routes.INTERACTIONS_FOLLOWUP_MODIFY, dict(id=self.client.state.me.id, token=token, message=message), json=data)
         return InteractionFollowupMessage.create(self.client, dict(r.json(), token=token))
 
     def interactions_followup_delete(self, token, message):
