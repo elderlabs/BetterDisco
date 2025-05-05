@@ -5,8 +5,7 @@ from disco.util.serializer import Serializer
 
 
 class Config:
-    def __init__(self, obj=None, parse_nested=False):
-        self._parse_nested = parse_nested
+    def __init__(self, obj=None):
         self.__dict__.update({
             k: getattr(self, k) for k in dir(self.__class__)
         })
@@ -22,8 +21,7 @@ class Config:
 
         if obj:
             self.__dict__.update(obj)
-            if self._parse_nested:
-                self._parse_nested_config(obj)
+            self._parse_nested_config(obj)
 
     def _parse_nested_config(self, data):
         for key in dir(self):
@@ -31,17 +29,13 @@ class Config:
             if key.startswith('__'):
                 continue
             if isinstance(_attr, dict):
-                setattr(self, key, Config(obj=data[key], parse_nested=self._parse_nested))
+                setattr(self, key, Config(obj=data[key]))
             elif inspect.isclass(_attr) and issubclass(_attr(), Config):
-                setattr(self, key, _attr(obj=data[key], parse_nested=self._parse_nested))
-
-    def get(self, key, default=None):
-        return self.__dict__.get(key, default)
+                setattr(self, key, _attr(obj=data[key]))
 
     @classmethod
-    def from_file(cls, path, parse_nested=False):
+    def from_file(cls, path):
         inst = cls()
-        inst._parse_nested = parse_nested
 
         with open(path, 'r') as f:
             data = f.read()
@@ -52,8 +46,7 @@ class Config:
         _data = Serializer.loads(ext[1:], data)
 
         inst.__dict__.update(_data)
-        if parse_nested:
-            inst._parse_nested_config(_data)
+        inst._parse_nested_config(_data)
         return inst
 
     def from_prefix(self, prefix):
@@ -82,3 +75,30 @@ class Config:
             else:
                 result[key] = value
         return result
+
+    def __getitem__(self, key):
+        return self.__dict__[key]
+
+    def __setitem__(self, key, value):
+        self.__dict__[key] = value
+
+    def __delitem__(self, key):
+        del self.__dict__[key]
+
+    def __contains__(self, key):
+        return key in self.__dict__
+
+    def __iter__(self):
+        return iter(self.__dict__)
+
+    def get(self, key, default=None):
+        return self.__dict__.get(key, default)
+
+    def keys(self):
+        return self.__dict__.keys()
+
+    def values(self):
+        return self.__dict__.values()
+
+    def items(self):
+        return self.__dict__.items()
