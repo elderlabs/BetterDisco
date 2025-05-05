@@ -24,21 +24,14 @@ class Config:
             self._parse_nested_config(obj)
 
     def _parse_nested_config(self, data):
-        try:
-            for key, value in self.__annotations__.items():
-                if issubclass(value, Config):
-                    if key in data:
-                        setattr(self, key, value(obj=data[key]))
-        except AttributeError:
-            for key in dir(self):
-                _attr = getattr(self, key)
-                if key.startswith('__') or not inspect.isclass(_attr):
-                    continue
-                if issubclass(_attr, Config):
-                    setattr(self, key, _attr(obj=data[key]))
-
-    def get(self, key, default=None):
-        return self.__dict__.get(key, default)
+        for key in dir(self):
+            _attr = getattr(self, key)
+            if key.startswith('__'):
+                continue
+            if isinstance(_attr, dict):
+                setattr(self, key, Config(obj=data[key]))
+            elif inspect.isclass(_attr) and issubclass(_attr(), Config):
+                setattr(self, key, _attr(obj=data[key]))
 
     @classmethod
     def from_file(cls, path):
@@ -82,3 +75,30 @@ class Config:
             else:
                 result[key] = value
         return result
+
+    def __getitem__(self, key):
+        return self.__dict__[key]
+
+    def __setitem__(self, key, value):
+        self.__dict__[key] = value
+
+    def __delitem__(self, key):
+        del self.__dict__[key]
+
+    def __contains__(self, key):
+        return key in self.__dict__
+
+    def __iter__(self):
+        return iter(self.__dict__)
+
+    def get(self, key, default=None):
+        return self.__dict__.get(key, default)
+
+    def keys(self):
+        return self.__dict__.keys()
+
+    def values(self):
+        return self.__dict__.values()
+
+    def items(self):
+        return self.__dict__.items()
