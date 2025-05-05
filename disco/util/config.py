@@ -26,9 +26,11 @@ class Config:
     def _parse_nested_config(self, data):
         for key in dir(self):
             _attr = getattr(self, key)
-            if key.startswith('__'):
+            if key.startswith('__') or callable(_attr):
                 continue
             if isinstance(_attr, dict):
+                if any(isinstance(k, int) for k in _attr.keys()):
+                    continue
                 setattr(self, key, Config(obj=data[key]))
             elif inspect.isclass(_attr) and issubclass(_attr(), Config):
                 setattr(self, key, _attr(obj=data[key]))
