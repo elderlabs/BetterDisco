@@ -157,7 +157,7 @@ class ListField(Field):
 
     @staticmethod
     def serialize(value, inst=None):
-        return list(map(Field.serialize, value))
+        return list(map(functools_partial(Field.serialize, inst=inst), value))
 
     def try_convert(self, raw, client, **kwargs):
         return [self.deserializer(i, client) for i in raw]
