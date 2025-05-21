@@ -539,7 +539,7 @@ class SelectMenuComponent(BaseComponent):
     options = ListField(SelectOption)
     channel_types = ListField(enum(ChannelType), cast=int)  # just int if fails
     placeholder = Field(text)
-    default_values = Field(SelectDefaultValue)
+    default_values = ListField(SelectDefaultValue)
     min_values = Field(int)
     max_values = Field(int)
     disabled = Field(bool)
