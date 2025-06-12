@@ -890,6 +890,12 @@ class _Message(SlottedModel):
 
         return content
 
+    @cached_property
+    def url(self):
+        if self.channel.is_dm:
+            return f'https://discord.com/channels/@me/{self.channel_id}/{self.id}'
+        return f'https://discord.com/channels/{self.guild_id}/{self.channel_id}/{self.id}'
+
 
 class MessageResolvedData(SlottedModel):
     users = DictField(snowflake, User)

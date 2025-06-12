@@ -698,6 +698,12 @@ class Channel(SlottedModel, Permissible):
             **kwargs
         )
 
+    @cached_property
+    def url(self):
+        if self.is_dm:
+            return f'https://discord.com/channels/@me/{self.id}'
+        return f'https://discord.com/channels/{self.guild_id}/{self.id}'
+
 
 class Thread(Channel):
     archived = Field(bool)
