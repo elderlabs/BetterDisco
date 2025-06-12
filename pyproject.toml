@@ -1,7 +1,7 @@
 [project]
 name = "betterdisco-py"
 description = "A Discord API library, written in Python, for those that like to dance. [QUEUE COWBOY BEBOP THEME]"
-version = "2024.10.10"
+version = "2025.06.11"
 requires-python = ">= 3.9"
 license = {text = "MIT License"}
 readme = {file = "README.md", content-type = "text/markdown"}
