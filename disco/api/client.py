@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from gevent.local import local
 from urllib.parse import quote
 
-from disco.api.http import Routes, HTTPClient
+from disco.api.http import Routes, HTTPClient, APIException
 from disco.util.functional import optional
 from disco.util.logging import LoggingClass
 from disco.util.sanitize import S
@@ -1192,8 +1192,12 @@ class APIClient(LoggingClass):
     def interactions_create(self, interaction, token, type, data=None, files=None):
         r = self.http(Routes.INTERACTIONS_CREATE, dict(id=interaction, token=token), json=dict(type=type, data=data), files=files)
         if r.status_code == 204 and type != 8:
-            rr = self.http(Routes.INTERACTIONS_ORIGINAL_RESPONSE_GET, dict(id=self.client.state.me.id, token=token))
-            return InteractionResponse.create(self.client, dict(token=token, type=type, data=data, message=rr.json()))
+            try:
+                rr = self.http(Routes.INTERACTIONS_ORIGINAL_RESPONSE_GET, dict(id=self.client.state.me.id, token=token))
+                return InteractionResponse.create(self.client, dict(token=token, type=type, data=data, message=rr.json()))
+            except APIException as e:
+                self.log.debug(f"Interaction {interaction} does not have an original message to get.")
+                return None
 
     def interactions_edit(self, application, token, data=None, files=None):
         if files:

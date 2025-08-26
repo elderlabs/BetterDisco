@@ -409,6 +409,7 @@ class ComponentTypes:
     FILE = 13
     SEPARATOR = 14
     CONTAINER = 17
+    LABEL = 18
 
 
 class ButtonStyles:
@@ -434,7 +435,7 @@ class SelectOption(SlottedModel):
     label = Field(text)
     value = Field(text)
     description = Field(text)
-    emoji = Field(Emoji, default=None)
+    emoji = Field(Emoji, default=None, create=False)
     default = Field(bool)
 
 
@@ -617,17 +618,27 @@ class ContainerComponent(BaseComponent):
             self.components.append(*args)
 
 
-# TODO: Fix Message Modals
+class LabelComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.LABEL)
+    label = Field(text)
+    description = Field(text)
+    component = Field(component)
+
+
+# TODO: Fix Message Modals ||| FIXED?
 class MessageModal(SlottedModel):
     title = Field(text)
     custom_id = Field(text)
-    components = ListField(ActionRow)
+    components = ListField(LabelComponent)
 
     def add_component(self, *args, **kwargs):
-        if len(args) == 1:
-            return self.components.append(*args)
+        if len(args):
+            self.components += args
+            return
+        elif "type" in kwargs and kwargs.get("type") != ComponentTypes.LABEL:
+            return self.components.append(LabelComponent(component(kwargs)))
         else:
-            return self.components.append(ActionRow(*args, **kwargs))
+            return self.components.append(LabelComponent(*args, **kwargs))
 
 
 # TODO: remove after circular import fix
