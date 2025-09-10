@@ -1,9 +1,14 @@
 from abc import ABCMeta, abstractmethod as abc_abstractmethod
-from audioop import mul as audioop_mul
+from warnings import warn as warnings_warn
+try:
+    from audioop import mul as audioop_mul
+except ImportError:
+    warnings_warn('audioop-lts is not installed, voice volume support is disabled')
 from gevent import sleep as gevent_sleep, spawn as gevent_spawn
 from gevent.lock import Semaphore as GeventSemaphore
 from gevent.subprocess import PIPE as GEVENT_PIPE, Popen as GeventPopen
 from io import BytesIO
+from sys import modules as sys_modules
 from types import GeneratorType
 
 from disco.util.metaclass import add_metaclass
@@ -223,6 +228,8 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
 
     @volume.setter
     def volume(self, value):
+        if 'audioop' not in sys_modules:
+            raise Exception('audioop-lts not installed. Voice volume support is disabled.')
         if 0.0 > value:
             raise Exception('Volume accepts float values between 0.0 and 2.0 only')
         self._volume = min(value, 2.0)
