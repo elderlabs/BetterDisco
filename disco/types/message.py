@@ -484,12 +484,14 @@ class MessageInteraction(SlottedModel):
 
 class MessageInterationMetadata(SlottedModel):
     id = Field(snowflake)
+    name = Field(text)
     type = Field(enum(_InteractionType))
     user = Field(User)
-    authorizing_integration_owners = DictField(enum(ApplicationIntegrationType), snowflake)
+    authorizing_integration_owners = DictField(int, snowflake)
     original_response_message_id = Field(snowflake)
     interacted_message_id = Field(snowflake)
     triggering_interaction_metadata = Field(dict)
+    command_type = Field(int)
 
 
 class MessagePollTypes:
