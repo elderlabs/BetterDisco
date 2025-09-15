@@ -718,6 +718,12 @@ class Channel(SlottedModel, Permissible):
             **kwargs
         )
 
+    @cached_property
+    def url(self):
+        if self.is_dm:
+            return f'https://discord.com/channels/@me/{self.id}'
+        return f'https://discord.com/channels/{self.guild_id}/{self.id}'
+
     def start_thread(self, *args, **kwargs):
         """
         Start a thread, whether it be attached to a message, or not.
@@ -820,7 +826,6 @@ class Channel(SlottedModel, Permissible):
         """
         assert self.is_thread
         return self.client.api.channels_threads_members_list(self.id)
-
 
 class Thread(Channel):
     archived = Field(bool)

@@ -660,12 +660,14 @@ class MessageInteraction(SlottedModel):
 
 class MessageInterationMetadata(SlottedModel):
     id = Field(snowflake)
+    name = Field(text)
     type = Field(enum(_InteractionType))
     user = Field(User)
-    authorizing_integration_owners = DictField(enum(ApplicationIntegrationType), snowflake)
+    authorizing_integration_owners = DictField(int, snowflake)
     original_response_message_id = Field(snowflake)
     interacted_message_id = Field(snowflake)
     triggering_interaction_metadata = Field(dict)
+    command_type = Field(int)
 
 
 class MessagePollTypes:
@@ -889,6 +891,13 @@ class _Message(SlottedModel):
         """
         return self.client.api.channels_messages_delete(self.channel_id, self.id)
 
+    def publish(self):
+        """
+        Publish this message.
+        """
+        assert self.channel.is_announcement
+        return self.channel.publish_message(self)
+
     def set_embeds_suppressed(self, state):
         """
         Toggle this message's embed suppression.
@@ -1058,6 +1067,12 @@ class _Message(SlottedModel):
             content = re_sub('(<#([0-9]+)>)', replace_channel, content)
 
         return content
+
+    @cached_property
+    def url(self):
+        if self.channel.is_dm:
+            return f'https://discord.com/channels/@me/{self.channel_id}/{self.id}'
+        return f'https://discord.com/channels/{self.guild_id}/{self.channel_id}/{self.id}'
 
     def start_thread(self, name, auto_archive_duration=None, rate_limit_per_user=None, *args, **kwargs):
         """

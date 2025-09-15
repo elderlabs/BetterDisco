@@ -539,11 +539,8 @@ class State:
                 else:
                     member.user = self.users[member.id]
 
-            if not event.presences:
-                return
-
+        if event.presences:
             for presence in event.presences:
-                # TODO: this matches the recursive/hack-fix method found in on_presence_update
                 user = presence.user
                 user.presence = presence
                 self.users[user.id].inplace_update(user)

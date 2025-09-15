@@ -1,41 +1,30 @@
-name: "DANCE"
+name: "Github Build"
 
 on:
-  push:
-    branches:
-    - main
-    paths:
-    - 'disco/**'
   workflow_dispatch:
 
 jobs:
   build:
     name: Build
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     steps:
     - name: Pull Repository
       uses: actions/checkout@v4
-#    - name: Setup Python 3.12
-#      uses: actions/setup-python@v5
-#      with:
-#        python-version: "3.12"
     - name: Setup Python 3.12
-      run: |
-        python3.12 -m venv .venv
-        source .venv/bin/activate
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
     - name: Install Dependencies
       run: |
-        source .venv/bin/activate
-        .venv/bin/python -m pip install --no-cache-dir --upgrade pip
-        .venv/bin/python -m pip install --no-cache-dir --upgrade setuptools
-        .venv/bin/python -m pip install --no-cache-dir --upgrade wheel
-        .venv/bin/python -m pip install --no-cache-dir --upgrade -r requirements.txt
-        .venv/bin/python -m pip install --no-cache-dir --upgrade build
+        python -m pip install --no-cache-dir --upgrade pip
+        python -m pip install --no-cache-dir --upgrade setuptools
+        python -m pip install --no-cache-dir --upgrade wheel
+        python -m pip install --no-cache-dir --upgrade -r requirements.txt
+        python -m pip install --no-cache-dir --upgrade build
     - name: Build Wheel and Tarball Packages
       run: |
-        source .venv/bin/activate
-        .venv/bin/python -m build
+        python -m build
     - name: Store distribution packages
       uses: actions/upload-artifact@v4
       with:
@@ -46,7 +35,7 @@ jobs:
     name: Publish
     needs:
     - build
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/betterdisco-py
@@ -68,21 +57,17 @@ jobs:
     name: Sign and Release
     needs:
     - build
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     permissions:
       contents: write  # IMPORTANT: mandatory for making GitHub Releases
       id-token: write  # IMPORTANT: mandatory for sigstore
 
     steps:
-#    - name: Setup Python 3.12
-#      uses: actions/setup-python@v5
-#      with:
-#        python-version: "3.12"
     - name: Setup Python 3.12
-      run: |
-        python3.12 -m venv .venv
-        source .venv/bin/activate
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
     - name: Download Distributions
       uses: actions/download-artifact@v4
       with:
