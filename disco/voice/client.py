@@ -68,7 +68,7 @@ class VoiceException(Exception):
 
 
 class VoiceClient(LoggingClass):
-    VOICE_GATEWAY_VERSION = 8
+    VOICE_GATEWAY_VERSION = 9
 
     SUPPORTED_MODES = {
         'aead_aes256_gcm_rtpsize',
@@ -191,7 +191,6 @@ class VoiceClient(LoggingClass):
         self.state_emitter.emit(state, prev_state)
 
     def set_endpoint(self, endpoint):
-        endpoint = endpoint.split(':', 1)[0]
         if self.endpoint == endpoint:
             return
 
@@ -518,6 +517,7 @@ class VoiceClient(LoggingClass):
         if self._identified:
             self.send(VoiceOPCode.RESUME, {
                 'server_id': self.server_id,
+                'channel_id': self.channel_id,
                 'session_id': self._session_id,
                 'token': self.token,
                 'seq_ack': self.seq,
@@ -526,10 +526,12 @@ class VoiceClient(LoggingClass):
             self.seq = -1
             self.send(VoiceOPCode.IDENTIFY, {
                 'server_id': self.server_id,
+                'channel_id': self.channel_id,
                 'user_id': self.user_id,
                 'session_id': self._session_id,
                 'token': self.token,
                 'video': self.video_enabled,
+                # 'streams': [],
             })
 
     def on_close(self, code=None, reason=None):
@@ -577,7 +579,9 @@ class VoiceClient(LoggingClass):
 
             if code == 4006 or (code == 0 and 'HEARTBEAT' in reason):
                 self.log.warning(f'[{self.channel_id}] Session invalidated. Spawning fresh connection to channel.')
-                return self.connect(self.channel_id, mute=self.mute, deaf=self.deaf, video=self.video_enabled)
+                self.disconnect(reconnect=True)
+                gevent_sleep(5)
+                return self.connect(self.channel_id, mute=self.mute, deaf=self.deaf, video=self.video_enabled, timeout=30)
 
         wait_time = (self._reconnects * 5) - 5
 
@@ -594,13 +598,13 @@ class VoiceClient(LoggingClass):
 
         if self.channel_id == channel_id:
             if self.state == VoiceState.CONNECTED:
-                self.log.debug('[{}] Already connected to {}, returning'.format(self.channel_id, self.channel))
+                self.log.info('[{}] Already connected to {}, returning'.format(self.channel_id, self.channel))
                 return self
         else:
             if self.state == VoiceState.CONNECTED:
-                self.log.debug('[{}] Moving to channel {}'.format(self.channel_id, channel_id))
+                self.log.info('[{}] Moving to channel {}'.format(self.channel_id, channel_id))
             else:
-                self.log.debug('[{}] Attempting connection to channel id {}'.format(self.channel_id or '-', channel_id))
+                self.log.info('[{}] Attempting connection to channel id {}'.format(self.channel_id or '-', channel_id))
                 self.set_state(VoiceState.AWAITING_ENDPOINT)
 
         self.set_voice_state(channel_id, **kwargs)
@@ -612,18 +616,23 @@ class VoiceClient(LoggingClass):
             self._ws_creation_time = time()
             return self
 
-    def disconnect(self):
-        self._safe_reconnect_state = False
+    def disconnect(self, reconnect=False):
+        if reconnect:
+            self._safe_reconnect_state = True
+        else:
+            self._safe_reconnect_state = False
+
         if self.state == VoiceState.DISCONNECTED:
             return
 
         self.set_state(VoiceState.DISCONNECTED)
 
-        try:
-            self.media.now_playing.source.proc.kill()
-            self.media.now_playing.source = None
-        except:
-            pass
+        if not reconnect:
+            try:
+                self.media.now_playing.source.proc.kill()
+                self.media.now_playing.source = None
+            except:
+                pass
 
         if self.ws and self.ws.sock and self.ws.sock.connected:
             self.ws.close()
@@ -637,11 +646,12 @@ class VoiceClient(LoggingClass):
         if self.udp:
             self.udp.disconnect()
 
-        if self.client.state.voice_clients.get(self.server_id):
-            del self.client.state.voice_clients[self.server_id]
+        if not reconnect:
+            if self.client.state.voice_clients.get(self.server_id):
+                del self.client.state.voice_clients[self.server_id]
 
-        if self.client.state.voice_states.get(self._session_id):
-            del self.client.state.voice_states[self._session_id]
+            if self.client.state.voice_states.get(self._session_id):
+                del self.client.state.voice_states[self._session_id]
 
         return self.client.events.emit('VoiceDisconnect', self)
 
