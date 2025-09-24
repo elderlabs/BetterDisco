@@ -190,7 +190,10 @@ def _make(typ, data, client):
 
 
 def snowflake(data):
-    return int(data) if data else None
+    if data:
+        assert int(data) >= 21154535154122752, "Invalid snowflake"
+        return int(data)
+    return None
 
 
 def enum(typ):

@@ -1,8 +1,17 @@
 from gevent import sleep as gevent_sleep, spawn as gevent_spawn
+from struct import unpack_from as struct_unpack_from
 from time import time
-
+try:
+    from ujson import JSONDecodeError
+except ImportError:
+    from json import JSONDecodeError
 from collections import namedtuple as namedtuple
 from websocket import WebSocketConnectionClosedException, WebSocketTimeoutException
+
+try:
+    from davey import DaveSession, ProposalsOperationType as DaveProposalsOperationType, CommitWelcome as DaveCommitWelcome
+except ImportError:
+    pass
 
 from disco.gateway.encoding import ENCODERS
 from disco.gateway.packets import OPCode
@@ -108,6 +117,13 @@ class VoiceClient(LoggingClass):
         self.packets.on(VoiceOPCode.CODECS, self.on_voice_codecs)
         if self.video_enabled:
             self.packets.on(VoiceOPCode.VIDEO, self.on_video)
+        self.packets.on(VoiceOPCode.DAVE_TRANSITION_EXECUTE, self.on_dave_transition_execute)
+        self.packets.on(VoiceOPCode.DAVE_TRANSITION_PREPARE, self.on_dave_transition_prepare)
+        self.packets.on(VoiceOPCode.DAVE_PREPARE_EPOCH, self.on_dave_prepare_epoch)
+        self.packets.on(VoiceOPCode.DAVE_MLS_TRANSITION_ANNOUNCE_COMMIT, self.on_dave_mls_transition_announce_commit)
+        self.packets.on(VoiceOPCode.DAVE_MLS_WELCOME, self.on_dave_mls_welcome)
+        self.packets.on(VoiceOPCode.DAVE_MLS_EXTERNAL_SENDER, self.on_dave_mls_external_sender)
+        self.packets.on(VoiceOPCode.DAVE_MLS_PROPOSALS, self.on_dave_mls_proposal)
 
         # State + state change emitter
         self.state = VoiceState.DISCONNECTED
@@ -131,6 +147,21 @@ class VoiceClient(LoggingClass):
         self.keyframe_interval = None
         self.secure_frames_version = None
         self.seq = -1
+
+        # DAVE - E2EE
+        self.dave_handler = None
+        self.dave_privacy_key = None
+
+        self.max_dave_protocol_version = 1
+        self.dave_protocol_version = 0
+        self.dave_epoch = 0
+        self.dave_identity = 0
+        self.dave_credential_type = 1
+        self.dave_signature_key = None
+
+        self._dave_transition_id = None
+        self.dave_pending_transitions = {}
+        self.dave_downgraded = False
 
         # Websocket connection
         self.ws = None
@@ -279,10 +310,17 @@ class VoiceClient(LoggingClass):
 
     def send(self, op, data):
         if self.ws and self.ws.sock and self.ws.sock.connected:
-            self.log.debug('[{}] sending OP {} (data = {})'.format(self.channel_id, op, data))
-            self.ws.send(self.encoder.encode({'op': op, 'd': data}), self.encoder.OPCODE)
+            self.log.debug(f'[{self.channel_id}] sending OP {op} (data = {data})')
+            self.ws.send_text(self.encoder.encode({'op': op, 'd': data}))
         else:
-            self.log.debug('[{}] dropping because WS is closed OP {} (data = {})'.format(self.channel_id, op, data))
+            self.log.debug(f'[{self.channel_id}] dropping because WS is closed OP {op} (data = {data})')
+
+    def send_binary(self, op, data):
+        if self.ws and self.ws.sock and self.ws.sock.connected:
+            self.log.debug(f'[{self.channel_id}] sending OP {op}')
+            self.ws.send_bytes(bytes([op]) + data)
+        else:
+            self.log.debug(f'[{self.channel_id}] dropping because WS is closed OP {op}')
 
     def on_voice_client_disconnect(self, data):
         user_id = int(data['user_id'])
@@ -402,6 +440,7 @@ class VoiceClient(LoggingClass):
         self.audio_codec = sdp['audio_codec']
         self.transport_id = sdp['media_session_id']  # analytics
         self.secure_frames_version = sdp['secure_frames_version']
+        self.dave_protocol_version = sdp['dave_protocol_version']
         if 'sdp' in sdp.keys():
             self.sdp = sdp['sdp']  # webRTC only
 
@@ -416,6 +455,9 @@ class VoiceClient(LoggingClass):
 
         # Create a secret box for encryption/decryption
         self.udp.setup_encryption(bytes(bytearray(sdp['secret_key'])))  # UDP only
+
+        if sdp['dave_protocol_version']:
+            self.dave_reset()
 
         self.set_state(VoiceState.CONNECTED)
 
@@ -504,6 +546,16 @@ class VoiceClient(LoggingClass):
             self.packets.emit(data['op'], data['d'])
             if 'seq' in data.keys():
                 self.seq = data['seq']
+        except JSONDecodeError:
+            if type(msg) is bytes:  # Hello DAVE
+                data = {}
+                data['seq'] = int.from_bytes(msg[:2], 'big', signed=False)
+                self.seq = data['seq']
+                data['op'] = msg[2]  # third byte
+                data['d'] = msg[3:]  # everything else after three-byte header
+                self.log.debug(f'[{self.channel_id}] Received OP {data["op"]}, SEQ {data["seq"]}')
+                self.packets.emit(data['op'], data['d'])
+
         except Exception:
             self.log.error('Failed to parse voice gateway message: ')
 
@@ -532,6 +584,7 @@ class VoiceClient(LoggingClass):
                 'token': self.token,
                 'video': self.video_enabled,
                 # 'streams': [],
+                'max_dave_protocol_version': self.max_dave_protocol_version,
             })
 
     def on_close(self, code=None, reason=None):
@@ -655,8 +708,117 @@ class VoiceClient(LoggingClass):
 
         return self.client.events.emit('VoiceDisconnect', self)
 
-    def send_frame(self, *args, **kwargs):
-        self.udp.send_frame(*args, **kwargs)
+    def send_frame(self, frame, *args, **kwargs):
+        if self.dave_handler and not self.dave_downgraded:
+            try:
+                frame = self.dave_handler.encrypt_opus(frame)
+            except ValueError:
+                pass
+        self.udp.send_frame(frame, *args, **kwargs)
 
     def increment_timestamp(self, *args, **kwargs):
         self.udp.increment_timestamp(*args, **kwargs)
+
+    # Discord End-to-End Encryption Protocol Support (DAVE); RFC9420
+    def on_dave_transition_execute(self, transition_id):  # OP: 22
+        if isinstance(transition_id, dict):
+            transition_id = transition_id['transition_id']
+        self.log.info(f'[{self.channel_id}] DAVE Execute Transition {transition_id}')
+        if transition_id not in self.dave_pending_transitions.keys():
+            return
+        if transition_id != self.dave_protocol_version and not self.dave_protocol_version:
+            self.dave_downgraded = True  # connection is downgraded and unchanged
+            self.log.info(f'[{self.channel_id}] DAVE Execute Transition {transition_id} downgraded')
+        elif transition_id and self.dave_downgraded:
+            self.dave_downgraded = False
+            if self.dave_handler:
+                self.dave_handler.set_passthrough_mode(True, 10)
+            self.log.info(f'[{self.channel_id}] DAVE Execute Transition {transition_id} upgraded')
+        self.log.info(f'[{self.channel_id}] DAVE Execute Transition {transition_id} complete')
+
+    # received on connection downgrade
+    def on_dave_transition_prepare(self, data):  # OP: 21
+        self.log.info(f'[{self.channel_id}] DAVE Preparing Transition')
+        self.dave_protocol_version = data['protocol_version']
+        self._dave_transition_id = data['transition_id']
+        self.dave_pending_transitions[self._dave_transition_id] = self.dave_protocol_version
+
+        if self._dave_transition_id == 0:
+            self.on_dave_transition_execute(self._dave_transition_id)
+        elif not self.dave_protocol_version and self.dave_handler:
+            self.dave_handler.set_passthrough_mode(True, 120)
+
+        self.dave_transition_ready(self._dave_transition_id)
+
+    def on_dave_prepare_epoch(self, data):  # OP: 24
+        self.log.info(f'[{self.channel_id}] DAVE Preparing EPOCH {data["epoch"]}')
+        if data['epoch'] == 1:
+            self.dave_protocol_version = data['protocol_version']
+            self.dave_reset()
+
+    # binary received from welcome
+    def on_dave_mls_transition_announce_commit(self, data):  # OP: 29
+        transition_id = struct_unpack_from('>H', data)[0]
+        try:
+            self.dave_handler.process_commit(data[2:])
+            if transition_id != 0:
+                self.dave_pending_transitions[transition_id] = self.dave_protocol_version
+                self.dave_transition_ready(transition_id)
+            self.log.info(f'[{self.channel_id}] DAVE MLS Commit transition {transition_id} processed')
+        except:
+            self.dave_mls_commit_welcome_invalid(transition_id)
+
+    def on_dave_mls_welcome(self, data):  # OP: 30
+        transition_id = struct_unpack_from('>H', data)[0]
+        try:
+            self.dave_handler.process_welcome(data[2:])
+            if transition_id != 0:
+                self.dave_pending_transitions[transition_id] = self.dave_protocol_version
+                self.dave_transition_ready(transition_id)
+            self.log.info(f'[{self.channel_id}] DAVE MLS Welcome transition {transition_id} processed')
+        except:
+            self.dave_mls_commit_welcome_invalid(transition_id)
+
+    # contains creds and key to join an MLS group in binary
+    def on_dave_mls_external_sender(self, data):  # OP: 25
+        self.dave_handler.set_external_sender(data)
+        self.log.info(f'[{self.channel_id}] DAVE MLS External Sender set')
+
+    # contains list of proposals to be added or removed
+    def on_dave_mls_proposal(self, data):  # OP: 27
+        result = self.dave_handler.process_proposals(DaveProposalsOperationType.append if data[0] == 0 else DaveProposalsOperationType.revoke, data[1:])
+        if isinstance(result, DaveCommitWelcome):
+            self.dave_mls_commit_welcome(result)
+        self.log.info(f'[{self.channel_id}] DAVE MLS Proposals processed')
+
+    def dave_transition_ready(self, transition_id):  # OP: 23
+        self.log.info(f'[{self.channel_id}] DAVE Transition {transition_id} ready')
+        self.send(VoiceOPCode.DAVE_TRANSITION_READY, {'transition_id': transition_id,})
+
+    # sends key package in binary
+    def dave_mls_key_package(self):  # OP: 26
+        self.log.info(f'[{self.channel_id}] DAVE MLS Key Package sending')
+        self.send_binary(VoiceOPCode.DAVE_MLS_KEY_PACKAGE, self.dave_handler.get_serialized_key_package())
+
+    # sends commit and welcome on new user join
+    def dave_mls_commit_welcome(self, data):  # OP: 28
+        self.send_binary(VoiceOPCode.DAVE_MLS_WELCOME_COMMIT, data.commit + data.welcome if data.welcome else data.commit)
+
+    def dave_mls_commit_welcome_invalid(self, transition_id):  # OP: 31
+        self.log.info(f'[{self.channel_id}] DAVE MLS Key Commit Welcome transition {transition_id} invalid')
+        self.send(VoiceOPCode.DAVE_MLS_WELCOME_INVALID_COMMIT, {'transition_id': transition_id,})
+        self.dave_reset()
+
+    def dave_reset(self):
+        if self.dave_protocol_version:
+            if self.dave_handler:
+                self.log.info(f'[{self.channel_id}] DAVE reinitializing')
+                self.dave_handler.reinit(self.dave_protocol_version, self.client.state.me.id, self.channel_id)
+            else:
+                self.log.info(f'[{self.channel_id}] DAVE initializing')
+                self.dave_handler = DaveSession(self.dave_protocol_version, self.client.state.me.id, self.channel_id)
+            self.dave_mls_key_package()
+        elif self.dave_handler:
+            self.log.info(f'[{self.channel_id}] DAVE shutting down')
+            self.dave_handler.reset()
+            self.dave_handler.set_passthrough_mode(True, 10)

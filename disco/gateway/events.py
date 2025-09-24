@@ -1181,3 +1181,19 @@ class MessagePollVoteAdd(GatewayEvent):
 
 class MessagePollVoteRemove(GatewayEvent):
     pass
+
+
+class GuildAppliedBoostsUpdate(GatewayEvent):
+    pass
+
+
+class VoiceChannelStartTimeUpdate(GatewayEvent):
+    pass
+
+
+class GuildPowerupEntitlementsCreate(GatewayEvent):
+    pass
+
+
+class GuildPowerupEntitlementsDelete(GatewayEvent):
+    pass

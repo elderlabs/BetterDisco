@@ -96,6 +96,7 @@ class Routes:
     CHANNELS_THREAD_MEMBERS_LIST = (HTTPMethod.GET, CHANNELS_THREAD_MEMBERS)
     CHANNELS_THREAD_MEMBERS_REMOVE = (HTTPMethod.DELETE, CHANNELS_THREAD_MEMBERS + '/{member}')
     CHANNELS_TYPING = (HTTPMethod.POST, CHANNELS + '/typing')
+    CHANNELS_VOICE_EFFECT_CREATE = (HTTPMethod.POST, CHANNELS + '/voice-channel-effects')
     CHANNELS_WEBHOOKS_CREATE = (HTTPMethod.POST, CHANNELS + '/webhooks')
     CHANNELS_WEBHOOKS_LIST = (HTTPMethod.GET, CHANNELS + '/webhooks')
 
@@ -221,6 +222,13 @@ class Routes:
     STICKERS_GET = (HTTPMethod.GET, STICKERS + '/{sticker}')
     STICKERS_NITRO_GET = (HTTPMethod.GET, '/sticker-packs')
 
+    STREAMS = '/streams'
+    STREAMS_MODIFY = (HTTPMethod.PATCH, STREAMS + '/{stream_key}/stream')
+    STREAMS_NOTIFY_CREATE = (HTTPMethod.POST, STREAMS + '/{stream_key}/notify')
+    STREAMS_PREVIEW_CREATE = (HTTPMethod.POST, STREAMS + '/{stream_key}/preview')
+    STREAMS_PREVIEW_GET = (HTTPMethod.GET, STREAMS + '/{stream_key}/preview')
+    STREAMS_PREVIEW_VIDEO_CREATE = (HTTPMethod.POST, STREAMS + '/{stream_key}/preview/video')
+
     USERS = '/users'
     USERS_GET = (HTTPMethod.GET, USERS + '/{user}')
     USERS_ME_CONNECTIONS_LIST = (HTTPMethod.GET, USERS + '/@me/connections')
@@ -237,6 +245,9 @@ class Routes:
 
     VOICE = '/voice'
     VOICE_REGIONS_LIST = (HTTPMethod.GET, VOICE + '/regions')
+    VOICE_PUBLIC_KEYS_LIST = (HTTPMethod.GET, VOICE + '/public-keys')
+    VOICE_PUBLIC_KEY_VERIFY = (HTTPMethod.POST, VOICE + '/{user}/match-public-key')
+    VOICE_FILTER_CATALOG_GET = (HTTPMethod.GET, '/voice-filters/catalog')
 
     WEBHOOKS = '/webhooks/{webhook}'
     WEBHOOKS_DELETE = (HTTPMethod.DELETE, WEBHOOKS)

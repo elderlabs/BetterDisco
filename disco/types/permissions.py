@@ -52,6 +52,8 @@ class Permissions(BitsetMap):
     USE_CLYDE_AI = 1 << 47
     SET_VOICE_CHANNEL_STATUS = 1 << 48
     SEND_POLLS = 1 << 49
+    USE_EXTERNAL_APPS = 1 << 50
+    PIN_MESSAGES = 1 << 51
 
 
 class PermissionValue(BitsetValue):
