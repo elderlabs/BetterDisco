@@ -410,6 +410,7 @@ class ComponentTypes:
     SEPARATOR = 14
     CONTAINER = 17
     LABEL = 18
+    FILE_UPLOAD = 19
 
 
 class ButtonStyles:
@@ -623,6 +624,14 @@ class LabelComponent(BaseComponent):
     label = Field(text)
     description = Field(text)
     component = Field(component)
+
+
+class FileUploadComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.FILE_UPLOAD)
+    custom_id = Field(text)
+    min_values = Field(int)
+    max_values = Field(int)
+    required = Field(bool)
 
 
 # TODO: Fix Message Modals ||| FIXED?
