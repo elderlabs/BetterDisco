@@ -7,7 +7,7 @@ from unicodedata import normalize as unicodedata_normalize
 
 from disco.types.base import (
     BitsetMap, BitsetValue, SlottedModel, Field, ListField, AutoDictField,
-    snowflake, text, datetime, enum, cached_property, DictField,
+    snowflake, text, datetime, enum, cached_property, DictField, str_or_int,
 )
 from disco.types.channel import Channel, ChannelMention, ChannelType, Thread, RoleSubscriptionData
 from disco.types.guild import GuildMember, Role
@@ -545,6 +545,7 @@ class SelectMenuComponent(BaseComponent):
     min_values = Field(int)
     max_values = Field(int)
     disabled = Field(bool)
+    values = ListField(str_or_int)
 
 
 class TextInputComponent(BaseComponent):
