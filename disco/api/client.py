@@ -1190,7 +1190,10 @@ class APIClient(LoggingClass):
         return GuildApplicationCommandPermissions.create_map(self.client, r.json())
 
     def interactions_create(self, interaction, token, type, data=None, files=None):
-        r = self.http(Routes.INTERACTIONS_CREATE, dict(id=interaction, token=token), json=dict(type=type, data=data), files=files)
+        if files:
+            r = self.http(Routes.INTERACTIONS_CREATE, dict(id=interaction, token=token), data={'payload_json': json_dumps(dict(type=type, data=data))}, files=files)
+        else:
+            r = self.http(Routes.INTERACTIONS_CREATE, dict(id=interaction, token=token), json=dict(type=type, data=data), files=files)
         if r.status_code == 204 and type != 8:
             try:
                 rr = self.http(Routes.INTERACTIONS_ORIGINAL_RESPONSE_GET, dict(id=self.client.state.me.id, token=token))
