@@ -272,7 +272,7 @@ class GatewayClient(LoggingClass):
 
         # Kill heartbeater, a reconnect/resume will trigger a HELLO which will respawn it
         if self._heartbeat_task:
-            self.log.info('WS Closed: killing heartbeater')
+            self.log.debug('WS Closed: killing heartbeater')
             self._heartbeat_task.kill()
             self._heartbeat_task = None
 
@@ -320,7 +320,7 @@ class GatewayClient(LoggingClass):
             return sys_exit(1)
 
         wait_time = (self.reconnects - 1) * 5 if self.reconnects < 6 else 30
-        self.log.info(f'Will attempt to {"resume" if self.session_id else "reconnect"} after {wait_time} seconds')
+        self.log.info(f'{"Resuming" if self.session_id else "Reconnecting"} in {wait_time} seconds')
         gevent_sleep(wait_time)
 
         # Reconnect

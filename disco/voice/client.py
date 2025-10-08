@@ -594,7 +594,7 @@ class VoiceClient(LoggingClass):
         self.log.info('[{}] WS Closed: {}{}({})'.format(self.channel_id, f'[{code}] ' if code else '', f'{reason} ' if reason else '', self._reconnects))
 
         if self._heartbeat_task:
-            self.log.info('[{}] WS Closed: killing heartbeater'.format(self.channel_id))
+            self.log.debug('[{}] WS Closed: killing heartbeater'.format(self.channel_id))
             self._heartbeat_task.kill()
             self._heartbeat_task = None
 
