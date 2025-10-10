@@ -1,8 +1,17 @@
 from gevent import sleep as gevent_sleep, spawn as gevent_spawn
 from gevent.event import Event as GeventEvent
 from platform import system as platform_system
+from sys import version_info as sys_version_info, modules as sys_modules
 from time import time, perf_counter_ns as time_perf_counter_ns
 from websocket import ABNF, WebSocketConnectionClosedException, WebSocketTimeoutException
+
+if sys_version_info >= (3, 14):
+    from compression.zstd import ZstdDecompressor
+else:
+    try:
+        from zstandard import ZstdDecompressor
+    except ImportError:
+        pass
 
 try:
     from isal.isal_zlib import decompress as zlib_decompress, decompressobj as zlib_decompressobj
@@ -16,19 +25,17 @@ from disco.util.websocket import Websocket
 from disco.util.logging import LoggingClass
 from disco.util.limiter import SimpleLimiter
 
-TEN_MEGABYTES = 10490000
-ZLIB_SUFFIX = b'\x00\x00\xff\xff'
-
 
 class GatewayClient(LoggingClass):
     GATEWAY_VERSION = 9
 
-    def __init__(self, client, max_reconnects=5, encoder='json', zlib_stream_enabled=True, ipc=None):
+    def __init__(self, client, max_reconnects=5, encoder='json', zlib_stream_enabled=False, zstd_stream_enabled=False, ipc=None):
         super(GatewayClient, self).__init__()
         self.client = client
         self.max_reconnects = max_reconnects
         self.encoder = ENCODERS[encoder]
         self.zlib_stream_enabled = zlib_stream_enabled
+        self.zstd_stream_enabled = zstd_stream_enabled
 
         self.events = client.events
         self.packets = client.packets
@@ -57,6 +64,7 @@ class GatewayClient(LoggingClass):
         self.ws = None
         self.ws_event = GeventEvent()
         self._zlib = None
+        self._zstd = None
         self._buffer = None
 
         # State
@@ -172,7 +180,9 @@ class GatewayClient(LoggingClass):
 
         gateway_url += f'/?v={self.GATEWAY_VERSION}&encoding={self.encoder.TYPE}'
 
-        if self.zlib_stream_enabled:  # transport compression may not benefit ETF?
+        if self.zstd_stream_enabled and ('zstandard' in sys_modules or '_compression' in sys_modules and sys_version_info >= (3, 14)):
+            gateway_url += '&compress=zstd-stream'
+        elif self.zlib_stream_enabled:  # transport compression may not benefit ETF?
             gateway_url += '&compress=zlib-stream'
 
         self.log.info(f'Opening websocket connection to `{gateway_url}`')
@@ -185,7 +195,13 @@ class GatewayClient(LoggingClass):
         self.ws.run_forever(ping_interval=60, ping_timeout=5)
 
     def on_message(self, msg):
-        if self.zlib_stream_enabled:
+        if self.zstd_stream_enabled:
+            msg = self._zstd.decompress(msg)
+
+            if self.encoder.OPCODE == ABNF.OPCODE_TEXT:
+                msg = str(msg, 'utf=8')
+
+        elif self.zlib_stream_enabled:
             if not self._buffer:
                 self._buffer = bytearray()
 
@@ -194,7 +210,7 @@ class GatewayClient(LoggingClass):
             if len(msg) < 4:
                 return
 
-            if msg[-4:] != ZLIB_SUFFIX:
+            if msg[-4:] != b'\x00\x00\xff\xff':
                 return
 
             msg = self._zlib.decompress(self._buffer)
@@ -206,7 +222,7 @@ class GatewayClient(LoggingClass):
             # Detect zlib, decompress
             is_erlpack = (msg[0] == 131)
             if msg[0] != '{' and not is_erlpack:
-                msg = str(zlib_decompress(msg, 15, TEN_MEGABYTES), 'utf=8')
+                msg = str(zlib_decompress(msg, 15, 10490000), 'utf=8')  # 10490000 = 10MB
 
         try:
             data = self.encoder.decode(msg)
@@ -235,7 +251,12 @@ class GatewayClient(LoggingClass):
 
     def on_open(self):
         self.ws.is_closed = False
-        if self.zlib_stream_enabled:
+        if self.zstd_stream_enabled:
+            if sys_version_info >= (3, 14):
+                self._zstd = ZstdDecompressor().decompress()
+            else:
+                self._zstd = ZstdDecompressor().decompressobj()
+        if self.zlib_stream_enabled and not self._zstd:
             self._zlib = zlib_decompressobj()
 
         if self.seq and self.session_id:

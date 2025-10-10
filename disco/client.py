@@ -1,5 +1,6 @@
-from time import time
 from gevent import spawn as gevent_spawn
+from time import time
+from sys import version_info as sys_version_info
 
 from disco.state import State, StateConfig
 from disco.api.client import APIClient
@@ -95,7 +96,12 @@ class Client(LoggingClass):
         self.packets = Emitter()
 
         self.api = APIClient(self.config.token, self)
-        self.gw = GatewayClient(self, self.config.max_reconnects, self.config.encoder, self.config.compression)
+        if isinstance(self.config.compression, bool) and self.config.compression and sys_version_info >= (3, 14) or not isinstance(self.config.compression, bool) and 'zstd' in self.config.compression:
+            self.gw = GatewayClient(self, self.config.max_reconnects, self.config.encoder, zstd_stream_enabled=True)
+        elif isinstance(self.config.compression, bool) and self.config.compression and sys_version_info < (3, 14) or not isinstance(self.config.compression, bool) and 'zlib' in self.config.compression:
+            self.gw = GatewayClient(self, self.config.max_reconnects, self.config.encoder, zlib_stream_enabled=True)
+        else:
+            self.gw = GatewayClient(self, self.config.max_reconnects, self.config.encoder)
         self.state = State(self, StateConfig(self.config.get('state', {})))
 
         if self.config.manhole_enable:
