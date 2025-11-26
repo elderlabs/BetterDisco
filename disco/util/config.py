@@ -67,13 +67,13 @@ class Config:
 
         self.__dict__.update(other)
 
-    def to_dict(self, clean=False):
+    def to_dict(self, clean=True):
         result = {}
         for key, value in self.__dict__.items():
             if clean and (callable(value) or key.startswith('__')):  # Skip methods and private attributes
                 continue
             if isinstance(value, Config):
-                result[key] = value.to_dict()
+                result[key] = value.to_dict(clean=clean)
             else:
                 result[key] = value
         return result
