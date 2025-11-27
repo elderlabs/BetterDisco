@@ -410,7 +410,7 @@ class HTTPClient(LoggingClass):
             elif r.status_code != 429 and 400 <= r.status_code < 500:
                 err = r.json()
                 if err and 'code' in err and 'message' in err:
-                    self.log.warning(f'Request failed with status code {r.status_code}: {err["code"]} - {err["message"]}')
+                    self.log.warning(f'Request failed with status code {r.status_code}: {err["code"]} - {err["message"]} ({route[1].format(**args)})')
                 else:
                     self.log.warning(f'Request failed with status code {r.status_code}: {str(r.content, "utf=8")}')
                 response.exception = APIException(r)
