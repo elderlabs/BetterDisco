@@ -411,6 +411,9 @@ class ComponentTypes:
     CONTAINER = 17
     LABEL = 18
     FILE_UPLOAD = 19
+    RADIO_GROUP = 21
+    CHECKBOX_GROUP = 22
+    CHECKBOX = 23
 
 
 class ButtonStyles:
@@ -633,6 +636,28 @@ class FileUploadComponent(BaseComponent):
     min_values = Field(int)
     max_values = Field(int)
     required = Field(bool)
+
+
+class RadioGroupComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.RADIO_GROUP)
+    custom_id = Field(text)
+    options = ListField(SelectOption)
+    required = Field(bool)
+
+
+class CheckboxGroupComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.CHECKBOX_GROUP)
+    custom_id = Field(text)
+    options = ListField(SelectOption)
+    min_values = Field(int)
+    max_values = Field(int)
+    required = Field(bool)
+
+
+class CheckboxComponent(BaseComponent):
+    type = Field(enum(ComponentTypes), cast=int, default=ComponentTypes.CHECKBOX)
+    custom_id = Field(text)
+    default = Field(bool)
 
 
 # TODO: Fix Message Modals ||| FIXED?
