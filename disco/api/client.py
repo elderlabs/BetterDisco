@@ -65,7 +65,7 @@ class APIClient(LoggingClass):
         super(APIClient, self).__init__()
 
         self.client = client
-        self.http = HTTPClient(token, self._after_requests)
+        self.http = HTTPClient(token, self._after_requests, gateway_url=client.config.gateway_url, gateway_version=client.config.gateway_version)
         self.token = token
 
         self._captures = local()

@@ -26,6 +26,8 @@ parser.add_argument('--log-level', help='log level', default=None)
 parser.add_argument('--manhole', action='store_true', help='Enable the manhole', default=None)
 parser.add_argument('--manhole-bind', help='host:port for the manhole to bind to', default=None)
 parser.add_argument('--encoder', help='Encoder for gateway data', default=None)
+parser.add_argument('--gateway_url', help='API endpoint to connect to', default=None)
+parser.add_argument('--gateway_version', help='API endpoint version', default=None)
 
 
 # Mapping of argument names to configuration overrides
@@ -38,6 +40,8 @@ CONFIG_OVERRIDE_MAPPING = {
     'manhole': 'manhole_enable',
     'manhole_bind': 'manhole_bind',
     'encoder': 'encoder',
+    'gateway_url': 'gateway_url',
+    'gateway_version': 'gateway_version',
 }
 
 

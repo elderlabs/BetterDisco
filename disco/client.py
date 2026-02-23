@@ -55,6 +55,9 @@ class ClientConfig(Config):
     encoder = 'json'
     compression = True
 
+    gateway_url = 'https://discord.com/api'
+    gateway_version = '9'
+
 
 class Client(LoggingClass):
     """

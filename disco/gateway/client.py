@@ -27,8 +27,6 @@ from disco.util.limiter import SimpleLimiter
 
 
 class GatewayClient(LoggingClass):
-    GATEWAY_VERSION = 9
-
     def __init__(self, client, max_reconnects=5, encoder='json', zlib_stream_enabled=False, zstd_stream_enabled=False, ipc=None):
         super(GatewayClient, self).__init__()
         self.client = client
@@ -174,11 +172,14 @@ class GatewayClient(LoggingClass):
     def connect_and_run(self, gateway_url=None):
         if not gateway_url:
             if not self._cached_gateway_url:
-                self._cached_gateway_url = self.client.api.gateway_get()['url']
+                try:
+                    self._cached_gateway_url = self.client.api.gateway_get()['url']
+                except:
+                    self._cached_gateway_url = self.client.config.gateway_url.replace('https://', 'wss://')
 
             gateway_url = self._cached_gateway_url
 
-        gateway_url += f'/?v={self.GATEWAY_VERSION}&encoding={self.encoder.TYPE}'
+        gateway_url += f'/?v={self.client.config.gateway_version}&encoding={self.encoder.TYPE}'
 
         if self.zstd_stream_enabled and ('zstandard' in sys_modules or '_compression' in sys_modules and sys_version_info >= (3, 14)):
             gateway_url += '&compress=zstd-stream'

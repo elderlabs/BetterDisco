@@ -321,16 +321,18 @@ class HTTPClient(LoggingClass):
     A simple HTTP client which wraps the requests library, adding support for
     Discords rate-limit headers, authorization, and request/response validation.
     """
-    BASE_URL = 'https://discord.com/api/v9'
     MAX_RETRIES = 5
 
-    def __init__(self, token, after_request=None):
+    def __init__(self, token, after_request=None, gateway_url='https://discord.com/api', gateway_version=9):
         super(HTTPClient, self).__init__()
 
         py_version = python_version()
 
         self.limiter = RateLimiter()
         self.after_request = after_request
+
+        self.gateway_url = gateway_url
+        self.gateway_version = gateway_version
 
         self.session = RequestsSession()
         self.session.headers.update({
@@ -392,7 +394,7 @@ class HTTPClient(LoggingClass):
         self.log.debug('KW: %s', kwargs)
 
         # Make the actual request
-        url = self.BASE_URL + route[1].format(**args)
+        url = self.gateway_url + f'/v{self.gateway_version}' + route[1].format(**args)
         self.log.info('%s %s %s', route[0], url, '({})'.format(kwargs.get('params')) if kwargs.get('params') else '')
         try:
             r = self.session.request(route[0], url, **kwargs)
