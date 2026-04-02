@@ -1,4 +1,4 @@
-name: "CodeQL"
+name: "Github CodeQL"
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
 jobs:
   analyze:
     name: Analyze
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read

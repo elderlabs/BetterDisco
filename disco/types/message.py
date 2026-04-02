@@ -10,7 +10,7 @@ from disco.types.base import (
     snowflake, text, datetime, enum, cached_property, DictField,
 )
 from disco.types.channel import Channel, ChannelMention, ChannelType, Thread, RoleSubscriptionData
-from disco.types.guild import GuildMember, Role
+from disco.types.guild import GuildMember, Role, GuildSoundboardSound
 from disco.types.oauth import Application, ApplicationIntegrationType
 from disco.types.reactions import Emoji, MessageReaction, StickerItem
 from disco.types.user import User
@@ -32,7 +32,7 @@ class MessageType:
     USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_2 = 10
     USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_3 = 11
     CHANNEL_FOLLOW_ADD = 12
-    GUILD_STREAM = 13
+    GUILD_STREAM = 13  # deprecated
     GUILD_DISCOVERY_DISQUALIFIED = 14
     GUILD_DISCOVERY_REQUALIFIED = 15
     GUILD_DISCOVERY_GRACE_PERIOD_INITIAL_WARNING = 16
@@ -52,10 +52,37 @@ class MessageType:
     STAGE_RAISE_HAND = 30
     STAGE_TOPIC = 31
     GUILD_APPLICATION_PREMIUM_SUBSCRIPTION = 32
+    PRIVATE_CHANNEL_INTEGRATION_ADDED = 33  # deprecated
+    PRIVATE_CHANNEL_INTEGRATION_REMOVED = 34  # deprecated
+    PREMIUM_REFERRAL = 35
     GUILD_INCIDENT_ALERT_MODE_ENABLED = 36
     GUILD_INCIDENT_ALERT_MODE_DISABLED = 37
     GUILD_INCIDENT_REPORT_RAID = 38
     GUILD_INCIDENT_REPORT_FALSE_ALARM = 39
+    GUILD_DEADCHAT_REVIVE_PROMPT = 40
+    CUSTOM_GIFT = 41
+    GUILD_GAMING_STATS_PROMPT = 42
+    POLL = 43  # deprecated
+    PURCHASE_NOTIFICATION = 44
+    VOICE_HANGOUT_INVITE = 45  # deprecated
+    POLL_RESULT = 46
+    CHANGELOG = 47
+    NITRO_NOTIFICATION = 48
+    CHANNEL_LINKED_TO_LOBBY = 49
+    GIFTING_PROMPT = 50
+    IN_GAME_MESSAGE_NUX = 51
+    GUILD_JOIN_REQUEST_ACCEPT_NOTIFICATION = 52
+    GUILD_JOIN_REQUEST_REJECT_NOTIFICATION = 53
+    GUILD_JOIN_REQUEST_WITHDRAWN_NOTIFICATION = 54
+    HD_STREAMING_UPGRADED = 55
+    CHAT_WALLPAPER_SET = 56  # deprecated
+    CHAT_WALLPAPER_REMOVE = 57  # deprecated
+    REPORT_TO_MOD_DELETED_MESSAGE = 58
+    REPORT_TO_MOD_TIMEOUT_USER = 59
+    REPORT_TO_MOD_KICK_USER = 60
+    REPORT_TO_MOD_BAN_USER = 61
+    REPORT_TO_MOD_CLOSED_REPORT = 62
+    EMOJI_ADDED = 63
 
 
 class MessageActivityType:
@@ -90,22 +117,37 @@ class MessageFlags(BitsetMap):
     EPHEMERAL = 1 << 6
     LOADING = 1 << 7
     FAILED_TO_MENTION_SOME_ROLES_IN_THREAD = 1 << 8
-    # UNKNOWN = 1 << 9
+    GUILD_FEED_HIDDEN = 1 << 9
     SHOULD_SHOW_LINK_NOT_DISCORD_WARNING = 1 << 10
     # UNKNOWN = 1 << 11
     SUPPRESS_NOTIFICATIONS = 1 << 12
     IS_VOICE_MESSAGE = 1 << 13
+    HAS_SNAPSHOT = 1 << 14
+    IS_COMPONENTS_V2 = 1 << 15
+    SENT_BY_SOCIAL_LAYER_INTEGRATION = 1 << 16
 
 
 class MessageFlagValue(BitsetValue):
     map = MessageFlags
 
 
+class MessageReferenceTypes:
+    DEFAULT = 0
+    FORWARD = 1
+
+
+class MessageForwardOnly(SlottedModel):
+    embed_indices = ListField(int)
+    attachment_ids = ListField(snowflake)
+
+
 class MessageReference(SlottedModel):
+    type = Field(enum(MessageReferenceTypes))
     message_id = Field(snowflake)
     channel_id = Field(snowflake)
     guild_id = Field(snowflake)
     fail_if_not_exists = Field(bool)
+    forward_only = Field(MessageForwardOnly)
 
 
 class MessageEmbedType:
@@ -474,6 +516,28 @@ class _InteractionType:
     MODAL_SUBMIT = 5
 
 
+class EphemeralityReason:
+    NONE = 0
+    FEATURE_LIMITED = 1
+    GUILD_FEATURE_LIMITED = 2
+    USER_FEATURE_LIMITED = 3
+    SLOWMODE = 4
+    RATE_LIMIT = 5
+    CANNOT_MESSAGE_USER = 6
+    USER_VERIFICATION_LEVEL = 7
+    CANNOT_UNARCHIVE_THREAD = 8
+    CANNOT_JOIN_THREAD = 9
+    MISSING_PERMISSIONS = 10
+    CANNOT_SEND_ATTACHMENTS = 11
+    CANNOT_SEND_EMBEDS = 12
+    CANNOT_SEND_STICKERS = 13
+    AUTOMOD_BLOCKED = 14
+    HARMFUL_LINK = 15
+    CANNOT_USE_COMMAND = 16
+    BETA_GUILD_SIZE = 17
+    CANNOT_USE_EXTERNAL_APPS = 18
+
+
 class MessageInteraction(SlottedModel):
     id = Field(snowflake)
     type = Field(enum(_InteractionType))
@@ -492,6 +556,9 @@ class MessageInterationMetadata(SlottedModel):
     interacted_message_id = Field(snowflake)
     triggering_interaction_metadata = Field(dict)
     command_type = Field(int)
+    ephemerality_reason = Field(enum(EphemeralityReason))
+    target_user = Field(User)
+    target_message_id = Field(snowflake)
 
 
 class MessagePollTypes:
@@ -615,6 +682,12 @@ class _Message(SlottedModel):
     role_subscription_data = Field(RoleSubscriptionData, create=False)
     poll = Field(MessagePoll, create=False)
     call = Field(MessageCall, create=False)
+    purchase_notification = Field(dict)
+    gift_info = Field(dict)
+    changelog_id = Field(snowflake)
+    soundboard_sounds = ListField(GuildSoundboardSound)
+    potions = ListField(dict)
+    shared_client_theme = Field(dict)
 
     def __repr__(self):
         return '<Message id={} channel_id={}>'.format(self.id, self.channel_id)

@@ -34,6 +34,14 @@ class Routes:
     Simple Python object-enum of all method/url route combinations available to this client.
     """
     APPLICATIONS = '/applications/{application}'
+    APPLICATIONS_EMOJIS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/emojis')
+    APPLICATIONS_EMOJIS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/emojis/{emoji}')
+    APPLICATIONS_EMOJIS_GET = (HTTPMethod.GET, APPLICATIONS + '/emojis/{emoji}')
+    APPLICATIONS_EMOJIS_LIST = (HTTPMethod.GET, APPLICATIONS + '/emojis')
+    APPLICATIONS_EMOJIS_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/emojis/{emoji}')
+    APPLICATIONS_ENTITLEMENTS_CONSUME = (HTTPMethod.GET, APPLICATIONS + '/entitlements/{entitlement}/consume')
+    APPLICATIONS_ENTITLEMENTS_CREATE = (HTTPMethod.GET, APPLICATIONS + '/entitlements')
+    APPLICATIONS_ENTITLEMENTS_DELETE = (HTTPMethod.GET, APPLICATIONS + '/entitlements')
     APPLICATIONS_GLOBAL_COMMANDS_BULK_OVERWRITE = (HTTPMethod.PUT, APPLICATIONS + '/commands')
     APPLICATIONS_GLOBAL_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/commands')
     APPLICATIONS_GLOBAL_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/commands/{command}')
@@ -61,6 +69,7 @@ class Routes:
     CHANNELS_FOLLOW = (HTTPMethod.POST, CHANNELS + '/followers')
     CHANNELS_GET = (HTTPMethod.GET, CHANNELS)
     CHANNELS_INVITES_CREATE = (HTTPMethod.POST, CHANNELS + '/invites')
+    CHANNELS_INVITES_GET = (HTTPMethod.GET, CHANNELS + '/invites')
     CHANNELS_INVITES_LIST = (HTTPMethod.GET, CHANNELS + '/invites')
     CHANNELS_MESSAGES_BULK_DELETE = (HTTPMethod.POST, CHANNELS + '/messages/bulk-delete')
     CHANNELS_MESSAGES_CREATE = (HTTPMethod.POST, CHANNELS + '/messages')
@@ -126,11 +135,14 @@ class Routes:
     GUILDS_EMOJIS_GET = (HTTPMethod.GET, GUILDS + '/emojis/{emoji}')
     GUILDS_EMOJIS_LIST = (HTTPMethod.GET, GUILDS + '/emojis')
     GUILDS_EMOJIS_MODIFY = (HTTPMethod.PATCH, GUILDS + '/emojis/{emoji}')
+    GUILDS_EVENTS_CREATE = (HTTPMethod.POST, GUILDS + '/scheduled-events')
     GUILDS_EVENTS_DELETE = (HTTPMethod.DELETE, GUILDS + '/scheduled-events/{event}')
     GUILDS_EVENTS_GET = (HTTPMethod.GET, GUILDS + '/scheduled-events/{event}')
+    GUILDS_EVENTS_LIST = (HTTPMethod.GET, GUILDS + '/scheduled-events')
     GUILDS_EVENTS_MODIFY = (HTTPMethod.PATCH, GUILDS + '/scheduled-events/{event}')
     GUILDS_EVENTS_USERS_LIST = (HTTPMethod.GET, GUILDS + '/scheduled-events/{event}/users')
     GUILDS_GET = (HTTPMethod.GET, GUILDS)
+    GUILDS_INCIDENTS_ACTION_MODIFY = (HTTPMethod.PUT, GUILDS + '/incident-actions')
     GUILDS_INTEGRATIONS_CREATE = (HTTPMethod.POST, GUILDS + '/integrations')
     GUILDS_INTEGRATIONS_DELETE = (HTTPMethod.DELETE, GUILDS + '/integrations/{integration}')
     GUILDS_INTEGRATIONS_LIST = (HTTPMethod.GET, GUILDS + '/integrations')
@@ -161,6 +173,7 @@ class Routes:
     GUILDS_ROLES_DELETE = (HTTPMethod.DELETE, GUILDS + '/roles/{role}')
     GUILDS_ROLES_LIST = (HTTPMethod.GET, GUILDS + '/roles')
     GUILDS_ROLES_MODIFY = (HTTPMethod.PATCH, GUILDS + '/roles/{role}')
+    GUILDS_ROLES_MEMBER_COUNT_GET = (HTTPMethod.GET, GUILDS + '/roles/member-counts')
     GUILDS_STICKERS = GUILDS + '/stickers'
     GUILDS_STICKERS_CREATE = (HTTPMethod.POST, GUILDS_STICKERS)
     GUILDS_STICKERS_DELETE = (HTTPMethod.DELETE, GUILDS_STICKERS + '/{sticker}')
@@ -204,6 +217,9 @@ class Routes:
     INVITES = '/invites/{invite}'
     INVITES_DELETE = (HTTPMethod.DELETE, INVITES)
     INVITES_GET = (HTTPMethod.GET, INVITES)
+    INVITES_TARGET_USERS_GET = (HTTPMethod.GET, INVITES + '/target-users')
+    INVITES_TARGET_USERS_MODIFY = (HTTPMethod.PUT, INVITES + '/target-users')
+    INVITES_TARGET_USERS_JOB_STATUS_GET = (HTTPMethod.GET, INVITES + '/target-users/job-status')
 
     OAUTH2 = '/oauth2'
     OAUTH2_APPLICATIONS_ME_GET = (HTTPMethod.GET, OAUTH2 + '/applications/@me')

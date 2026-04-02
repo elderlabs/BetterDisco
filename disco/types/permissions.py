@@ -54,6 +54,7 @@ class Permissions(BitsetMap):
     SEND_POLLS = 1 << 49
     USE_EXTERNAL_APPS = 1 << 50
     PIN_MESSAGES = 1 << 51
+    BYPASS_SLOWMODE = 1 << 52
 
 
 class PermissionValue(BitsetValue):

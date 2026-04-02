@@ -159,6 +159,17 @@ class ForumTag(SlottedModel):
     emoji_name = Field(text)
 
 
+class ForumSortOrderTypes:
+    LATEST_ACTIVITY = 0
+    CREATION_DATE = 1
+
+
+class ForumLayoutTypes:
+    NOT_SET = 0
+    LIST_VIEW = 1
+    GALLERY_VIEW = 3
+
+
 class Channel(SlottedModel, Permissible):
     """
     Represents a Discord Channel.
@@ -213,8 +224,8 @@ class Channel(SlottedModel, Permissible):
     available_tags = ListField(ForumTag)
     default_reaction_emoji = Field(DefaultReaction, create=False)
     default_thread_rate_limit_per_user = Field(int)
-    default_sort_order = Field(int)
-    default_forum_layout = Field(int)
+    default_sort_order = Field(enum(ForumSortOrderTypes))
+    default_forum_layout = Field(enum(ForumLayoutTypes))
     auto_archive_duration = Field(int)
     status = Field(text)
     icon_emoji = Field(Emoji)

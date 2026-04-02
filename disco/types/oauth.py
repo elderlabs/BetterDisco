@@ -30,7 +30,17 @@ class ApplicationInstallParams(SlottedModel):
 
 
 class ApplicationFlags(BitsetMap):
+    EMBEDDED_RELEASED = 1 << 1
+    MANAGED_EMOJI = 1 << 2
+    EMBEDDED_IAP = 1 << 3
+    GROUP_DM_CREATE = 1 << 4
+    RPC_PRIVATE_BETA = 1 << 5
     APPLICATION_AUTO_MODERATION_RULE_CREATE_BADGE = 1 << 6
+    GAME_PROFILE_DISABLED = 1 << 7
+    PUBLIC_OAUTH2_CLIENT = 1 << 8
+    CONTEXTLESS_ACTIVITY = 1 << 9
+    SOCIAL_LAYER_INTEGRATION_LIMITED = 1 << 10
+    CLOUD_GAMING_DEMO = 1 << 11
     GATEWAY_PRESENCE = 1 << 12
     GATEWAY_PRESENCE_LIMITED = 1 << 13
     GATEWAY_GUILD_MEMBERS = 1 << 14
@@ -39,7 +49,17 @@ class ApplicationFlags(BitsetMap):
     EMBEDDED = 1 << 17
     GATEWAY_MESSAGE_CONTENT = 1 << 18
     GATEWAY_MESSAGE_CONTENT_LIMITED = 1 << 19
+    EMBEDDED_FIRST_PARTY = 1 << 20
+    APPLICATION_COMMAND_MIGRATED = 1 << 21
     APPLICATION_COMMAND_BADGE = 1 << 23
+    ACTIVE = 1 << 24
+    ACTIVE_GRACE_PERIOD = 1 << 25
+    IFRAME_MODAL = 1 << 26
+    SOCIAL_LAYER_INTEGRATION = 1 << 27
+    PROMOTED = 1 << 29
+    PARTNER = 1 << 30
+    PARENT = 1 << 33
+    DISABLE_RELATIONSHIP_ACCESS = 1 << 34
 
 
 class ApplicationFlagsValue(BitsetValue):
@@ -53,6 +73,12 @@ class ApplicationIntegrationType:
 
 class ApplicationIntegrationTypeConfiguration(SlottedModel):
     oauth2_install_params = Field(ApplicationInstallParams)
+
+
+class ApplicationEventWebhookStatus:
+    DISABLED = 1
+    ENABLED = 2
+    DISABLED_BY_DISCORD = 3
 
 
 class Application(SlottedModel):
@@ -77,9 +103,13 @@ class Application(SlottedModel):
     flags = Field(ApplicationFlagsValue)
     approximate_guild_count = Field(int)
     approximate_user_install_count = Field(int)
+    approximate_user_authorization_count = Field(int)
     redirect_uris = ListField(str)
     interactions_endpoint_url = Field(str)
     role_connections_verification_url = Field(str)
+    event_webhooks_url = Field(str)
+    event_webhooks_status = Field(enum(ApplicationEventWebhookStatus))
+    event_webhooks_types = ListField(str)
     tags = ListField(str)
     install_params = Field(ApplicationInstallParams)
     integration_types_config = Field(dict)  # TODO: this is a dumpster-fire
@@ -147,3 +177,5 @@ class ApplicationRoleConnection(SlottedModel):
     platform_name = Field(text)
     platform_username = Field(text)
     metadata = Field(ApplicationRoleConnectionMetadata)
+    application = Field(Application)
+    application_metadata = ListField(ApplicationRoleConnectionMetadata)

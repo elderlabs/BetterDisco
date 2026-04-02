@@ -1,13 +1,27 @@
-from disco.types.base import SlottedModel, Field, datetime, text, enum
+from disco.types.base import SlottedModel, Field, datetime, text, enum, BitsetMap, BitsetValue, ListField
 from disco.types.user import User
-from disco.types.guild import Guild, GuildScheduledEvent
+from disco.types.guild import Guild, GuildScheduledEvent, Role
 from disco.types.channel import Channel, StageInstance
 from disco.types.oauth import Application
+
+
+class InviteTypes:
+    GUILD = 0
+    GROUP_DM = 1
+    FRIEND = 2
 
 
 class InviteTargetTypes:
     STREAM = 1
     EMBEDDED_APPLICATION = 2
+
+
+class InviteFlags(BitsetMap):
+    IS_GUEST_INVITE = 1 << 0
+
+
+class InviteFlagsValue(BitsetValue):
+    map = InviteFlags
 
 
 class Invite(SlottedModel):
@@ -43,6 +57,7 @@ class Invite(SlottedModel):
     created_at : datetime
         When this invite was created.
     """
+    type = Field(enum(InviteTypes))
     code = Field(text)
     guild = Field(Guild)
     channel = Field(Channel)
@@ -55,11 +70,13 @@ class Invite(SlottedModel):
     expires_at = Field(datetime)
     stage_instance = Field(StageInstance)
     guild_scheduled_event = Field(GuildScheduledEvent)
+    flags = Field(InviteFlagsValue)
     uses = Field(int)
     max_uses = Field(int)
     max_age = Field(int)
     temporary = Field(bool)
     created_at = Field(datetime)
+    roles = ListField(Role)
 
     @classmethod
     def create_for_channel(cls, channel, *args, **kwargs):
