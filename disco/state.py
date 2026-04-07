@@ -109,7 +109,7 @@ class State:
         self.config = config
 
         self.ready = Event()
-        self.guilds_waiting_sync = 0
+        self.guilds_awaiting_sync = []
 
         self.me = None
         self.guilds = HashMap()
@@ -193,7 +193,7 @@ class State:
 
     def on_ready(self, event):
         self.me = event.user
-        self.guilds_waiting_sync = len(event.guilds)
+        self.guilds_awaiting_sync = [i.id for i in event.guilds]
         self.ready.clear()
 
     def on_user_update(self, event):
@@ -273,11 +273,6 @@ class State:
                 self.dms[event.channel.id] = event.channel
 
     def on_guild_create(self, event):
-        if not self.ready.is_set():
-            self.guilds_waiting_sync -= 1
-            if self.guilds_waiting_sync <= 0:
-                self.ready.set()
-
         guild = copy(event.guild)
 
         if not self.config.sync_guild_members:
@@ -331,6 +326,14 @@ class State:
                     self.guilds[event.guild.id].members[voice_state.user_id] = voice_state.member
                 if self.config.cache_users and voice_state.user_id not in self.users and voice_state.member.user:
                     self.users[voice_state.user_id] = voice_state.member.user
+
+        if not self.ready.is_set():
+            try:
+                self.guilds_awaiting_sync.remove(event.id)
+            except ValueError:
+                pass
+            if len(self.guilds_awaiting_sync) <= 0:
+                self.ready.set()
 
     def on_guild_update(self, event):
         ignored = ['channels', 'emojis', 'members', 'stickers', 'threads', 'voice_states', 'presences']
