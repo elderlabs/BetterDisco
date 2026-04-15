@@ -56,7 +56,10 @@ class ClientConfig(Config):
     compression = True
 
     gateway_url = 'https://discord.com/api'
+    http_gateway_url = gateway_url
     gateway_version = '9'
+
+    shutdown_on_cloudflare_429 = True
 
 
 class Client(LoggingClass):

@@ -339,7 +339,7 @@ class HTTPClient(LoggingClass):
     """
     MAX_RETRIES = 5
 
-    def __init__(self, token, after_request=None, gateway_url='https://discord.com/api', gateway_version=9):
+    def __init__(self, token, after_request=None, http_gateway_url='https://discord.com/api', gateway_version=9, shutdown_on_cloudflare_429=True):
         super(HTTPClient, self).__init__()
 
         py_version = python_version()
@@ -347,8 +347,10 @@ class HTTPClient(LoggingClass):
         self.limiter = RateLimiter()
         self.after_request = after_request
 
-        self.gateway_url = gateway_url
+        self.http_gateway_url = http_gateway_url
         self.gateway_version = gateway_version
+
+        self.shutdown_on_cloudflare_429 = shutdown_on_cloudflare_429
 
         self.session = RequestsSession()
         self.session.headers.update({
@@ -410,7 +412,7 @@ class HTTPClient(LoggingClass):
         self.log.debug('KW: %s', kwargs)
 
         # Make the actual request
-        url = self.gateway_url + f'/v{self.gateway_version}' + route[1].format(**args)
+        url = self.http_gateway_url + f'/v{self.gateway_version}' + route[1].format(**args)
         self.log.info('%s %s %s', route[0], url, '({})'.format(kwargs.get('params')) if kwargs.get('params') else '')
         try:
             r = self.session.request(route[0], url, **kwargs)
@@ -434,10 +436,6 @@ class HTTPClient(LoggingClass):
                 response.exception = APIException(r)
                 raise response.exception
             elif r.status_code in [429, 500, 502, 503]:
-                if r.status_code == 429:
-                    self.log.warning('Request responded w/ 429, retrying (but this should not happen, check your clock sync)')
-
-                # If we hit the max retries, throw an error
                 retry += 1
                 if retry > self.MAX_RETRIES:
                     self.log.error('Failing request, hit max retries')
@@ -449,20 +447,25 @@ class HTTPClient(LoggingClass):
                         url, r.status_code, backoff,
                     ))
                 elif r.status_code == 429:
-                    self.log.warning('Request to `{}` failed with code {}, retrying after {}s'.format(
-                        url, r.status_code, r.json()["retry_after"],
-                    ))
-                    backoff = math_ceil(r.json()["retry_after"])
+                    if 'retry_after' in r.json():
+                        self.log.warning('Request to `{}` failed with code {}, retrying after {}s'.format(
+                            url, r.status_code, r.json()["retry_after"],
+                        ))
+                        backoff = math_ceil(r.json()["retry_after"])
+                    else:
+                        self.log.error(f'Request to `{url}` cancelled, no `retry_after` provided by API (Cloudflare rate-limited?)')
+                        if self.shutdown_on_cloudflare_429:
+                            from sys import exit as sys_exit
+                            return sys_exit(1)
+                        return
                 else:
                     self.log.warning('Request to `{}` failed with code {}, retrying after {}s ({})'.format(
                         url, r.status_code, backoff, str(r.content, "utf=8"),
                     ))
                 gevent_sleep(backoff)
 
-                # Otherwise just recurse and try again
                 return self(route, args, retry_number=retry, **kwargs)
         except ConnectionError:
-            # Catch ConnectionResetError
             backoff = random_backoff()
             self.log.warning('Request to `{}` failed with ConnectionError, retrying after {}s'.format(url, backoff))
             gevent_sleep(backoff)
