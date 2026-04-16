@@ -1,8 +1,9 @@
 from gevent import sleep as gevent_sleep
 from math import ceil as math_ceil
+from platform import python_version
 from random import randint as random_randint
 from requests import Session as RequestsSession, __version__ as requests_version, ConnectionError, Timeout
-from platform import python_version
+from time import monotonic
 
 from disco import VERSION as disco_version
 from disco.util.logging import LoggingClass
@@ -334,17 +335,18 @@ class APIException(Exception):
 
 class HTTPClient(LoggingClass):
     """
-    A simple HTTP client which wraps the requests library, adding support for
+    A simple HTTP client which wraps the `requests` library, adding support for
     Discords rate-limit headers, authorization, and request/response validation.
     """
     MAX_RETRIES = 5
 
-    def __init__(self, token, after_request=None, http_gateway_url='https://discord.com/api', gateway_version=9, shutdown_on_cloudflare_429=True):
+    def __init__(self, token, after_request=None, http_gateway_url='https://discord.com/api', gateway_version=9, shutdown_on_cloudflare_429=True, max_queries_per_second=50):
         super(HTTPClient, self).__init__()
 
         py_version = python_version()
 
-        self.limiter = RateLimiter()
+        self.limiter = RateLimiter(max_queries_per_second=max_queries_per_second)
+        self.invalid_requests = []
         self.after_request = after_request
 
         self.http_gateway_url = http_gateway_url
@@ -383,7 +385,7 @@ class HTTPClient(LoggingClass):
             to create the requestable route. The HTTPClient uses this to track
             rate limits as well.
         kwargs : dict
-            Keyword arguments that will be passed along to the requests library.
+            Keyword arguments that will be passed along to the `requests` library.
 
         Raises
         ------
@@ -401,7 +403,7 @@ class HTTPClient(LoggingClass):
 
         # Build the bucket URL
         args = {k: v for k, v in args.items()}
-        filtered = {k: (v if k in ('guild', 'channel') else '') for k, v in args.items()}
+        filtered = {k: (v if k in ('guild', 'channel', 'webhook') else '') for k, v in args.items()}
         bucket = (route[0], route[1].format(**filtered))
 
         response = APIResponse()
@@ -423,6 +425,23 @@ class HTTPClient(LoggingClass):
 
             # Update rate limiter
             self.limiter.update(bucket, r)
+
+            if r.status_code in (401, 403, 429):
+                now = monotonic()
+
+                # Drop old entries (10 minutes)
+                self.invalid_requests = [t for t in self.invalid_requests if now - t < 600]
+                self.invalid_requests.append(now)
+
+                if len(self.invalid_requests) >= 10000:
+                    self.log.error('Hit API invalid request limit (10000/10min), backing off')
+
+                    delay = 600 - (now - self.invalid_requests[0])
+                    if delay > 0:
+                        gevent_sleep(delay)
+
+                elif len(self.invalid_requests) >= 9000:
+                    gevent_sleep(0.5)
 
             # If we got a success status code, just return the data
             if r.status_code < 400:
@@ -472,6 +491,6 @@ class HTTPClient(LoggingClass):
             return self(route, args, retry_number=retry, **kwargs)
         except Timeout:
             backoff = random_backoff()
-            self.log.warning('Request to `{}` failed with ConnectionTimeout, retrying after {}s')
+            self.log.warning(f'Request to `{url}` failed with ConnectionTimeout, retrying after {backoff}s')
             gevent_sleep(backoff)
             return self(route, args, retry_number=retry, **kwargs)

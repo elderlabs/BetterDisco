@@ -1,7 +1,6 @@
 from gevent import sleep as gevent_sleep, spawn as gevent_spawn
 from gevent.event import Event as GeventEvent
-from math import ceil as math_ceil
-from time import time
+from time import monotonic
 
 from disco.util.logging import LoggingClass
 
@@ -34,8 +33,9 @@ class RouteState(LoggingClass):
     """
     def __init__(self, route, response):
         self.route = route
-        self.remaining = 0
-        self.reset_time = 0
+        self.bucket = None
+        self.remaining = 1
+        self.reset_time = 0.0
         self.event = None
 
         self.update(response)
@@ -56,25 +56,26 @@ class RouteState(LoggingClass):
         Whether the next request to the route (at this moment in time) will
         trigger the rate limit.
         """
-
-        if self.remaining - 1 < 0 and time() <= self.reset_time:
-            return True
-
-        return False
+        return self.remaining <= 1 and monotonic() <= self.reset_time
 
     def update(self, response):
         """
-        Updates this route with a given Requests response object. It's expected
-        the response has the required headers, however in the case that it doesn't
+        Updates this route with the provided Requests response object. It's expected
+        the response has the required headers, however in the case that it doesn't,
         this function has no effect.
         """
-        if 'X-RateLimit-Remaining' not in response.headers:
-            return
+        if 'X-RateLimit-Bucket' in response.headers:
+            self.bucket = response.headers.get('X-RateLimit-Bucket')
 
-        self.remaining = int(response.headers.get('X-RateLimit-Remaining'))
-        self.reset_time = math_ceil(float((response.headers.get('X-RateLimit-Reset'))))
+        if 'X-RateLimit-Remaining' in response.headers:
+            self.remaining = int(response.headers.get('X-RateLimit-Remaining', 0))
 
-    def wait(self, timeout=None):
+        if 'X-RateLimit-Reset-After' in response.headers:
+            self.reset_time = monotonic() + float(response.headers.get('X-RateLimit-Reset-After'))
+        # elif 'X-RateLimit-Reset' in response.headers:
+        #     self.reset_time = float(response.headers.get('X-RateLimit-Reset'))
+
+    def wait(self):
         """
         Waits until this route is no longer under a cooldown.
 
@@ -84,22 +85,24 @@ class RouteState(LoggingClass):
             The duration we waited for, in seconds or zero if we didn't have to
             wait at all.
         """
-        if self.event.is_set():
+        if not self.event or self.event.is_set():
             return 0
 
-        start = time()
+        start = monotonic()
         self.event.wait()
-        return time() - start
+        return monotonic() - start
 
     def cooldown(self):
         """
         Waits for the current route to be cooled-down (aka waiting until reset time).
         """
-        if self.reset_time - time() < 0:
-            raise Exception('Cannot cooldown for negative time period; check clock sync')
+        if self.reset_time - monotonic() <= 0:
+            return 0
 
+        if self.event:
+            return self.wait()
         self.event = GeventEvent()
-        delay = (self.reset_time - time()) + .5
+        delay = (self.reset_time - monotonic()) + 0.05
         self.log.debug('Cooling down bucket %s for %s seconds', self, delay)
         gevent_sleep(delay)
         self.event.set()
@@ -117,8 +120,20 @@ class RateLimiter(LoggingClass):
         Contains a :class:`RouteState` for each route the RateLimiter is currently
         tracking.
     """
-    def __init__(self):
+    def __init__(self, max_queries_per_second=50):
         self.states = {}
+        self.buckets = {}
+        self.global_requests = []
+        self.max_queries_per_second = max_queries_per_second
+
+    def _get_state(self, route):
+        state = self.states.get(route)
+
+        # If this route is mapped to a bucket, use shared state
+        if state and state.bucket and state.bucket in self.buckets:
+            return self.buckets[state.bucket]
+
+        return state
 
     def check(self, route):
         """
@@ -139,16 +154,33 @@ class RateLimiter(LoggingClass):
             The number of seconds we had to wait for this rate limit, or zero
             if no time was waited.
         """
-        return self._check(None) + self._check(route)
+        total = 0
+        if None in self.states:
+            total += self._check(None)
+        total += self._check(route)
+
+        now = monotonic()
+        self.global_requests = [t for t in self.global_requests if now - t < 1.0]
+        while len(self.global_requests) >= self.max_queries_per_second:
+            delay = 1.0 - (monotonic() - self.global_requests[0])
+            if delay > 0:
+                gevent_sleep(delay)
+            now = monotonic()
+            self.global_requests = [t for t in self.global_requests if now - t < 1.0]
+        self.global_requests.append(now)
+
+        return total
 
     def _check(self, route):
         if route in self.states:
             # If the route is being cooled off, we need to wait until its ready
-            if self.states[route].chilled:
-                return self.states[route].wait()
+            state = self._get_state(route)
 
-            if self.states[route].next_will_ratelimit:
-                return gevent_spawn(self.states[route].cooldown).get()
+            if state.chilled:
+                return state.wait()
+
+            if state.next_will_ratelimit:
+                return gevent_spawn(state.cooldown).get()
 
         return 0
 
@@ -167,8 +199,19 @@ class RateLimiter(LoggingClass):
         """
         if 'X-RateLimit-Global' in response.headers:
             route = None
+        else:
+            try:
+                if response.status_code == 429 and response.json().get('global', False):
+                    route = None
+            except Exception:
+                pass
 
         if route in self.states:
-            self.states[route].update(response)
+            state = self.states[route]
+            state.update(response)
         else:
-            self.states[route] = RouteState(route, response)
+            state = RouteState(route, response)
+            self.states[route] = state
+
+        if state.bucket:
+            self.buckets[state.bucket] = state

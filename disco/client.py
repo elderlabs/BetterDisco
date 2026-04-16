@@ -60,6 +60,7 @@ class ClientConfig(Config):
     gateway_version = '9'
 
     shutdown_on_cloudflare_429 = True
+    max_queries_per_second = 50
 
 
 class Client(LoggingClass):

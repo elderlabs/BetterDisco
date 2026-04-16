@@ -29,7 +29,8 @@ parser.add_argument('--encoder', help='Encoder for gateway data', default=None)
 parser.add_argument('--gateway_url', help='WS API endpoint to connect to', default=None)
 parser.add_argument('--http_gateway_url', help='HTTP API endpoint to connect to', default=None)
 parser.add_argument('--gateway_version', help='API endpoint version', default=None)
-parser.add_argument('--shutdown_on_cloudflare_429', help='Shutdown on Cloudflare ratelimiting', default=True)
+parser.add_argument('--shutdown_on_cloudflare_429', help='Shutdown on Cloudflare ratelimiting', default=False)
+parser.add_argument('--max_queries_per_second', help='Max number of outbound queries to the API per second', default=None)
 
 
 # Mapping of argument names to configuration overrides
@@ -46,6 +47,7 @@ CONFIG_OVERRIDE_MAPPING = {
     'http_gateway_url': 'http_gateway_url',
     'gateway_version': 'gateway_version',
     'shutdown_on_cloudflare_429': 'shutdown_on_cloudflare_429',
+    'max_queries_per_second': 'max_queries_per_second',
 }
 
 
