@@ -1,5 +1,6 @@
 from gevent import sleep as gevent_sleep, spawn as gevent_spawn
 from gevent.event import Event as GeventEvent
+from requests import JSONDecodeError
 from time import monotonic
 
 from disco.util.logging import LoggingClass
@@ -37,6 +38,7 @@ class RouteState(LoggingClass):
         self.remaining = 1
         self.reset_time = 0.0
         self.event = None
+        self.scope = None
 
         self.update(response)
 
@@ -67,13 +69,14 @@ class RouteState(LoggingClass):
         if 'X-RateLimit-Bucket' in response.headers:
             self.bucket = response.headers.get('X-RateLimit-Bucket')
 
+        if 'X-RateLimit-Scope' in response.headers:
+            self.scope = response.headers.get('X-RateLimit-Scope')
+
         if 'X-RateLimit-Remaining' in response.headers:
             self.remaining = int(response.headers.get('X-RateLimit-Remaining', 0))
 
         if 'X-RateLimit-Reset-After' in response.headers:
             self.reset_time = monotonic() + float(response.headers.get('X-RateLimit-Reset-After'))
-        # elif 'X-RateLimit-Reset' in response.headers:
-        #     self.reset_time = float(response.headers.get('X-RateLimit-Reset'))
 
     def wait(self):
         """
@@ -197,13 +200,13 @@ class RateLimiter(LoggingClass):
             The response object for the last request to the route, whose headers
             will be used to update the routes rate limit state.
         """
-        if 'X-RateLimit-Global' in response.headers:
+        if 'X-RateLimit-Global' in response.headers or response.headers.get('X-RateLimit-Scope') == 'global':
             route = None
         else:
             try:
                 if response.status_code == 429 and response.json().get('global', False):
                     route = None
-            except Exception:
+            except JSONDecodeError:
                 pass
 
         if route in self.states:

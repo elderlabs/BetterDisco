@@ -27,7 +27,7 @@ from disco.util.limiter import SimpleLimiter
 
 
 class GatewayClient(LoggingClass):
-    def __init__(self, client, max_reconnects=5, encoder='json', zlib_stream_enabled=False, zstd_stream_enabled=False, ipc=None):
+    def __init__(self, client, max_reconnects=5, encoder='json', zlib_stream_enabled=False, zstd_stream_enabled=False, ipc=None, ignored_events=[], subscribed_events=[]):
         super(GatewayClient, self).__init__()
         self.client = client
         self.max_reconnects = max_reconnects
@@ -35,6 +35,8 @@ class GatewayClient(LoggingClass):
         self.zlib_stream_enabled = zlib_stream_enabled
         self.zstd_stream_enabled = zstd_stream_enabled
 
+        self.ignored_events = ignored_events
+        self.subscribed_events = subscribed_events
         self.events = client.events
         self.packets = client.packets
 
@@ -43,8 +45,7 @@ class GatewayClient(LoggingClass):
             self.shards = ipc.get_shards()
             self.ipc = ipc
 
-        # Is actually 60, but 120 allows a buffer
-        self.limiter = SimpleLimiter(60, 130)
+        self.limiter = SimpleLimiter(120, 60)
 
         # Create emitter and bind to gateway payloads
         self.packets.on((RECV, OPCode.DISPATCH), self.handle_dispatch)
@@ -118,9 +119,10 @@ class GatewayClient(LoggingClass):
             gevent_sleep(interval / 1000)
 
     def handle_dispatch(self, packet):
-        timestamp = time_perf_counter_ns()
         try:
-            packet['d']['timestamp_ns'] = timestamp
+            if self.ignored_events and packet['t'] in self.ignored_events or self.subscribed_events and packet['t'] not in self.subscribed_events:
+                return
+            packet['d']['timestamp_ns'] = time_perf_counter_ns()
             obj = GatewayEvent.from_dispatch(self.client, packet)
         except Exception as e:
             if self.client.config.log_unknown_events:
@@ -150,6 +152,7 @@ class GatewayClient(LoggingClass):
         self.log.warning('Received INVALID_SESSION, forcing a fresh reconnect')
         self.last_conn_state = 'INVALID_SESSION'
         self.session_id = None
+        self.seq = 0
         self.ws.close(status=4000)
 
     def handle_hello(self, packet):

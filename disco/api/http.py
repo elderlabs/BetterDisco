@@ -2,7 +2,7 @@ from gevent import sleep as gevent_sleep
 from math import ceil as math_ceil
 from platform import python_version
 from random import randint as random_randint
-from requests import Session as RequestsSession, __version__ as requests_version, ConnectionError, Timeout
+from requests import Session as RequestsSession, __version__ as requests_version, ConnectionError, Timeout, JSONDecodeError
 from time import monotonic
 
 from disco import VERSION as disco_version
@@ -426,7 +426,7 @@ class HTTPClient(LoggingClass):
             # Update rate limiter
             self.limiter.update(bucket, r)
 
-            if r.status_code in (401, 403, 429):
+            if r.status_code in (401, 403, 404, 429):
                 now = monotonic()
 
                 # Drop old entries (10 minutes)
@@ -446,8 +446,11 @@ class HTTPClient(LoggingClass):
             # If we got a success status code, just return the data
             if r.status_code < 400:
                 return r
-            elif r.status_code != 429 and 400 <= r.status_code < 500:
-                err = r.json()
+            elif r.status_code != 429 and 400 <= r.status_code < 500 and r.status_code != 408:
+                try:
+                    err = r.json()
+                except JSONDecodeError:
+                    err = None
                 if err and 'code' in err and 'message' in err:
                     self.log.warning(f'Request failed with status code {r.status_code}: {err["code"]} - {err["message"]} ({route[1].format(**args)})')
                 else:
