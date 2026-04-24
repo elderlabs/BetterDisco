@@ -113,4 +113,10 @@ def disco_main(run=False):
 
 
 if __name__ == '__main__':
-    disco_main(True)
+    try:
+        disco_main(True)
+    except KeyboardInterrupt:
+        print('\nShutting down...')
+    finally:
+        from sys import exit as sys_exit
+        sys_exit(0)
