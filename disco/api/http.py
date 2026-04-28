@@ -406,6 +406,7 @@ class HTTPClient(LoggingClass):
         filtered = {k: (v if k in ('guild', 'channel', 'webhook') else '') for k, v in args.items()}
         bucket = (route[0], route[1].format(**filtered))
 
+        r = None
         response = APIResponse()
 
         # Possibly wait if we're rate limited
@@ -497,3 +498,5 @@ class HTTPClient(LoggingClass):
             self.log.warning(f'Request to `{url}` failed with ConnectionTimeout, retrying after {backoff}s')
             gevent_sleep(backoff)
             return self(route, args, retry_number=retry, **kwargs)
+        finally:
+            r and r.close()

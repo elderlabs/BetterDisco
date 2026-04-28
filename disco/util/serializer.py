@@ -1,6 +1,28 @@
 from types import FunctionType as types_FunctionType
 
 
+try:
+    import orjson as _json
+
+    def dumps(obj, *args, **kwargs):
+        return _json.dumps(obj, *args, **kwargs).decode('utf-8')
+
+    def loads(s, *args, **kwargs):
+        return _json.loads(s)
+
+except ImportError:
+    try:
+        import ujson as _json
+    except ImportError:
+        import json as _json
+
+    def dumps(obj, *args, **kwargs):
+        return _json.dumps(obj, *args, **kwargs)
+
+    def loads(s, *args, **kwargs):
+        return _json.loads(s)
+
+
 class Serializer:
     FORMATS = {
         'json',
@@ -15,10 +37,6 @@ class Serializer:
 
     @staticmethod
     def json():
-        try:
-            from ujson import loads, dumps
-        except ImportError:
-            from json import loads, dumps
         return loads, dumps
 
     @staticmethod

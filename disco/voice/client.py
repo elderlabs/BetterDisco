@@ -2,7 +2,7 @@ from gevent import sleep as gevent_sleep, spawn as gevent_spawn
 from struct import unpack_from as struct_unpack_from
 from time import time
 try:
-    from ujson import JSONDecodeError
+    from orjson import JSONDecodeError
 except ImportError:
     from json import JSONDecodeError
 from collections import namedtuple as namedtuple

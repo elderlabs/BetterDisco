@@ -1,18 +1,14 @@
-try:
-    from ujson import dumps as json_dumps
-except ImportError:
-    from json import dumps as json_dumps
-from warnings import warn as warnings_warn
-
 from contextlib import contextmanager
 from gevent.local import local
 from urllib.parse import quote
+from warnings import warn as warnings_warn
 
 from disco.api.http import Routes, HTTPClient
 from disco.types.integration import UserConnection
 from disco.util.functional import optional
 from disco.util.logging import LoggingClass
 from disco.util.sanitize import S
+from disco.util.serializer import dumps as json_dumps
 from disco.types.application import InteractionCallbackData, ApplicationCommand, GuildApplicationCommandPermissions, Interaction, InteractionResponse
 from disco.types.user import User
 from disco.types.message import Message

@@ -1,9 +1,5 @@
-try:
-    from ujson import dumps as json_dumps, loads as json_loads
-except ImportError:
-    from json import dumps as json_dumps, loads as json_loads
-
 from disco.gateway.encoding.base import BaseEncoder
+from disco.util.serializer import dumps as json_dumps, loads as json_loads
 
 
 class JSONEncoder(BaseEncoder):
