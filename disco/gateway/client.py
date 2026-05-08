@@ -5,19 +5,6 @@ from sys import version_info as sys_version_info, modules as sys_modules
 from time import time, perf_counter_ns as time_perf_counter_ns
 from websocket import ABNF, WebSocketConnectionClosedException, WebSocketTimeoutException
 
-if sys_version_info >= (3, 14):
-    from compression.zstd import ZstdDecompressor
-else:
-    try:
-        from zstandard import ZstdDecompressor
-    except ImportError:
-        pass
-
-try:
-    from isal.isal_zlib import decompress as zlib_decompress, decompressobj as zlib_decompressobj
-except ImportError:
-    from zlib import decompress as zlib_decompress, decompressobj as zlib_decompressobj
-
 from disco.gateway.packets import OPCode, RECV, SEND
 from disco.gateway.events import GatewayEvent
 from disco.gateway.encoding import ENCODERS
@@ -34,6 +21,24 @@ class GatewayClient(LoggingClass):
         self.encoder = ENCODERS[encoder]
         self.zlib_stream_enabled = zlib_stream_enabled
         self.zstd_stream_enabled = zstd_stream_enabled
+
+        if sys_version_info >= (3, 14):
+            global ZstdDecompressor; from compression.zstd import ZstdDecompressor
+        else:
+            try:
+                global ZstdDecompressor; from zstandard import ZstdDecompressor
+            except ImportError:
+                self.zstd_stream_enabled = False
+
+        try:
+            global zlib_decompress
+            global zlib_decompressobj
+            from isal.isal_zlib import decompress as zlib_decompress, decompressobj as zlib_decompressobj
+        except ImportError:
+            try:
+                from zlib import decompress as zlib_decompress, decompressobj as zlib_decompressobj
+            except ImportError:
+                self.zlib_stream_enabled = False
 
         self.ignored_events = ignored_events
         self.subscribed_events = subscribed_events
@@ -61,6 +66,7 @@ class GatewayClient(LoggingClass):
 
         # Websocket connection
         self.ws = None
+        self.ws_task = None
         self.ws_event = GeventEvent()
         self._zlib = None
         self._zstd = None
@@ -118,10 +124,12 @@ class GatewayClient(LoggingClass):
             self._heartbeat_acknowledged = False
             gevent_sleep(interval / 1000)
 
+    # overridable for additional logic
+    def pre_dispatch(self, packet):
+        return packet
+
     def handle_dispatch(self, packet):
         try:
-            if self.ignored_events and packet['t'] in self.ignored_events or self.subscribed_events and packet['t'] not in self.subscribed_events:
-                return
             packet['d']['timestamp_ns'] = time_perf_counter_ns()
             obj = GatewayEvent.from_dispatch(self.client, packet)
         except Exception as e:
@@ -238,6 +246,8 @@ class GatewayClient(LoggingClass):
         if data['s'] and data['s'] > self.seq:
             self.seq = data['s']
 
+        if data['op'] == OPCode.DISPATCH and (self.ignored_events and data['t'] in self.ignored_events or self.subscribed_events and data['t'] not in self.subscribed_events or not self.pre_dispatch(data)):
+            return
         # Emit packet
         self.packets.emit((RECV, data['op']), data)
 
@@ -293,6 +303,9 @@ class GatewayClient(LoggingClass):
     def on_close(self, code=None, reason=None):
         # Make sure we clean up any old data
         self.ws.is_closed = True
+        self.ws = None
+        self.ws_task.kill()
+        self.ws_task = None
         self._buffer = None
 
         # Kill heartbeater, a reconnect/resume will trigger a HELLO which will respawn it
@@ -349,10 +362,10 @@ class GatewayClient(LoggingClass):
         gevent_sleep(wait_time)
 
         # Reconnect
-        self.connect_and_run(self._cached_gateway_url)
+        self.ws_task = gevent_spawn(self.connect_and_run(self._cached_gateway_url))
 
     def run(self):
-        gevent_spawn(self.connect_and_run)
+        self.ws_task = gevent_spawn(self.connect_and_run)
         self.ws_event.wait()
 
     def request_guild_members(self, guild_id, query=None, limit=0, presences=False):

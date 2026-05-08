@@ -275,6 +275,19 @@ class State:
     def on_guild_create(self, event):
         guild = copy(event.guild)
 
+        if guild.id in self.guilds.keys():
+            for channel in self.guilds[guild.id].channels.keys():
+                del self.channels[channel]
+            for thread in self.guilds[guild.id].threads.keys():
+                del self.threads[thread]
+            for emoji in self.guilds[guild.id].emojis.keys():
+                del self.emojis[emoji]
+            for sticker in self.guilds[guild.id].stickers.keys():
+                del self.stickers[sticker]
+            for voice_state in self.guilds[guild.id].voice_states.keys():
+                del self.voice_states[voice_state]
+            del self.guilds[guild.id]
+
         if not self.config.sync_guild_members:
             guild.members = {}
         if not self.config.cache_channels:
