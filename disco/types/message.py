@@ -104,6 +104,7 @@ class MessageActivity(SlottedModel):
         The party id from a Rich Presence event.
     """
     type = Field(enum(MessageActivityType))
+    session_id = Field(text)
     party_id = Field(text)
 
 
@@ -367,7 +368,11 @@ class MessageEmbed(SlottedModel):
 
 
 class MessageAttachmentFlags(BitsetMap):
+    IS_CLIP = 1 << 0
+    IS_THUMBNAIL = 1 << 1
     IS_REMIX = 1 << 2
+    IS_SPOILER = 1 << 3
+    IS_ANIMATED = 1 << 4
 
 
 class MessageAttachmentFlagsValue(BitsetValue):
@@ -397,6 +402,7 @@ class MessageAttachment(SlottedModel):
     """
     id = Field(snowflake)
     filename = Field(text)
+    title = Field(text)
     description = Field(text)
     content_type = Field(text)
     size = Field(int)
@@ -404,10 +410,15 @@ class MessageAttachment(SlottedModel):
     proxy_url = Field(text)
     height = Field(int)
     width = Field(int)
+    placeholder = Field(text)
+    placeholder_version = Field(int)
     ephemeral = Field(bool)
     duration_sec = Field(float)
     waveform = Field(text)
     flags = Field(MessageAttachmentFlagsValue)
+    clip_participants = ListField(User)
+    clip_created_at = Field(datetime)
+    application = Field(Application, create=False)
 
 
 class AllowedMentionsTypes:
