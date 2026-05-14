@@ -102,7 +102,7 @@ class GatewayClient(LoggingClass):
             return self._send(op, data)
 
     def _send(self, op, data):
-        self.log.debug('GatewayClient.send %s', op)
+        self.log.debug(f'GatewayClient.send OP: {op}')
         self.packets.emit((SEND, op), data)
         self.ws.send(self.encoder.encode({
             'op': op,
@@ -286,7 +286,7 @@ class GatewayClient(LoggingClass):
             self.log.info('WS Opened: sending identify payload')
             self.send(OPCode.IDENTIFY, {
                 'token': self.client.config.token,
-                'compress': False,  # json-only, payload compression
+                'compress': self.encoder.TYPE == 'json' and True or False,  # json-only, payload compression
                 'large_threshold': 250,
                 'intents': self.client.config.intents,
                 'shard': [
