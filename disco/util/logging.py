@@ -1,6 +1,6 @@
 import sys
 from logging import WARNING, INFO, DEBUG, ERROR, CRITICAL, NOTSET, captureWarnings as logging_captureWarnings, \
-    basicConfig as logging_basicConfig, getLogger as logging_getLogger, Formatter as logging_Formatter
+    getLogger as logging_getLogger, Formatter as logging_Formatter, StreamHandler as logging_StreamHandler
 from warnings import simplefilter as warnings_simplefilter
 
 
@@ -79,27 +79,41 @@ def _patch_emitter():
 
 
 def setup_logging(**kwargs):
-    kwargs.setdefault('format', LOG_FORMAT)
-    kwargs.setdefault('stream', sys.stdout)
-
     # Setup warnings module correctly
     warnings_simplefilter('always', DeprecationWarning)
     logging_captureWarnings(True)
 
-    # Pass through our basic configuration
-    logging_basicConfig(**kwargs)
+    root = logging_getLogger()
+
+    if not root.handlers:
+        handler = StreamHandler()
+        handler.setFormatter(LoggingFormatter())
+        root.addHandler(handler)
+
+    for key, value in kwargs.items():
+        setattr(root, key, value)
 
     formatter = LoggingFormatter()
-    for handler in logging_getLogger().handlers:
+    for handler in root.handlers:
         handler.setFormatter(formatter)
 
     sys.excepthook = _log_uncaught_exception
     _patch_gevent_spawn()
     _patch_emitter()
 
-    # Override some noisy loggers
+    # Override noisy loggers
     for logger, level in LEVEL_OVERRIDES.items():
         logging_getLogger(logger).setLevel(level)
+
+
+class StreamHandler(logging_StreamHandler):
+    def emit(self, record):
+        if record.levelno >= ERROR:
+            self.stream = sys.stderr
+        else:
+            self.stream = sys.stdout
+
+        super().emit(record)
 
 
 class LoggingFormatter(logging_Formatter):

@@ -498,5 +498,9 @@ class HTTPClient(LoggingClass):
             self.log.warning(f'Request to `{url}` failed with ConnectionTimeout, retrying after {backoff}s')
             gevent_sleep(backoff)
             return self(route, args, retry_number=retry, **kwargs)
+        except Exception as e:
+            if not isinstance(e, APIException):
+                self.log.critical(f'Request to `{url}` failed with {e.__class__.__name__}: {e}')
+            raise e
         finally:
             r and r.close()
