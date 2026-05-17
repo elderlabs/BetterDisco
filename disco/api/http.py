@@ -2,11 +2,12 @@ from gevent import sleep as gevent_sleep
 from math import ceil as math_ceil
 from platform import python_version
 from random import randint as random_randint
-from requests import Session as RequestsSession, __version__ as requests_version, ConnectionError, Timeout, JSONDecodeError
+from requests import Session as RequestsSession, __version__ as requests_version, ConnectionError, Timeout
+from requests.exceptions import JSONDecodeError
 from time import monotonic
 
 from disco import VERSION as disco_version
-from disco.util.logging import LoggingClass
+from disco.util.logging import LoggingClass, find_external_caller
 from disco.api.ratelimit import RateLimiter
 
 
@@ -403,7 +404,7 @@ class HTTPClient(LoggingClass):
 
         # Build the bucket URL
         args = {k: v for k, v in args.items()}
-        filtered = {k: (v if k in ('guild', 'channel', 'webhook') else '') for k, v in args.items()}
+        filtered = {k: (v if k in ('guild', 'channel', 'webhook', 'token') else '') for k, v in args.items()}
         bucket = (route[0], route[1].format(**filtered))
 
         r = None
@@ -412,11 +413,13 @@ class HTTPClient(LoggingClass):
         # Possibly wait if we're rate limited
         response.rate_limited_duration = self.limiter.check(bucket)
 
-        self.log.debug('KW: %s', kwargs)
+        if kwargs:
+            self.log.debug('KW: %s', kwargs)
 
         # Make the actual request
         url = self.http_gateway_url + f'/v{self.gateway_version}' + route[1].format(**args)
-        self.log.info('%s %s %s', route[0], url, '({})'.format(kwargs.get('params')) if kwargs.get('params') else '')
+        _trace = find_external_caller()
+        self.log.info(' '.join(i for i in (route[0], route[1].format(**args), '({})'.format(kwargs.get('params')) if kwargs.get('params') else '', f'\033[1;30m=> {_trace}' if _trace else '') if i))
         try:
             r = self.session.request(route[0], url, **kwargs)
 

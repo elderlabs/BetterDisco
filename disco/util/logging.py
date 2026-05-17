@@ -3,7 +3,6 @@ from logging import WARNING, INFO, DEBUG, ERROR, CRITICAL, NOTSET, captureWarnin
     getLogger as logging_getLogger, Formatter as logging_Formatter, StreamHandler as logging_StreamHandler
 from warnings import simplefilter as warnings_simplefilter
 
-
 LEVEL_OVERRIDES = {
     'requests': INFO,
     'urllib3.connectionpool': INFO
@@ -106,6 +105,17 @@ def setup_logging(**kwargs):
         logging_getLogger(logger).setLevel(level)
 
 
+def find_external_caller():
+    frame = sys._getframe(0)
+    while frame:
+        # Check if the frame's module is different from the current module
+        module_name = frame.f_globals.get('__name__')
+        if module_name and not module_name.startswith('disco.'):
+            return f'{module_name}.{frame.f_code.co_name}()'
+        frame = frame.f_back
+    return None
+
+
 class StreamHandler(logging_StreamHandler):
     def emit(self, record):
         if record.levelno >= ERROR:
@@ -129,7 +139,7 @@ class LoggingFormatter(logging_Formatter):
             ERROR: '[\033[31m',
             CRITICAL: '[\033[33;41m',
         }.get(record.levelno, '[')
-        self._style._fmt = f'{lvl}%(levelname)s\033[0m] %(asctime)s - %(name)s:%(lineno)d - %(message)s'
+        self._style._fmt = f'\033[0m{lvl}%(levelname)s\033[0m] %(asctime)s - %(name)s\033[1;30m:%(lineno)d\033[0m - %(message)s\033[0m'
         return super().format(record)
 
 

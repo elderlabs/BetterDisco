@@ -65,6 +65,7 @@ class APIClient(LoggingClass):
         self.token = token
 
         self._captures = local()
+        self.log.info(f'Disco APIClient initialized - {client.config.http_gateway_url}/v{client.config.gateway_version}')
 
     def __repr__(self):
         return '<Disco APIClient{}>'.format(f' shard_id={self.client.config.shard_id}' if self.client else '')

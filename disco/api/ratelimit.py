@@ -1,6 +1,6 @@
 from gevent import sleep as gevent_sleep, spawn as gevent_spawn
 from gevent.event import Event as GeventEvent
-from requests import JSONDecodeError
+from requests.exceptions import JSONDecodeError
 from time import monotonic
 
 from disco.util.logging import LoggingClass
@@ -189,7 +189,7 @@ class RateLimiter(LoggingClass):
 
     def update(self, route, response):
         """
-        Updates the given routes state with the rate-limit headers inside the
+        Updates the given route's state with the rate-limit headers inside the
         response from a previous call to the route.
 
         Parameters
