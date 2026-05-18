@@ -113,6 +113,12 @@ class RoleTags(SlottedModel):
     guild_connections = Field(bool)  # null = True
 
 
+class RoleColors(SlottedModel):
+    primary_color = Field(text)
+    secondary_color = Field(text)
+    tertiary_color = Field(text)
+
+
 class Role(SlottedModel):
     """
     A role object.
@@ -146,6 +152,7 @@ class Role(SlottedModel):
     hoist = Field(bool)
     managed = Field(bool)
     color = Field(int)
+    colors = Field
     permissions = Field(PermissionValue)
     position = Field(int)
     mentionable = Field(bool)
@@ -154,6 +161,7 @@ class Role(SlottedModel):
     unicode_emoji = Field(text)
     icon = Field(text)
     flags = Field(RoleFlagsValue)
+    description = Field(text)
 
     def __repr__(self):
         return f'<Role id={self.id} name={self.name}>'
@@ -555,6 +563,7 @@ class IncidentsData(SlottedModel):
     dms_disabled_until = Field(datetime)
     dm_spam_detected_at = Field(datetime)
     raid_detected_at = Field(datetime)
+    lockdown_duration_hours = Field(datetime)
 
 
 class Guild(SlottedModel, Permissible):
@@ -640,10 +649,11 @@ class Guild(SlottedModel, Permissible):
     widget_enabled = Field(bool)
     widget_channel_id = Field(snowflake)
     verification_level = Field(enum(VerificationLevel))
+    verification_role_id = Field(snowflake)
     default_message_notifications = Field(enum(DefaultMessageNotificationsLevel))
     explicit_content_filter = Field(enum(ExplicitContentFilterLevel))
-    roles = AutoDictField(Role, 'id')
-    emojis = AutoDictField(GuildEmoji, 'id')
+    roles = AutoDictField(Role, 'id', default={})
+    emojis = AutoDictField(GuildEmoji, 'id', default={})
     features = ListField(str)
     mfa_level = Field(enum(MFALevel))
     application_id = Field(snowflake)
@@ -665,30 +675,35 @@ class Guild(SlottedModel, Permissible):
     approximate_presence_count = Field(int)
     welcome_screen = Field(WelcomeScreen)
     nsfw_level = Field(enum(GuildNSFWLevel))
-    stickers = AutoDictField(Sticker, 'id')
+    stickers = AutoDictField(Sticker, 'id', default={})
     premium_progress_bar_enabled = Field(bool)
+    premium_progress_bar_enabled_user_updated_at = Field(datetime)
     safety_alerts_channel_id = Field(snowflake)
     joined_at = Field(datetime)
     large = Field(bool)
     unavailable = Field(bool, default=False)
     member_count = Field(int)
-    voice_states = AutoDictField(GuildVoiceState, 'session_id')
-    members = AutoDictField(GuildMember, 'id')
-    channels = AutoDictField(Channel, 'id')
-    threads = AutoDictField(Thread, 'id')
+    voice_states = AutoDictField(GuildVoiceState, 'session_id', default={})
+    members = AutoDictField(GuildMember, 'id', default={})
+    channels = AutoDictField(Channel, 'id', default={})
+    threads = AutoDictField(Thread, 'id', default={})
     # presences = AutoDictField(Presence, 'status')
-    stage_instances = AutoDictField(StageInstance, 'id')
+    stage_instances = AutoDictField(StageInstance, 'id', default={})
     latest_onboarding_question_id = Field(snowflake)
     lazy = Field(bool)
-    guild_scheduled_events = AutoDictField(GuildScheduledEvent, 'id')
+    guild_scheduled_events = AutoDictField(GuildScheduledEvent, 'id', default={})
     # embedded_activities = ListField(None)
     home_header = Field(text)
     hub_type = Field(text)
     # application_command_counts = Field(None)
-    soundboard_sounds = AutoDictField(GuildSoundboardSound, 'sound_id')
+    soundboard_sounds = AutoDictField(GuildSoundboardSound, 'sound_id', default={})
     inventory_settings = Field(InventorySettings)
     incidents_data = Field(IncidentsData)
     version = Field(int)
+    official_message_color = Field(text)
+    owner_configured_content_level = Field(int)
+    premium_features = Field(dict)
+    # region = Field(text)
 
     def __init__(self, *args, **kwargs):
         super(Guild, self).__init__(*args, **kwargs)
@@ -1049,6 +1064,8 @@ class AuditLogActionTypes:
     ONBOARDING_PROMPT_DELETE = 165
     ONBOARDING_CREATE = 166
     ONBOARDING_UPDATE = 167
+    GUILD_HOME_FEATURE_ITEM = 171
+    GUILD_HOME_REMOVE_ITEM = 172
     HOME_SETTINGS_CREATE = 190
     HOME_SETTINGS_UPDATE = 191
     VOICE_CHANNEL_STATUS_CREATE = 192
@@ -1059,6 +1076,7 @@ class AuditLogActionTypes:
     GUILD_MEMBER_VERIFICATION_UPDATE = 210
     GUILD_PROFILE_UPDATE = 211
     GUILD_MIGRATE_PIN_PERMISSION = 212
+    BYPASS_SLOWMODE_PERMISSION_MIGRATION_COMPLETE = 213
 
 
 GUILD_ACTIONS = (

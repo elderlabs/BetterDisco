@@ -4,6 +4,7 @@ from gevent.event import Event
 from weakref import WeakValueDictionary
 
 from disco.types.channel import Thread, Channel
+# from disco.types.guild import Guild
 from disco.util.config import Config
 from disco.util.string import underscore
 from disco.util.hashmap import HashMap, DefaultHashMap
@@ -110,6 +111,7 @@ class State:
 
         self.ready = Event()
         self.guilds_awaiting_sync = []
+        self.ignored_guild_attrs = []
 
         self.me = None
         self.guilds = HashMap()
@@ -123,7 +125,6 @@ class State:
         self.voice_clients = HashMap(WeakValueDictionary())
         self.voice_states = HashMap(WeakValueDictionary())
 
-        # If message tracking is enabled, listen to those events
         if self.config.track_messages:
             self.messages = DefaultHashMap(lambda: deque(maxlen=self.config.track_messages_size))
             self.EVENTS += ['MessageDelete', 'MessageDeleteBulk',]
@@ -133,33 +134,53 @@ class State:
 
         if self.config.sync_guild_members:
             self.EVENTS += ['GuildMemberAdd', 'GuildMemberRemove', 'GuildMembersChunk', 'GuildMemberUpdate', 'PresenceUpdate',]
+        else:
+            self.ignored_guild_attrs += ['members', 'presences']
 
         if self.config.cache_channels or self.config.cache_dm_channels:
             self.EVENTS += ['ChannelCreate', 'ChannelDelete', 'ChannelTopicUpdate', 'ChannelUpdate', 'VoiceChannelStatusUpdate',]
+        elif not self.config.cache_channels:
+            self.ignored_guild_attrs.append('channels')
 
         if self.config.cache_threads:
             self.EVENTS += ['ThreadCreate', 'ThreadDelete', 'ThreadListSync', 'ThreadUpdate',]
+        else:
+            self.ignored_guild_attrs.append('threads')
 
         if self.config.cache_roles:
             self.EVENTS += ['GuildRoleCreate', 'GuildRoleDelete', 'GuildRoleUpdate',]
+        else:
+            self.ignored_guild_attrs.append('roles')
 
         if self.config.cache_voice_states:
             self.EVENTS += ['VoiceStateUpdate',]
+        else:
+            self.ignored_guild_attrs.append('voice_states')
 
         if self.config.cache_emojis:
             self.EVENTS += ['GuildEmojisUpdate',]
+        else:
+            self.ignored_guild_attrs.append('emojis')
 
         if self.config.cache_stickers:
             self.EVENTS += ['GuildStickersUpdate',]
+        else:
+            self.ignored_guild_attrs.append('stickers')
 
         if self.config.cache_soundboard:
             self.EVENTS += ['GuildSoundboardSoundCreate', 'GuildSoundboardSoundDelete', 'GuildSoundboardSoundUpdate',]
+        else:
+            self.ignored_guild_attrs.append('soundboard_sounds')
 
         if self.config.cache_scheduled_events:
             self.EVENTS += ['GuildScheduledEventCreate', 'GuildScheduledEventDelete', 'GuildScheduledEventUpdate',]
+        else:
+            self.ignored_guild_attrs.append('guild_scheduled_events')
 
         if self.config.cache_stage_instances:
             self.EVENTS += ['StageInstanceCreate', 'StageInstanceDelete', 'StageInstanceUpdate',]
+        else:
+            self.ignored_guild_attrs.append('stage_instances')
 
         # The bound listener objects
         self.listeners = []
@@ -172,7 +193,8 @@ class State:
         """
         Unbinds all bound event listeners for this state object.
         """
-        map(lambda k: k.unbind(), self.listeners)
+        for listener in self.listeners:
+            listener.unbind()
         self.listeners = []
 
     def bind(self):
@@ -192,6 +214,18 @@ class State:
                 StackMessage(message.id, message.channel_id, message.author.id))
 
     def on_ready(self, event):
+        self.guilds.clear()
+        self.channels.clear()
+        self.commands.clear()
+        self.dms.clear()
+        self.emojis.clear()
+        self.stickers.clear()
+        self.threads.clear()
+        self.users.clear()
+        self.voice_states.clear()
+        if hasattr(self, 'messages'):
+            self.messages.clear()
+
         self.me = event.user
         self.guilds_awaiting_sync = [i.id for i in event.guilds]
         self.ready.clear()
@@ -273,48 +307,17 @@ class State:
                 self.dms[event.channel.id] = event.channel
 
     def on_guild_create(self, event):
+        # self.guilds[event.guild.id] = Guild.create(self.client, {k: v for k, v in event.raw_data['guild'].items() if k not in self.ignored_guild_attrs})
+
         guild = copy(event.guild)
-
-        if guild.id in self.guilds.keys():
-            for channel in self.guilds[guild.id].channels.keys():
-                del self.channels[channel]
-            for thread in self.guilds[guild.id].threads.keys():
-                del self.threads[thread]
-            for emoji in self.guilds[guild.id].emojis.keys():
-                del self.emojis[emoji]
-            for sticker in self.guilds[guild.id].stickers.keys():
-                del self.stickers[sticker]
-            for voice_state in self.guilds[guild.id].voice_states.keys():
-                del self.voice_states[voice_state]
-            del self.guilds[guild.id]
-
-        if not self.config.sync_guild_members:
-            guild.members = {}
-        if not self.config.cache_channels:
-            guild.channels = {}
-        if not self.config.cache_threads:
-            guild.threads = {}
-        if not self.config.cache_roles:
-            guild.roles = {}
-        if not self.config.cache_emojis:
-            guild.emojis = {}
-        if not self.config.cache_stickers:
-            guild.stickers = {}
-        if not self.config.cache_voice_states:
-            guild.voice_states = {}
-        if not self.config.cache_soundboard:
-            guild.soundboard_sounds = {}
-        if not self.config.cache_scheduled_events and hasattr(guild, 'scheduled_events'):
-            guild.scheduled_events = {}
-        if not self.config.cache_stage_instances:
-            guild.stage_instances = {}
-
+        for i in self.ignored_guild_attrs:
+            setattr(guild, i, {})
         self.guilds[event.guild.id] = guild
 
-        self.channels.update(guild.channels)
-        self.threads.update(guild.threads)
-        self.emojis.update(guild.emojis)
-        self.stickers.update(guild.stickers)
+        self.channels.update(self.guilds[event.guild.id].channels)
+        self.threads.update(self.guilds[event.guild.id].threads)
+        self.emojis.update(self.guilds[event.guild.id].emojis)
+        self.stickers.update(self.guilds[event.guild.id].stickers)
 
         if self.config.cache_voice_states:
             for voice_state in event.guild.voice_states.values():
@@ -350,6 +353,7 @@ class State:
 
     def on_guild_update(self, event):
         ignored = ['channels', 'emojis', 'members', 'stickers', 'threads', 'voice_states', 'presences']
+        ignored += [i for i in self.ignored_guild_attrs if i not in ignored]
         if not hasattr(event.guild, 'widget_enabled'):
             ignored.append('widget_enabled')
         self.guilds[event.guild.id].inplace_update(event.guild, ignored=ignored)

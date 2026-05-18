@@ -303,10 +303,21 @@ class GatewayClient(LoggingClass):
     def on_close(self, code=None, reason=None):
         # Make sure we clean up any old data
         self.ws.is_closed = True
+
+        for handlers in self.ws.emitter.event_handlers.values():
+            handlers.clear()
+        self.ws.emitter = None
+
+        for attr in ('on_close', 'on_cont_message', 'on_data', 'on_error', 'on_message', 'on_open', 'on_ping', 'on_pong', 'on_reconnect'):
+            setattr(self.ws, attr, None)
+
+        self.ws.sock = None
         self.ws = None
         self.ws_task.kill()
         self.ws_task = None
         self._buffer = None
+        self._zlib = None
+        self._zstd = None
 
         # Kill heartbeater, a reconnect/resume will trigger a HELLO which will respawn it
         if self._heartbeat_task:
