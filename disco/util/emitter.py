@@ -1,7 +1,8 @@
 from collections import defaultdict
 from gevent import spawn as gevent_spawn
 from gevent.event import AsyncResult as GeventAsyncResult
-from gevent.queue import Queue as GeventQueue, Full as GeventFull
+from gevent.pool import Pool as GeventPool
+from gevent.queue import Queue as GeventQueue
 
 from disco.util.logging import LoggingClass
 
@@ -11,22 +12,25 @@ class Priority:
     #  the given emitter instance will be dispatched _sequentially_ to all BEFORE
     #  handlers. Until these before handlers complete execution, no other event
     #  will be allowed to continue. Any exceptions raised will be ignored.
-    BEFORE = 1
+    BEFORE = 10000
+
+    # STATE should be used for updating state objects alone. Never anything else.
+    STATE = 20000
 
     # AFTER has the same behavior as before with regard to dispatching events,
     #  with the one difference being it executes after all the BEFORE listeners.
-    AFTER = 2
+    AFTER = 30000
 
     # SEQUENTIAL guarantees that all events your handler receives will be ordered
     #  when looked at in isolation. SEQUENTIAL handlers will not block other handlers,
     #  but do use a queue internally and thus can fall behind.
-    SEQUENTIAL = 3
+    SEQUENTIAL = 40000
 
     # NONE provides no guarantees around the ordering or execution of events, sans
     #  that BEFORE handlers will always complete before any NONE handlers are called.
-    NONE = 4
+    NONE = 50000
 
-    ALL = {BEFORE, AFTER, SEQUENTIAL, NONE}
+    ALL = {BEFORE, STATE, AFTER, SEQUENTIAL, NONE}
 
 
 class Event:
@@ -38,6 +42,12 @@ class Event:
         if hasattr(self.data, name):
             return getattr(self.data, name)
         raise AttributeError
+
+    def clone(self):
+        new = object.__new__(self.__class__)
+        new.parent = self.parent
+        new.data = self.data
+        return new
 
 
 class EmitterSubscription:
@@ -62,14 +72,14 @@ class EmitterSubscription:
 
         if self._queue_greenlet:
             self._queue_greenlet.kill()
+            self._queue_greenlet = None
 
     def __call__(self, *args, **kwargs):
         if self._queue is not None:
             try:
                 self._queue.put_nowait((args, kwargs))
-            except GeventFull:
-                # TODO: warning
-                pass
+            except Exception as e:  # specifically `GeventFull`
+                raise e
             return
 
         if callable(self.conditional):
@@ -84,15 +94,33 @@ class EmitterSubscription:
             args, kwargs = self._queue.get()
             try:
                 self.callback(*args, **kwargs)
-            except Exception:
-                # TODO: warning
-                pass
+            except Exception as e:
+                raise e
 
     def attach(self, emitter):
         self._emitter = emitter
 
         for event in self.events:
-            self._emitter.event_handlers[self.priority][event].append(self)
+            base = self.priority
+
+            # Start AFTER the base (base is never used)
+            if base in Priority.ALL:
+                emitter._priority_offsets[base] += 1
+                candidate = base + emitter._priority_offsets[base]
+            else:
+                candidate = base
+
+            # Ensure global uniqueness (shift forward)
+            while candidate in emitter._used_priorities:
+                candidate += 1
+
+            emitter._used_priorities.add(candidate)
+            emitter.event_handlers[candidate][event] = self
+
+            if not hasattr(self, '_resolved_priorities'):
+                self._resolved_priorities = {}
+
+            self._resolved_priorities[event] = candidate
 
         return self
 
@@ -100,8 +128,16 @@ class EmitterSubscription:
         emitter = emitter or self._emitter
 
         for event in self.events:
-            if self in emitter.event_handlers[self.priority][event]:
-                emitter.event_handlers[self.priority][event].remove(self)
+            priority = self._resolved_priorities.get(event, self.priority)
+
+            if priority in emitter.event_handlers:
+                if event in emitter.event_handlers[priority]:
+                    del emitter.event_handlers[priority][event]
+
+                if not emitter.event_handlers[priority]:
+                    del emitter.event_handlers[priority]
+
+                emitter._used_priorities.discard(priority)
 
     def remove(self, emitter=None):
         self.detach(emitter)
@@ -109,58 +145,34 @@ class EmitterSubscription:
 
 class Emitter(LoggingClass):
     def __init__(self):
-        self.event_handlers = {
-            k: defaultdict(list) for k in Priority.ALL
-        }
+        self.event_handlers = defaultdict(dict)
+        self._used_priorities = set()
+        self._priority_offsets = defaultdict(int)
+        self.pool = GeventPool()
 
     def emit(self, name, *args, **kwargs):
-        # First execute all BEFORE handlers sequentially
-        for listener in self.event_handlers[Priority.BEFORE].get(name, []):
-            try:
-                listener(*args, **kwargs)
-            except Exception as e:
-                raise Exception('BEFORE {} event handler `{}` raised {}: {}'.format(
-                    name,
-                    hasattr(listener.callback, '__name__') and listener.callback.__name__ or listener.callback.func.__name__,
-                    e.__class__.__name__,
-                    e,
-                )) from e
+        for priority in sorted(self.event_handlers.keys()):
+            listener = self.event_handlers[priority].get(name)
 
-        # Next execute all AFTER handlers sequentially
-        for listener in self.event_handlers[Priority.AFTER].get(name, []):
-            try:
-                listener(*args, **kwargs)
-            except Exception as e:
-                if not e.__class__.__name__ == 'WebSocketConnectionClosedException':
-                    raise Exception('AFTER {} event handler `{}` raised {}: {}'.format(
-                        name,
-                        hasattr(listener.callback, '__name__') and listener.callback.__name__ or listener.callback.func.__name__,
-                        e.__class__.__name__,
-                        e,
-                    )) from e
+            if not listener:
+                continue
 
-        # Next enqueue all sequential handlers. This just puts stuff into a queue
-        #  without blocking, so we don't have to worry too much
-        for listener in self.event_handlers[Priority.SEQUENTIAL].get(name, []):
             try:
-                # TODO: find an error catch for this, will die silently on-error
-                listener(*args, **kwargs)
-            except Exception as e:
-                raise Exception('SEQUENTIAL {} event handler `{}` raised: {}'.format(
-                    name,
-                    hasattr(listener.callback, '__name__') and listener.callback.__name__ or listener.callback.func.__name__,
-                    e.__class__.__name__,
-                    e,
-                )) from e
+                copied_args = tuple(
+                    arg.clone() if isinstance(arg, Event) else arg
+                    for arg in args
+                )
 
-        # Finally just spawn for everything else
-        for listener in self.event_handlers[Priority.NONE].get(name, []):
-            try:
-                gevent_spawn(listener, *args, **kwargs)
+                if priority == Priority.STATE:
+                    self.pool.spawn(listener, *copied_args, **kwargs)
+                elif priority < Priority.NONE:
+                    listener(*copied_args, **kwargs)
+                else:
+                    gevent_spawn(listener, *copied_args, **kwargs)
             except Exception as e:
                 raise Exception('{} event handler `{}` raised {}: {}'.format(
                     name,
-                    listener.callback.__name__,
+                    getattr(listener.callback, '__name__', repr(listener.callback)),
                     e.__class__.__name__,
                     e,
                 )) from e

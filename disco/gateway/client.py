@@ -120,7 +120,7 @@ class GatewayClient(LoggingClass):
                 return
             self._last_heartbeat = time()
 
-            self._send(OPCode.HEARTBEAT, self.seq)
+            self.handle_heartbeat()
             self._heartbeat_acknowledged = False
             gevent_sleep(interval / 1000)
 
@@ -142,8 +142,13 @@ class GatewayClient(LoggingClass):
         if self.replaying:
             self.replayed_events += 1
 
-    def handle_heartbeat(self, _):
-        self._send(OPCode.HEARTBEAT, self.seq)
+    def handle_heartbeat(self, _=None):
+        try:
+            self._send(OPCode.HEARTBEAT, self.seq)
+        except WebSocketConnectionClosedException:
+            pass
+        except Exception as e:
+            raise e
 
     def handle_heartbeat_acknowledge(self, _):
         self.log.debug('Received HEARTBEAT_ACK')
@@ -246,7 +251,7 @@ class GatewayClient(LoggingClass):
         if data['s'] and data['s'] > self.seq:
             self.seq = data['s']
 
-        if data['op'] == OPCode.DISPATCH and (self.ignored_events and data['t'] in self.ignored_events or self.subscribed_events and data['t'] not in self.subscribed_events or not self.pre_dispatch(data)):
+        if data['op'] in (OPCode.DISPATCH, OPCode.VOICE_STATE_UPDATE) and ((self.ignored_events and data['t'] in self.ignored_events) or (self.subscribed_events and data['t'] not in self.subscribed_events) or not self.pre_dispatch(data)):
             return
         # Emit packet
         self.packets.emit((RECV, data['op']), data)
@@ -304,7 +309,7 @@ class GatewayClient(LoggingClass):
         # Make sure we clean up any old data
         self.ws.is_closed = True
 
-        for handlers in self.ws.emitter.event_handlers.values():
+        for handlers in tuple(self.ws.emitter.event_handlers.values()):
             handlers.clear()
         self.ws.emitter = None
 
