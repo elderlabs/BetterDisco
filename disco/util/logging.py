@@ -111,7 +111,7 @@ def find_external_caller():
         # Check if the frame's module is different from the current module
         module_name = frame.f_globals.get('__name__')
         if module_name and not module_name.startswith('disco.'):
-            return f'{module_name}.{frame.f_code.co_name}()'
+            return f'{module_name}.{frame.f_code.co_name}'
         frame = frame.f_back
     return None
 

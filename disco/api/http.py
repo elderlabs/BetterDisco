@@ -419,7 +419,7 @@ class HTTPClient(LoggingClass):
         # Make the actual request
         url = self.http_gateway_url + f'/v{self.gateway_version}' + route[1].format(**args)
         _trace = find_external_caller()
-        self.log.info(' '.join(i for i in (route[0], route[1].format(**args), '({})'.format(kwargs.get('params')) if kwargs.get('params') else '', f'\033[1;30m=> {_trace}' if _trace else '') if i))
+        self.log.info(' '.join(i for i in (route[0], route[1].format(**args), kwargs.get('params') or '', f'\033[1;30m=> {_trace}' if _trace else '') if i))
         try:
             r = self.session.request(route[0], url, **kwargs)
 
