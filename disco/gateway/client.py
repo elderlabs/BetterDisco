@@ -264,9 +264,11 @@ class GatewayClient(LoggingClass):
         if isinstance(error, WebSocketTimeoutException):
             return self.log.error('Websocket connection has timed out. An upstream connection issue is likely present.')
         if not isinstance(error, WebSocketConnectionClosedException):
-            return self.log.error(f'WS received error: {error}')
+            if 'Handshake status 503 Service Unavailable' in str(error):
+                self.resuming = False  # things are NOT fine... 🔥
+            return self.log.error(f'WS received error: {error.__class__.__name__} - {error}')
         else:
-            return self.log.warning(f'WS received error: {error}')
+            return self.log.warning(f'WS received error: {error.__class__.__name__} - {error}')
 
     def on_open(self):
         self.ws.is_closed = False
@@ -318,7 +320,8 @@ class GatewayClient(LoggingClass):
 
         self.ws.sock = None
         self.ws = None
-        self.ws_task.kill()
+        if self.ws_task:
+            self.ws_task.kill()
         self.ws_task = None
         self._buffer = None
         self._zlib = None
@@ -338,6 +341,12 @@ class GatewayClient(LoggingClass):
         self.replaying = False
         self._heartbeat_acknowledged = True
 
+        # best to abandon resume attempts at this point as our session is likely dead or poisoned
+        if self.reconnects >= 2:
+            self._cached_gateway_url = None
+            self.session_id = None
+            self.resuming = False
+
         # Track reconnect attempts
         if reason:
             self.last_conn_state = reason
@@ -352,7 +361,7 @@ class GatewayClient(LoggingClass):
             for vc in self.client.state.voice_clients.values():
                 vc._safe_reconnect_state = True
         # Don't resume for these error codes
-        if code and (4000 < code <= 4010 or code in (1000, 1001)) or (not code and not self.resuming):
+        if code and (4000 < code <= 4010 or code in (503, 1000, 1001)) or (not code and not self.resuming):
             self.session_id = None
         # 4004 and all codes above 4009 are not resumable
         if code and (code == 4004 or code >= 4010):
