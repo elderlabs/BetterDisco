@@ -450,7 +450,7 @@ class HTTPClient(LoggingClass):
             # If we got a success status code, just return the data
             if r.status_code < 400:
                 return r
-            elif r.status_code != 429 and 400 <= r.status_code < 500 and r.status_code != 408:
+            elif r.status_code not in [408, 429] and 400 <= r.status_code < 500:
                 try:
                     err = r.json()
                 except JSONDecodeError:
@@ -461,22 +461,18 @@ class HTTPClient(LoggingClass):
                     self.log.warning(f'Request failed with status code {r.status_code}: {str(r.content, "utf=8")}')
                 response.exception = APIException(r)
                 raise response.exception
-            elif r.status_code in [429, 500, 502, 503]:
+            elif r.status_code in [408, 429, 500, 502, 503] or not r.status_code:
                 retry += 1
                 if retry > self.MAX_RETRIES:
                     self.log.error('Failing request, hit max retries')
                     raise APIException(r, retries=self.MAX_RETRIES)
 
                 backoff = random_backoff()
-                if r.status_code in [500, 502, 503]:
-                    self.log.warning('Request to `{}` failed with code {}, retrying after {}s'.format(
-                        url, r.status_code, backoff,
-                    ))
+                if r.status_code in [408, 500, 502, 503]:
+                    self.log.warning(f'Request to `{url}` failed with code {r.status_code}, retrying after {backoff}s')
                 elif r.status_code == 429:
                     if 'retry_after' in r.json():
-                        self.log.warning('Request to `{}` failed with code {}, retrying after {}s'.format(
-                            url, r.status_code, r.json()["retry_after"],
-                        ))
+                        self.log.warning(f'Request to `{url}` failed with code {r.status_code}, retrying after {r.json()["retry_after"]}s')
                         backoff = math_ceil(r.json()["retry_after"])
                     else:
                         self.log.error(f'Request to `{url}` cancelled, no `retry_after` provided by API (Cloudflare rate-limited?)')
@@ -485,20 +481,16 @@ class HTTPClient(LoggingClass):
                             return sys_exit(1)
                         return
                 else:
-                    self.log.warning('Request to `{}` failed with code {}, retrying after {}s ({})'.format(
-                        url, r.status_code, backoff, str(r.content, "utf=8"),
+                    self.log.warning('Request to `{}` failed{}, retrying after {}s ({})'.format(
+                        url, f' with code {r.status_code}' if r.status_code else '', backoff, str(r.content, "utf=8")
                     ))
                 gevent_sleep(backoff)
 
                 return self(route, args, retry_number=retry, **kwargs)
-        except ConnectionError:
+            return r.raise_for_status()
+        except (ConnectionError, Timeout) as e:
             backoff = random_backoff()
-            self.log.warning('Request to `{}` failed with ConnectionError, retrying after {}s'.format(url, backoff))
-            gevent_sleep(backoff)
-            return self(route, args, retry_number=retry, **kwargs)
-        except Timeout:
-            backoff = random_backoff()
-            self.log.warning(f'Request to `{url}` failed with ConnectionTimeout, retrying after {backoff}s')
+            self.log.warning(f'Request to `{url}` failed with {e.__class__.__name__}, retrying after {backoff}s')
             gevent_sleep(backoff)
             return self(route, args, retry_number=retry, **kwargs)
         except Exception as e:

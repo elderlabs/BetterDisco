@@ -341,6 +341,7 @@ class UDPVoiceClient(LoggingClass):
     def disconnect(self):
         if self._run_task:
             self._run_task.kill()
+            self._run_task = None
         return
 
     def connect(self, host, port, timeout=10, addrinfo=None):

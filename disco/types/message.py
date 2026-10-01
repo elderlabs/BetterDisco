@@ -721,7 +721,8 @@ class _Message(SlottedModel):
                 return self.client.state.channels.get(self.channel_id)
         elif self.channel_id in self.client.state.dms:
             return self.client.state.dms[self.channel_id]
-        return self.client.api.channels_get(self.channel_id)
+        # return self.client.api.channels_get(self.channel_id)
+        return self.client.state._get_channel(self, self.channel_id)
 
     @cached_property
     def thread(self):

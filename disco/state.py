@@ -1,5 +1,6 @@
 from collections import deque, namedtuple
 from copy import copy
+from gevent import sleep
 from gevent.event import Event
 from weakref import WeakValueDictionary
 
@@ -112,6 +113,7 @@ class State:
         self.ready = Event()
         self.guilds_awaiting_sync = []
         self.ignored_guild_attrs = []
+        self._channel_queue = {}
 
         self.me = None
         self.guilds = HashMap()
@@ -249,15 +251,16 @@ class State:
         # in the event we gain access to a thread or channel suddenly...
         if self.config.cache_channels and event.message.channel_id not in self.channels and event.message.channel_id not in self.threads:
             channel = event.message.channel
-            if self.config.cache_threads and isinstance(channel, Thread):
-                self.threads[event.message.channel_id] = channel
-                self.guilds[event.message.guild_id].threads[event.message.channel_id] = channel
-            elif isinstance(channel, Channel):
-                if self.config.cache_dm_channels and channel.is_dm and event.message.channel_id not in self.dms:
-                    self.dms[event.message.channel_id] = channel
-                elif self.config.cache_channels and not channel.is_dm:
-                    self.channels[event.message.channel_id] = channel
-                    self.guilds[event.message.guild_id].channels[event.message.channel_id] = channel
+            if 'CHANNEL_OBFUSCATED' not in tuple(channel.flags):
+                if self.config.cache_threads and isinstance(channel, Thread):
+                    self.threads[event.message.channel_id] = channel
+                    self.guilds[event.message.guild_id].threads[event.message.channel_id] = channel
+                elif isinstance(channel, Channel):
+                    if self.config.cache_dm_channels and channel.is_dm and event.message.channel_id not in self.dms:
+                        self.dms[event.message.channel_id] = channel
+                    elif self.config.cache_channels and not channel.is_dm:
+                        self.channels[event.message.channel_id] = channel
+                        self.guilds[event.message.guild_id].channels[event.message.channel_id] = channel
 
         if event.message.channel_id in self.channels:
             self.channels[event.message.channel_id].last_message_id = event.message.id
@@ -296,7 +299,7 @@ class State:
         if self.config.sync_guild_members and event.guild and event.guild.id in self.guilds:
             if event.interaction.member.id not in self.guilds[event.guild.id].members:
                 self.guilds[event.guild.id].members = event.interaction.member.id
-        if event.channel:
+        if event.channel and 'CHANNEL_OBFUSCATED' not in tuple(event.channel.flags):
             if self.config.cache_threads and event.channel.is_thread and event.channel.id not in self.threads:
                 self.threads[event.channel.id] = event.channel
                 self.guilds[event.guild.id].threads[event.channel.id] = event.channel
@@ -314,8 +317,8 @@ class State:
             setattr(guild, i, {})
         self.guilds[event.guild.id] = guild
 
-        self.channels.update(self.guilds[event.guild.id].channels)
-        self.threads.update(self.guilds[event.guild.id].threads)
+        self.channels.update((k, v) for k, v in self.guilds[event.guild.id].channels.items() if 'CHANNEL_OBFUSCATED' not in tuple(v.flags))
+        self.threads.update((k, v) for k, v in self.guilds[event.guild.id].threads.items() if 'CHANNEL_OBFUSCATED' not in tuple(v.flags))
         self.emojis.update(self.guilds[event.guild.id].emojis)
         self.stickers.update(self.guilds[event.guild.id].stickers)
 
@@ -396,7 +399,7 @@ class State:
                 del self.voice_states[vstate]
 
     def on_channel_create(self, event):
-        if self.config.cache_channels and event.channel.is_guild and event.channel.guild_id in self.guilds:
+        if self.config.cache_channels and event.channel.is_guild and event.channel.guild_id in self.guilds and 'CHANNEL_OBFUSCATED' not in tuple(event.channel.flags):
             self.guilds[event.channel.guild_id].channels[event.channel.id] = event.channel
             self.channels[event.channel.id] = event.channel
 
@@ -513,7 +516,7 @@ class State:
             return
 
         # Avoid adding duplicate events to member_count.
-        if event.member.user.id not in self.guilds[event.guild_id].members:
+        if event.member.user.id not in self.guilds[event.guild_id].members and self.guilds[event.guild_id].member_count:
             self.guilds[event.guild_id].member_count += 1
 
         if self.config.sync_guild_members:
@@ -539,7 +542,9 @@ class State:
         if event.guild_id not in self.guilds:
             return
 
-        self.guilds[event.guild_id].member_count -= 1
+        if self.guilds[event.guild_id].member_count:
+            self.guilds[event.guild_id].member_count -= 1
+
         if self.config.sync_guild_members and event.user.id in self.guilds[event.guild_id].members:
             del self.guilds[event.guild_id].members[event.user.id]
 
@@ -661,17 +666,21 @@ class State:
 
     def on_channel_topic_update(self, event):
         if self.config.cache_channels:
-            if event.guild_id in self.guilds:
-                self.guilds[event.guild_id].channels[event.id].topic = event.topic
             if event.id in self.channels:
                 self.channels[event.id].topic = event.topic
+            else:
+                return
+            if event.guild_id in self.guilds:
+                self.guilds[event.guild_id].channels[event.id].topic = event.topic
 
     def on_voice_channel_status_update(self, event):
         if self.config.cache_channels:
-            if event.guild_id in self.guilds:
-                self.guilds[event.guild_id].channels[event.id].status = event.status
             if event.id in self.channels:
                 self.channels[event.id].status = event.status
+            else:
+                return
+            if event.guild_id in self.guilds:
+                self.guilds[event.guild_id].channels[event.id].status = event.status
 
     def on_guild_soundboard_sound_create(self, event):
         if self.config.cache_soundboard and event.guild_id in self.guilds:
@@ -689,3 +698,30 @@ class State:
         if self.config.cache_soundboard and event.guild_id in self.guilds:
             for sound in event.soundboard_sounds:
                 self.guilds[event.guild_id].soundboard_sounds[sound.sound_id] = sound
+
+    def _get_channel(self, event, channel_id):
+        """
+        This monstrosity should buffer API queries for uncached channels briefly while we await a reply from the API,
+        instead of making x > 1 calls for the same information when we suddenly see multiple messages before the API
+        can realistically respond, typically seen during spam events.
+        """
+        if channel_id in self._channel_queue.keys():
+            loop_count = 0
+            self._channel_queue[channel_id]['queries'].append(event.id)
+
+            while channel_id in self._channel_queue.keys() and not self._channel_queue[channel_id]['channel']:
+                loop_count += 1
+                sleep(max(self.client.gw.latency / 1000, 0.1))
+                if loop_count >= 100:
+                    self._channel_queue[channel_id]['queries'].remove(event.id)
+                    raise Exception  # TODO
+
+        if channel_id not in self._channel_queue.keys():
+            self._channel_queue[channel_id] = {'channel': None, 'queries': [event.id]}
+            self._channel_queue[channel_id]['channel'] = self.client.api.channels_get(channel_id)
+
+        channel = self._channel_queue[channel_id]['channel']
+        self._channel_queue[channel_id]['queries'].remove(event.id)
+        if not len(self._channel_queue[channel_id]['queries']):
+            del self._channel_queue[channel_id]
+        return channel

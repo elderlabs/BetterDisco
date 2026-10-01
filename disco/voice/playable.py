@@ -110,8 +110,9 @@ class YoutubeDLInput(FFmpegInput):
     def __init__(self, url=None, ie_info=None, *args, **kwargs):
         try:
             from yt_dlp import YoutubeDL
+            from yt_dlp.networking.impersonate import ImpersonateTarget
             from yt_dlp.utils import DownloadError
-            self.ytdl = YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'default_search': 'ytsearch'})
+            self.ytdl = YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'default_search': 'ytsearch', 'impersonate': ImpersonateTarget.from_str('chrome')})
         except ImportError:
             self.ytdl = None
         super(YoutubeDLInput, self).__init__(None, *args, **kwargs)

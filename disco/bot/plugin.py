@@ -93,7 +93,7 @@ class BasePluginDeco:
     @classmethod
     def listen_packet(cls, *args, **kwargs):
         """
-        Binds the function to listen for a given gateway op code.
+        Binds the function to listen for a given gateway opcode.
         """
         return cls.add_meta_deco({
             'type': 'listener',
@@ -468,12 +468,14 @@ class Plugin(LoggingClass, PluginDeco):
         """
         for greenlet in self.greenlets:
             greenlet.kill()
+            greenlet = None
 
         for listener in self.listeners:
             listener.remove()
 
         for schedule in self.schedules.values():
             schedule.kill()
+            schedule = None
 
     def reload(self):
         self.bot.reload_plugin(self.__class__)
