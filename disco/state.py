@@ -327,6 +327,9 @@ class State:
                 if voice_state.session_id not in self.voice_states:
                     self.voice_states[voice_state.session_id] = voice_state
 
+        if event.guild.id in self.voice_clients:
+            self.voice_clients[event.guild.id].update_media_silence()
+
         if self.config.cache_users:
             for member in event.guild.members.values():
                 if member.user.id not in self.users:
@@ -480,6 +483,8 @@ class State:
                     self.voice_clients[event.state.guild_id]._safe_reconnect_state = True
                     self.voice_clients[event.state.guild_id]._session_id = event.state.session_id
                     self.voice_clients[event.state.guild_id].channel_id = event.state.channel_id
+                if event.state.guild_id in self.voice_clients:
+                    self.voice_clients[event.state.guild_id].update_media_silence()
             # Disconnection
             else:
                 if event.state.guild_id in self.guilds:
@@ -491,6 +496,8 @@ class State:
                     del self.voice_states[event.state.session_id]
                 except KeyError:
                     return
+                if event.state.guild_id in self.voice_clients:
+                    self.voice_clients[event.state.guild_id].update_media_silence()
         # New connection
         elif event.state.channel_id:
             if event.state.guild_id in self.guilds:
@@ -505,6 +512,8 @@ class State:
             if event.state.user_id == self.me.id and event.state.guild_id in self.voice_clients:
                 self.voice_clients[event.state.guild_id]._session_id = event.state.session_id
                 self.voice_clients[event.state.guild_id].channel_id = event.state.channel_id
+            if event.state.guild_id in self.voice_clients:
+                self.voice_clients[event.state.guild_id].update_media_silence()
 
     def on_guild_member_add(self, event):
         if self.config.cache_users and event.member.user.id not in self.users:

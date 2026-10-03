@@ -6,9 +6,10 @@ from gevent import spawn as gevent_spawn, Timeout as GeventTimeout
 from disco.util.crypto import AEScrypt
 from disco.util.enum import Enum
 from disco.util.logging import LoggingClass
+from disco.voice.opus import OpusDecoder
 
 AudioCodecs = ('opus',)
-VideoCodecs = ('AV1X', 'H265', 'H264', 'VP8', 'VP9')
+VideoCodecs = ('AV1X', 'H265', 'H264', 'VP8', 'VP9',)
 
 RTPPayloadTypes = Enum(
     OPUS=0x78,  # 120
@@ -31,6 +32,11 @@ RTCPPayloadTypes = Enum(
 
 MAX_UINT32 = 4294967295
 MAX_SEQUENCE = 65535
+OPUS_FRAME_SAMPLES = 960
+OPUS_SAMPLING_RATE = 48000
+OPUS_CHANNELS = 2
+OPUS_SAMPLE_WIDTH = 2
+OPUS_SILENCE_FRAME = b'\xf8\xff\xfe'
 
 RTP_HEADER_VERSION = 0x80  # Only RTP Version is set here (value of 2 << 6)
 RTP_EXTENSION_ONE_BYTE = (0xBE, 0xDE)
@@ -71,7 +77,12 @@ VoiceData = namedtuple('VoiceData', [
     'rtp',
     'nonce',
     'data',
+    'pcm',
+    'timestamp',
+    'duration',
+    'silence',
 ])
+VoiceData.__new__.__defaults__ = (None, None, 0, 0)
 
 VideoData = namedtuple('VideoData', [
     'client',
@@ -101,8 +112,12 @@ class UDPVoiceClient(LoggingClass):
         self.timestamp = 0
 
         self._nonce = 0
+        self._nonce_data = bytearray(24)
+        self._nonce_padding = bytearray(4)
         self._run_task = None
         self._secret_box = None
+        self._opus_decoders = {}
+        self._audio_state = {}
 
         # RTP Header
         self._rtp_audio_header = bytearray(12)
@@ -134,44 +149,123 @@ class UDPVoiceClient(LoggingClass):
     def setup_encryption(self, encryption_key):
         self._secret_box = AEScrypt(encryption_key, self.vc.mode)
 
+        if self._secret_box._disabled:
+            raise Exception('libnacl is not installed, voice support is unavailable')
+
     def send_frame(self, frame, sequence=None, timestamp=None, incr_timestamp=None):
-        # Pack the RTC header into our buffer (a list of numbers)
-        struct_pack_into('>H', self._rtp_audio_header, 2, sequence or self.sequence)  # BE, unsigned short
-        struct_pack_into('>I', self._rtp_audio_header, 4, timestamp or self.timestamp)  # BE, unsigned int
-        struct_pack_into('>i', self._rtp_audio_header, 8, self.vc.ssrc_audio)  # BE, int
+        if sequence is None:
+            sequence = self.sequence
+        if timestamp is None:
+            timestamp = self.timestamp
+        # Pack the RTP header into our buffer (a list of numbers)
+        struct_pack_into('>H', self._rtp_audio_header, 2, sequence)  # BE, unsigned short
+        struct_pack_into('>I', self._rtp_audio_header, 4, timestamp)  # BE, unsigned int
+        struct_pack_into('>I', self._rtp_audio_header, 8, self.vc.ssrc_audio)  # BE, unsigned int
 
         if self.vc.mode == 'aead_aes256_gcm_rtpsize':
-            nonce = bytearray(12)  # 96-bits
+            nonce_size = 12  # 96-bits
+        elif self.vc.mode == 'aead_xchacha20_poly1305_rtpsize':
+            nonce_size = 24  # 192-bits
         else:
-            nonce = bytearray(24)  # 192-bits is 24 bytes
+            raise Exception(f'Voice mode `{self.vc.mode}` is not supported.')
 
-        # Use an incrementing number as a nonce, only first 4 bytes of the nonce is padded on
+        # Use an incrementing number as a nonce. Only the first four bytes
+        # contain the counter; the remaining bytes remain zero.
         self._nonce += 1
         if self._nonce > MAX_UINT32:
             self._nonce = 0
-        struct_pack_into('>I', nonce, 0, self._nonce)  # BE, unsigned int
-        nonce_padding = nonce[:4]
-
-        if self.vc.mode not in ('aead_xchacha20_poly1305_rtpsize', 'aead_aes256_gcm_rtpsize'):
-            raise Exception(f'Voice mode `{self.vc.mode}` is not supported.')
+        struct_pack_into('>I', self._nonce_data, 0, self._nonce)  # BE, unsigned int
+        struct_pack_into('>I', self._nonce_padding, 0, self._nonce)  # BE, unsigned int
 
         # Encrypt the payload with the nonce
-        payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(nonce), aad=bytes(self._rtp_audio_header))
+        payload = self._secret_box.encrypt(plaintext=frame, nonce=bytes(self._nonce_data[:nonce_size]), aad=bytes(self._rtp_audio_header))
 
         # Pad the payload with the nonce
-        payload += nonce_padding
-
-        # Send the header (sans nonce padding) plus the payload
+        payload += self._nonce_padding
         self.send(self._rtp_audio_header + payload)
 
         # Increment our sequence counter
         self.sequence += 1
-        if self.sequence >= MAX_SEQUENCE:
+        if self.sequence > MAX_SEQUENCE:
             self.sequence = 0
 
         # Increment our timestamp (if applicable)
-        if incr_timestamp:
-            self.timestamp += incr_timestamp
+        if incr_timestamp is not None:
+            self.increment_timestamp(incr_timestamp)
+
+    def send_silence(self, frames=5):
+        for _ in range(frames):
+            self.send_frame(OPUS_SILENCE_FRAME, incr_timestamp=OPUS_FRAME_SAMPLES)
+
+    def decode_audio(self, user_id, rtp, data):
+        if not self.vc.client.events.has_listeners('VoiceData'):
+            return None
+
+        try:
+            data = self.vc.decrypt_voice_frame(user_id, data)
+        except Exception as e:
+            self.log.debug('[{}] [VoiceData] Failed to decrypt DAVE data from ssrc {}: {} - {}'.format(
+                self.vc.channel_id, rtp.ssrc, e.__class__.__name__, e,
+            ))
+            return None
+
+        decoder = self._opus_decoders.get(rtp.ssrc)
+        if not decoder:
+            decoder = OpusDecoder(OPUS_SAMPLING_RATE, OPUS_CHANNELS)
+            self._opus_decoders[rtp.ssrc] = decoder
+
+        try:
+            pcm, duration = decoder.decode(data)
+        except Exception as e:
+            self.log.debug('[{}] [VoiceData] Failed to decode Opus data from ssrc {}: {} - {}'.format(
+                self.vc.channel_id, rtp.ssrc, e.__class__.__name__, e,
+            ))
+            return None
+
+        state_key = user_id if user_id is not None else rtp.ssrc
+        state = self._audio_state.get(state_key)
+        if state is None or state['ssrc'] != rtp.ssrc:
+            if state:
+                self._opus_decoders.pop(state['ssrc'], None)
+            state = {
+                'ssrc': rtp.ssrc,
+                'rtp_timestamp': rtp.timestamp,
+                'timestamp': state['timestamp'] if state else 0,
+                'duration': duration,
+            }
+            self._audio_state[state_key] = state
+            silence = duration if data == OPUS_SILENCE_FRAME else 0
+            return pcm, state['timestamp'], duration, silence
+
+        delta = (rtp.timestamp - state['rtp_timestamp']) & MAX_UINT32
+        if delta > (MAX_UINT32 // 2):
+            delta -= MAX_UINT32 + 1
+
+        if delta <= 0:
+            return None
+
+        if delta > state['duration']:
+            silence = delta - state['duration']
+        else:
+            silence = 0
+
+        state['timestamp'] += delta
+        state['rtp_timestamp'] = rtp.timestamp
+        state['duration'] = duration
+
+        if data == OPUS_SILENCE_FRAME:
+            silence += duration
+
+        return pcm, state['timestamp'], duration, silence
+
+    def remove_audio_ssrc(self, ssrc, user_id=None):
+        self._opus_decoders.pop(ssrc, None)
+        if user_id is not None:
+            state = self._audio_state.get(user_id)
+            if state and state['ssrc'] == ssrc:
+                self._audio_state.pop(user_id, None)
+        else:
+            self._audio_state.pop(ssrc, None)
 
     def run(self):
         while True:
@@ -311,16 +405,25 @@ class UDPVoiceClient(LoggingClass):
                     continue
 
                 if payload_type.name == 'opus':
+                    user_id = self.vc.audio_ssrcs.get(rtp.ssrc)
+                    decoded = self.decode_audio(user_id, rtp, data)
+                    if decoded is None:
+                        continue
+
+                    pcm, audio_timestamp, duration, silence = decoded
                     payload = VoiceData(
                         client=self.vc,
-                        user_id=self.vc.audio_ssrcs.get(rtp.ssrc),
+                        user_id=user_id,
                         payload_type=payload_type.name,
                         rtp=rtp,
                         nonce=nonce,
                         data=data,
+                        pcm=pcm,
+                        timestamp=audio_timestamp,
+                        duration=duration,
+                        silence=silence,
                     )
 
-                    # Raw RTP stream data, still needs conversion to be useful
                     self.vc.client.events.emit('VoiceData', payload)
                 else:
                     payload = VideoData(
@@ -342,6 +445,8 @@ class UDPVoiceClient(LoggingClass):
         if self._run_task:
             self._run_task.kill()
             self._run_task = None
+        self._opus_decoders.clear()
+        self._audio_state.clear()
         return
 
     def connect(self, host, port, timeout=10, addrinfo=None):

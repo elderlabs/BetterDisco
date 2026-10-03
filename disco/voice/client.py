@@ -9,7 +9,7 @@ from collections import namedtuple as namedtuple
 from websocket import WebSocketConnectionClosedException, WebSocketTimeoutException
 
 try:
-    from davey import DaveSession, ProposalsOperationType as DaveProposalsOperationType, CommitWelcome as DaveCommitWelcome
+    from davey import DaveSession, MediaType as DaveMediaType, ProposalsOperationType as DaveProposalsOperationType, CommitWelcome as DaveCommitWelcome
 except ImportError:
     pass
 
@@ -20,7 +20,7 @@ from disco.util.emitter import Emitter
 from disco.util.logging import LoggingClass
 from disco.util.websocket import Websocket
 from disco.voice.packets import VoiceOPCode
-from disco.voice.udp import AudioCodecs, RTPPayloadTypes, UDPVoiceClient, VideoCodecs
+from disco.voice.udp import AudioCodecs, RTPPayloadTypes, UDPVoiceClient, VideoCodecs, OPUS_SILENCE_FRAME
 
 
 class SpeakingFlags:
@@ -95,6 +95,7 @@ class VoiceClient(LoggingClass):
         self.max_reconnects = max_reconnects
         self.video_enabled = video_enabled
         self.media = None
+        self._initial_silence = False
 
         self.deaf = False
         self.mute = False
@@ -198,6 +199,21 @@ class VoiceClient(LoggingClass):
     @property
     def user_id(self):
         return self.client.state.me.id
+
+    def update_media_silence(self):
+        if not self.media or self.is_dm or self.channel_id is None:
+            return
+
+        guild = self.client.state.guilds.get(self.server_id)
+        if not guild:
+            return
+
+        for voice_state in guild.voice_states.values():
+            if voice_state.channel_id == self.channel_id and voice_state.user_id != self.user_id:
+                self.media.set_silenced(False)
+                return
+
+        self.media.set_silenced(True)
 
     @property
     def ssrc_audio(self):
@@ -324,8 +340,10 @@ class VoiceClient(LoggingClass):
 
     def on_voice_client_disconnect(self, data):
         user_id = int(data['user_id'])
-        for ssrc in self.audio_ssrcs.keys():
+        for ssrc in list(self.audio_ssrcs.keys()):
             if self.audio_ssrcs[ssrc] == user_id:
+                if self.udp:
+                    self.udp.remove_audio_ssrc(ssrc, user_id)
                 del self.audio_ssrcs[ssrc]
                 break
 
@@ -460,6 +478,13 @@ class VoiceClient(LoggingClass):
             self.dave_reset()
 
         self.set_state(VoiceState.CONNECTED)
+
+        self._initial_silence = True
+        self.update_media_silence()
+        self.send_silence()
+        self._initial_silence = False
+        if self.media and self.media.silenced:
+            self.set_speaking(False)
 
         self._reconnects = 0
 
@@ -605,6 +630,10 @@ class VoiceClient(LoggingClass):
         if self.state == VoiceState.DISCONNECTED:
             return
 
+        if code == 4021:
+            self.log.warning('[{}] Voice gateway rate limited. Disconnecting without reconnecting.'.format(self.channel_id))
+            return self.disconnect()
+
         if not code and self._safe_reconnect_state or (code and code in (4009, 4015)):
             self.log.info('[{}] Attempting WS resumption'.format(self.channel_id))
         self.set_state(VoiceState.RECONNECTING)
@@ -708,6 +737,15 @@ class VoiceClient(LoggingClass):
 
         return self.client.events.emit('VoiceDisconnect', self)
 
+    def send_silence(self, frames=5):
+        if self.state != VoiceState.CONNECTED or not self.udp:
+            return
+
+        self.set_speaking(True)
+        for _ in range(frames):
+            self.udp.send_silence(1)
+            gevent_sleep(0.02)
+
     def send_frame(self, frame, *args, **kwargs):
         if self.dave_handler and not self.dave_downgraded:
             try:
@@ -715,6 +753,17 @@ class VoiceClient(LoggingClass):
             except ValueError:
                 pass
         self.udp.send_frame(frame, *args, **kwargs)
+
+    def decrypt_voice_frame(self, user_id, frame):
+        if not self.dave_handler or not user_id or frame == OPUS_SILENCE_FRAME or DaveMediaType is None:
+            return frame
+
+        can_decrypt = (self.dave_protocol_version and not self.dave_downgraded and self.dave_handler.ready) or \
+                      (self.dave_handler.ready and self.dave_handler.can_passthrough(user_id))
+        if not can_decrypt:
+            return frame
+
+        return self.dave_handler.decrypt(user_id, DaveMediaType.audio, frame)
 
     def increment_timestamp(self, *args, **kwargs):
         self.udp.increment_timestamp(*args, **kwargs)

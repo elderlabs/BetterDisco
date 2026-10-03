@@ -37,6 +37,11 @@ class Player(LoggingClass):
         # Current play task
         self.play_task = None
 
+        # Whether voice transmission is suppressed
+        self.silenced = False
+        self._silence_paused = False
+        self._silence_started = None
+
         # Core task
         self.run_task = gevent_spawn(self.run)
 
@@ -45,6 +50,8 @@ class Player(LoggingClass):
 
         # Event emitter for metadata
         self.events = Emitter()
+
+        self.client.update_media_silence()
 
     def client(self):
         return self.client()
@@ -59,58 +66,139 @@ class Player(LoggingClass):
     def pause(self):
         if self.paused:
             return
+
+        if self.client.state == VoiceState.CONNECTED and not getattr(self.client, '_initial_silence', False):
+            self.client.send_silence()
+            self._silence_started = time()
+
         self.paused = GeventEvent()
+        self.client.set_speaking(False)
         self.events.emit(self.Events.PAUSE_PLAY)
 
     def resume(self):
-        if self.paused:
+        if self.paused and not self._silence_paused:
+            self._advance_silence_timestamp()
             self.paused.set()
             self.paused = None
+            if not self.silenced:
+                self.client.set_speaking(True)
             self.events.emit(self.Events.RESUME_PLAY)
 
-    def play(self, item):
-        #  Grab the first frame before we start anything else, sometimes playables
-        #  can do some lengthy async tasks here to set up the playable, and we
-        #  don't want to lerp the first N frames of the playable into playing
-        #  faster
-        frame = item.next_frame()
-        if frame is None:
+    def set_silenced(self, silenced):
+        if self.silenced == silenced:
             return
 
+        self.silenced = silenced
+
+        if self.now_playing and hasattr(self.now_playing, 'set_transmitting'):
+            self.now_playing.set_transmitting(not silenced)
+
+        if silenced:
+            if self.now_playing and not getattr(self.now_playing, 'streaming', False) and not self.paused:
+                self._silence_paused = True
+                self.pause()
+            elif self.now_playing:
+                if self.client.state == VoiceState.CONNECTED and not getattr(self.client, '_initial_silence', False):
+                    self.client.send_silence()
+                self._silence_started = time()
+                self.client.set_speaking(False)
+            else:
+                self.client.set_speaking(False)
+        elif self._silence_paused:
+            self._silence_paused = False
+            self._advance_silence_timestamp()
+            self.resume()
+        else:
+            self._advance_silence_timestamp()
+            self.client.set_speaking(True)
+
+    def _advance_silence_timestamp(self):
+        if self._silence_started is None:
+            return
+
+        if self.now_playing:
+            samples_per_frame = getattr(self.now_playing, 'samples_per_frame', 960)
+            silence_samples = int((time() - self._silence_started) * 48000)
+            silence_samples -= silence_samples % samples_per_frame
+            if silence_samples > 0:
+                self.client.increment_timestamp(silence_samples)
+
+        self._silence_started = None
+
+    def play(self, item):
+        streaming = getattr(item, 'streaming', False)
+
+        if hasattr(item, 'set_transmitting'):
+            item.set_transmitting(not self.silenced)
+
+        if self.silenced and not streaming:
+            self._silence_paused = True
+            self.pause()
+
+        if self.paused:
+            self.client.set_speaking(False)
+            self.paused.wait()
+            if self.client.state == VoiceState.DISCONNECTED:
+                return
+
+        if self.client.state == VoiceState.DISCONNECTED:
+            return
+
+        if self.client.state != VoiceState.CONNECTED:
+            self.client.state_emitter.once(VoiceState.CONNECTED, timeout=30)
+
+        if self.client.state == VoiceState.DISCONNECTED:
+            return
+
+        if not self.silenced:
+            self.client.set_speaking(True)
+
+        frame = None
         start = time()
         loops = 0
 
         while True:
-            loops += 1
-
             if self.paused:
                 self.client.set_speaking(False)
                 self.paused.wait()
-                gevent_sleep(2)
-                self.client.set_speaking(True)
+                if self.client.state == VoiceState.DISCONNECTED:
+                    return
+                frame = None
                 start = time()
                 loops = 0
+                continue
 
             if self.client.state == VoiceState.DISCONNECTED:
                 return
 
             if self.client.state != VoiceState.CONNECTED:
                 self.client.state_emitter.once(VoiceState.CONNECTED, timeout=30)
+                if self.client.state == VoiceState.DISCONNECTED:
+                    return
+
+            if self.silenced:
+                frame = None
+                start = time()
+                loops = 0
+                gevent_sleep(0.02)
+                continue
+
+            if frame is None:
+                frame = item.next_frame()
+                if frame is None:
+                    return
 
             # Send the voice frame and increment our timestamp
             self.client.send_frame(frame)
             self.client.increment_timestamp(item.samples_per_frame)
-
-            frame = item.next_frame()
-            if frame is None:
-                return
+            frame = None
+            loops += 1
 
             next_time = start + 0.02 * loops
-            delay = max(0, 0.02 + (next_time - time()))
-            gevent_sleep(delay)
+            gevent_sleep(max(0, next_time - time()))
 
     def run(self):
-        self.client.set_speaking(True)
+        self.client.set_speaking(False)
 
         while self.playing:
             self.now_playing = self.queue.get()
@@ -124,6 +212,9 @@ class Player(LoggingClass):
                 self.playing = False
                 self.complete.set()
                 return
+
+        if self.client.state == VoiceState.CONNECTED:
+            self.client.send_silence()
 
         self.client.set_speaking(False)
         self.disconnect()

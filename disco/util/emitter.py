@@ -150,6 +150,12 @@ class Emitter(LoggingClass):
         self._priority_offsets = defaultdict(int)
         self.pool = GeventPool()
 
+    def has_listeners(self, name):
+        for handlers in self.event_handlers.values():
+            if name in handlers:
+                return True
+        return False
+
     def emit(self, name, *args, **kwargs):
         for priority in sorted(self.event_handlers.keys()):
             listener = self.event_handlers[priority].get(name)
