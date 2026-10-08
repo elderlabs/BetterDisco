@@ -8,7 +8,8 @@ from websocket import ABNF, WebSocketConnectionClosedException, WebSocketTimeout
 from disco.gateway.packets import OPCode, RECV, SEND
 from disco.gateway.events import GatewayEvent
 from disco.gateway.encoding import ENCODERS
-from disco.util.websocket import Websocket
+from disco.util.websocket import Websocket, get_http_status
+from disco.util.emitter import Priority
 from disco.util.logging import LoggingClass
 from disco.util.limiter import SimpleLimiter
 
@@ -53,12 +54,12 @@ class GatewayClient(LoggingClass):
         self.limiter = SimpleLimiter(120, 60)
 
         # Create emitter and bind to gateway payloads
-        self.packets.on((RECV, OPCode.DISPATCH), self.handle_dispatch)
-        self.packets.on((RECV, OPCode.HEARTBEAT), self.handle_heartbeat)
-        self.packets.on((RECV, OPCode.HEARTBEAT_ACK), self.handle_heartbeat_acknowledge)
-        self.packets.on((RECV, OPCode.RECONNECT), self.handle_reconnect)
-        self.packets.on((RECV, OPCode.INVALID_SESSION), self.handle_invalid_session)
-        self.packets.on((RECV, OPCode.HELLO), self.handle_hello)
+        self.packets.on((RECV, OPCode.DISPATCH), self.handle_dispatch, priority=Priority.BEFORE)
+        self.packets.on((RECV, OPCode.HEARTBEAT), self.handle_heartbeat, priority=Priority.BEFORE)
+        self.packets.on((RECV, OPCode.HEARTBEAT_ACK), self.handle_heartbeat_acknowledge, priority=Priority.BEFORE)
+        self.packets.on((RECV, OPCode.RECONNECT), self.handle_reconnect, priority=Priority.BEFORE)
+        self.packets.on((RECV, OPCode.INVALID_SESSION), self.handle_invalid_session, priority=Priority.BEFORE)
+        self.packets.on((RECV, OPCode.HELLO), self.handle_hello, priority=Priority.BEFORE)
 
         # Bind to ready payload
         self.events.on('Ready', self.on_ready)
@@ -67,6 +68,7 @@ class GatewayClient(LoggingClass):
         # Websocket connection
         self.ws = None
         self.ws_task = None
+        self._reconnect_task = None
         self.ws_event = GeventEvent()
         self._zlib = None
         self._zstd = None
@@ -81,6 +83,7 @@ class GatewayClient(LoggingClass):
         self.replayed_events = 0
         self.last_conn_state = None
         self.resuming = False
+        self._last_http_status = None
 
         # Cached gateway URL
         self._cached_gateway_url = None
@@ -97,7 +100,7 @@ class GatewayClient(LoggingClass):
         return f'<GatewayClient shard_id={self.client.config.shard_id} endpoint={self._cached_gateway_url}>'
 
     def send(self, op, data):
-        if not self.ws.is_closed:
+        if self.ws and not self.ws.is_closed:
             self.limiter.check()
             return self._send(op, data)
 
@@ -116,7 +119,7 @@ class GatewayClient(LoggingClass):
                 self.last_conn_state = 'HEARTBEAT'
                 self._heartbeat_acknowledged = True
                 self.ws.close(status=1000)
-                self.client.gw.on_close(0, 'HEARTBEAT failure')
+                # self.client.gw.on_close(0, 'HEARTBEAT failure')
                 return
             self._last_heartbeat = time()
 
@@ -161,11 +164,16 @@ class GatewayClient(LoggingClass):
         self.resuming = True
         self.ws.close(status=4000)
 
-    def handle_invalid_session(self, _):
-        self.log.warning('Received INVALID_SESSION, forcing a fresh reconnect')
+    def handle_invalid_session(self, packet):
+        if packet.get('d'):
+            self.log.warning('Received INVALID_SESSION, resuming')
+            self.resuming = True
+        else:
+            self.log.warning('Received INVALID_SESSION, forcing a fresh reconnect')
+            self.session_id = None
+            self.seq = 0
+            self.resuming = False
         self.last_conn_state = 'INVALID_SESSION'
-        self.session_id = None
-        self.seq = 0
         self.ws.close(status=4000)
 
     def handle_hello(self, packet):
@@ -178,12 +186,18 @@ class GatewayClient(LoggingClass):
         self.session_id = ready.session_id
         self._cached_gateway_url = ready.resume_gateway_url
         self.reconnects = 0
+        for vc in self.client.state.voice_clients.values():
+            if vc.channel_id and not vc._identified:
+                vc.set_voice_state(vc.channel_id, mute=vc.mute, deaf=vc.deaf, video=vc.video_enabled)
 
     def on_resumed(self, _):
         self.log.info(f'RESUME completed, replayed {self.replayed_events} event{"s" if self.replayed_events > 1 else ""}')
         self.reconnects = 0
         self.replaying = False
         self.resuming = False
+        for vc in self.client.state.voice_clients.values():
+            if vc.channel_id and not vc._identified:
+                vc.set_voice_state(vc.channel_id, mute=vc.mute, deaf=vc.deaf, video=vc.video_enabled)
 
     def connect_and_run(self, gateway_url=None):
         if not gateway_url:
@@ -204,10 +218,10 @@ class GatewayClient(LoggingClass):
 
         self.log.info(f'Opening websocket connection to `{gateway_url}`')
         self.ws = Websocket(gateway_url)
-        self.ws.emitter.on('on_open', self.on_open)
-        self.ws.emitter.on('on_error', self.on_error)
-        self.ws.emitter.on('on_close', self.on_close)
-        self.ws.emitter.on('on_message', self.on_message)
+        self.ws.emitter.on('on_open', self.on_open, priority=Priority.BEFORE)
+        self.ws.emitter.on('on_error', self.on_error, priority=Priority.BEFORE)
+        self.ws.emitter.on('on_close', self.on_close, priority=Priority.BEFORE)
+        self.ws.emitter.on('on_message', self.on_message, priority=Priority.BEFORE)
 
         self.ws.run_forever(ping_interval=60, ping_timeout=5)
 
@@ -216,7 +230,7 @@ class GatewayClient(LoggingClass):
             msg = self._zstd.decompress(msg)
 
             if self.encoder.OPCODE == ABNF.OPCODE_TEXT:
-                msg = str(msg, 'utf=8')
+                msg = str(msg, 'utf-8')
 
         elif self.zlib_stream_enabled:
             if not self._buffer:
@@ -233,18 +247,18 @@ class GatewayClient(LoggingClass):
             msg = self._zlib.decompress(self._buffer)
             # If encoder is text based, decode the data as utf-8
             if self.encoder.OPCODE == ABNF.OPCODE_TEXT:
-                msg = str(msg, 'utf=8')
+                msg = str(msg, 'utf-8')
             self._buffer = None
         else:
             # Detect zlib, decompress
             is_erlpack = (msg[0] == 131)
             if msg[0] != '{' and not is_erlpack:
-                msg = str(zlib_decompress(msg, 15, 10490000), 'utf=8')  # 10490000 = 10MB
+                msg = str(zlib_decompress(msg, 15, 10490000), 'utf-8')  # 10490000 = 10MB
 
         try:
             data = self.encoder.decode(msg)
-        except Exception:
-            self.log.exception('Failed to parse gateway message: ')
+        except Exception as e:
+            self.log.exception(f'Failed to parse gateway message: {e.__class__.__name__} - {e}')
             return
 
         # Update sequence
@@ -261,16 +275,17 @@ class GatewayClient(LoggingClass):
             self.shutting_down = True
             self.ws_event.set()
         self.resuming = True  # ideally this should be fine
+        self._last_http_status = get_http_status(error)
+        if self._last_http_status:
+            return self.log.error(f'Websocket handshake failed with HTTP status {self._last_http_status}')  # things are NOT fine... 🔥
         if isinstance(error, WebSocketTimeoutException):
             return self.log.error('Websocket connection has timed out. An upstream connection issue is likely present.')
         if not isinstance(error, WebSocketConnectionClosedException):
-            if 'Handshake status 503 Service Unavailable' in str(error):
-                self.resuming = False  # things are NOT fine... 🔥
-            return self.log.error(f'WS received error: {error.__class__.__name__} - {error}')
-        else:
-            return self.log.warning(f'WS received error: {error.__class__.__name__} - {error}')
+            return self.log.error(f'Websocket received error: {error.__class__.__name__} - {error}')
+        return self.log.error(f'Websocket received error: {error.__class__.__name__} - {error}')
 
     def on_open(self):
+        self._last_http_status = None
         self.ws.is_closed = False
         if self.zstd_stream_enabled:
             if sys_version_info >= (3, 14):
@@ -281,7 +296,7 @@ class GatewayClient(LoggingClass):
             self._zlib = zlib_decompressobj()
 
         if self.seq and self.session_id:
-            self.log.info(f'WS Opened: attempting resume with SID: {self.session_id} SEQ: {self.seq}')
+            self.log.info(f'Websocket Opened: attempting resume with SID: {self.session_id} SEQ: {self.seq}')
             self.replaying = True
             self.send(OPCode.RESUME, {
                 'token': self.client.config.token,
@@ -290,7 +305,7 @@ class GatewayClient(LoggingClass):
             })
         else:
             self.seq = 0
-            self.log.info('WS Opened: sending identify payload')
+            self.log.info('Websocket Opened: sending identify payload')
             self.send(OPCode.IDENTIFY, {
                 'token': self.client.config.token,
                 'compress': self.encoder.TYPE == 'json' and True or False,  # json-only, payload compression
@@ -307,6 +322,13 @@ class GatewayClient(LoggingClass):
                 },
             })
 
+    def reconnect(self, wait_time):
+        gevent_sleep(wait_time)
+        self._reconnect_task = None
+        if self.shutting_down:
+            return
+        self.ws_task = gevent_spawn(self.connect_and_run, self._cached_gateway_url)
+
     def on_close(self, code=None, reason=None):
         # Make sure we clean up any old data
         self.ws.is_closed = True
@@ -320,8 +342,6 @@ class GatewayClient(LoggingClass):
 
         self.ws.sock = None
         self.ws = None
-        if self.ws_task:
-            self.ws_task.kill()
         self.ws_task = None
         self._buffer = None
         self._zlib = None
@@ -329,65 +349,74 @@ class GatewayClient(LoggingClass):
 
         # Kill heartbeater, a reconnect/resume will trigger a HELLO which will respawn it
         if self._heartbeat_task:
-            self.log.debug('WS Closed: killing heartbeater')
+            self.log.debug('Websocket Closed: killing heartbeater')
             self._heartbeat_task.kill()
             self._heartbeat_task = None
 
         # If we're quitting, just break out of here
         if self.shutting_down:
-            self.log.info('WS Closed: shutting down')
+            if self._reconnect_task:
+                self._reconnect_task.kill()
+                self._reconnect_task = None
+            self.log.info('Websocket Closed: shutting down')
             return
 
         self.replaying = False
         self._heartbeat_acknowledged = True
 
-        # best to abandon resume attempts at this point as our session is likely dead or poisoned
-        if self.reconnects >= 2:
-            self._cached_gateway_url = None
-            self.session_id = None
-            self.resuming = False
-
         # Track reconnect attempts
         if reason:
             self.last_conn_state = reason
+        http_status = self._last_http_status
+        self._last_http_status = None
         self.reconnects += 1
-        self.log.info('WS Closed: {}{}({})'.format(f'[{code}] ' if code else '', f'{reason} ' if reason else '', self.reconnects))
+        self.log.info('Websocket Closed: {}{}{}({})'.format(f'[{code}] ' if code else '', f'[{http_status}] ' if http_status else '', f'{reason} ' if reason else '', self.reconnects))
 
         if self.max_reconnects and self.reconnects > self.max_reconnects:
             return self.log.error(f'Failed to reconnect after {self.max_reconnects} attempts, giving up')
 
-        # Allows us to resume VC clients if our GW is lost at the same time
-        if not self.resuming:
-            for vc in self.client.state.voice_clients.values():
-                vc._safe_reconnect_state = True
-        # Don't resume for these error codes
-        if code and (4000 < code <= 4010 or code in (503, 1000, 1001)) or (not code and not self.resuming):
-            self.session_id = None
-        # 4004 and all codes above 4009 are not resumable
-        if code and (code == 4004 or code >= 4010):
+        # Close codes that explicitly prohibit reconnecting.
+        if (code and code in (4004, 4010, 4011, 4012, 4013, 4014)) or (http_status and http_status == 429):
             reason = 'Unknown.'
-            if code == 4004:
-                reason = 'Invalid token.'
-            if code == 4010:
-                reason = 'Invalid shard ID.'
-            if code == 4011:
-                reason = 'Sharding required.' if self.client.config.shard_count == 1 else 'Further sharding required.'
-            if code == 4012:
-                reason = 'Invalid API version.'
-            if code == 4013:
-                reason = 'Invalid intents.'
-            if code == 4014:
-                reason = 'Unauthorized intents. (check the Discord Developer dashboard settings)'
+            if code:
+                reason = {
+                    4004: 'Invalid token.',
+                    4010: 'Invalid shard ID.',
+                    4011: 'Sharding required.' if self.client.config.shard_count == 1 else 'Further sharding required.',
+                    4012: 'Invalid API version.',
+                    4013: 'Invalid intents.',
+                    4014: 'Disallowed intents. (check the Discord Developer dashboard settings)',
+                }[code]
+            if http_status:  # this should NEVER fire
+                reason = 'Cloudflare sent 429. Give up.'
+            self.shutting_down = True
+            self.ws_event.set()
             self.log.error(f'Unable to continue, shutting down. Reason: {reason}')
             from sys import exit as sys_exit
             return sys_exit(1)
 
+        # A failed HTTP handshake is not a Discord Gateway close code. Treat upstream 5xx responses as
+        # a failed resume and fall back to the initial Gateway URL so Discord can issue a new session.
+        # A 408 is also a transient HTTP failure and must not be mistaken for a Discord close code.
+        # 1000, 1001, 4007, and 4009 require a new Gateway session rather than resuming the old one.
+        # A connection without a close code should be resumable.
+        if (http_status and (500 <= http_status <= 599 or http_status == 408)) or (code in (1000, 1001, 4007, 4009) or (not code and not self.resuming)):
+            self._cached_gateway_url = None
+            self.session_id = None
+            self.seq = 0
+            self.resuming = False
+
+        # A Gateway reconnect does not imply a fresh voice session when the existing voice socket remains identified.
+        # VoiceClient will request a new VOICE_STATE_UPDATE if it has lost its own session.
+        if not self.resuming:
+            for vc in self.client.state.voice_clients.values():
+                vc._safe_reconnect_state = True
+
         wait_time = (self.reconnects - 1) * 5 if self.reconnects < 6 else 30
         self.log.info(f'{"Resuming" if self.session_id else "Reconnecting"} in {wait_time} seconds')
-        gevent_sleep(wait_time)
-
-        # Reconnect
-        self.ws_task = gevent_spawn(self.connect_and_run(self._cached_gateway_url))
+        if self._reconnect_task:
+            self._reconnect_task.kill()
+        self._reconnect_task = gevent_spawn(self.reconnect, wait_time)
 
     def run(self):
         self.ws_task = gevent_spawn(self.connect_and_run)

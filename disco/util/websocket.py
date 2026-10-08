@@ -1,8 +1,24 @@
 from websocket import WebSocketApp, setdefaulttimeout
 from platform import system as platform_system
+try:
+    from regex import search as re_search
+except ImportError:
+    from re import search as re_search
 
 from disco.util.emitter import Emitter
 from disco.util.logging import LoggingClass
+
+
+def get_http_status(error):
+    """
+    Return the HTTP status from a WebSocket handshake failure, if present.
+    """
+    status = getattr(error, 'status_code', None)
+    if status is not None:
+        return status
+
+    match = re_search(r'Handshake status (\d{3})\b', str(error))
+    return int(match.group(1)) if match else None
 
 
 class Websocket(LoggingClass, WebSocketApp):

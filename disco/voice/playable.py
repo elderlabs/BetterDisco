@@ -117,7 +117,7 @@ class FFmpegInput(BaseInput, AbstractOpus):
 class YoutubeDLInput(FFmpegInput):
     def __init__(self, url=None, ie_info=None, *args, **kwargs):
         if YoutubeDL and curl_cffi:
-            self.ytdl = YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'default_search': 'ytsearch', 'impersonate': ImpersonateTarget.from_str(random_choice(('chrome', 'firefox', 'edge', 'safari')))})
+            self.ytdl = YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'default_search': 'ytsearch', 'http_handler': 'curl_cffi', 'impersonate': ImpersonateTarget.from_str(random_choice(('chrome', 'firefox', 'safari')))})
         elif YoutubeDL:
             self.ytdl = YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'default_search': 'ytsearch'})
         else:

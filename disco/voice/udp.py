@@ -12,12 +12,17 @@ AudioCodecs = ('opus',)
 VideoCodecs = ('AV1X', 'H265', 'H264', 'VP8', 'VP9',)
 
 RTPPayloadTypes = Enum(
-    OPUS=0x78,  # 120
-    # AV1X=0x,  # ?
-    H265=0x65,  # 101
-    H264=0x67,  # 103
-    VP8=0x69,  # 105
-    VP9=0x71,  # 107
+    OPUS=0x78,       # 120
+    AV1X=0x63,       # 99
+    AV1X_RTX=0x64,   # 100
+    H265=0x65,       # 101
+    H265_RTX=0x66,   # 102
+    H264=0x67,       # 103
+    H264_RTX=0x68,   # 104
+    VP8=0x69,        # 105
+    VP8_RTX=0x6A,    # 106
+    VP9=0x6B,        # 107
+    VP9_RTX=0x6C,    # 108
 )
 
 RTCPPayloadTypes = Enum(
@@ -338,7 +343,7 @@ class UDPVoiceClient(LoggingClass):
                 if self.vc.mode == 'aead_aes256_gcm_rtpsize':
                     nonce = bytearray(12)  # 96-bits
                 else:
-                    nonce = bytearray(24)  # 192-bits is 24 bytes
+                    nonce = bytearray(24)  # 192-bits
 
                 nonce[:4] = data[-4:]
                 data = data[:-4]
@@ -472,7 +477,7 @@ class UDPVoiceClient(LoggingClass):
                 return None, None
 
             # Read IP and port
-            ip = str(data[8:].split(b'\x00', 1)[0], "utf=8")
+            ip = str(data[8:].split(b'\x00', 1)[0], "utf-8")
             port = struct_unpack('<H', data[-2:])[0]  # little endian, unsigned short
 
         # Spawn read thread so we don't max buffers

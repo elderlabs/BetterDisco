@@ -458,7 +458,7 @@ class HTTPClient(LoggingClass):
                 if err and 'code' in err and 'message' in err:
                     self.log.warning(f'Request failed with status code {r.status_code}: {err["code"]} - {err["message"]} ({route[1].format(**args)})')
                 else:
-                    self.log.warning(f'Request failed with status code {r.status_code}: {str(r.content, "utf=8")}')
+                    self.log.warning(f'Request failed with status code {r.status_code}: {str(r.content, "utf-8")}')
                 response.exception = APIException(r)
                 raise response.exception
             elif r.status_code in [408, 429, 500, 502, 503] or not r.status_code:
@@ -482,7 +482,7 @@ class HTTPClient(LoggingClass):
                         return
                 else:
                     self.log.warning('Request to `{}` failed{}, retrying after {}s ({})'.format(
-                        url, f' with code {r.status_code}' if r.status_code else '', backoff, str(r.content, "utf=8")
+                        url, f' with code {r.status_code}' if r.status_code else '', backoff, str(r.content, "utf-8")
                     ))
                 gevent_sleep(backoff)
 
