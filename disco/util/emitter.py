@@ -87,7 +87,7 @@ class EmitterSubscription:
                 return
         return self.callback(*args, **kwargs)
 
-    def _queue_handler(self):
+    def _queue_handler(self):  # used with specifically Priority.SEQUENTIAL
         self._queue = GeventQueue(self.max_queue_size)
 
         while True:
@@ -95,7 +95,15 @@ class EmitterSubscription:
             try:
                 self.callback(*args, **kwargs)
             except Exception as e:
-                raise e
+                # A failed callback cannot permanently stop this sequential
+                # consumer and leave subsequent queued events stranded.
+                if self._emitter is not None:
+                    self._emitter.log.exception(f'Unhandled exception in sequential event handler: {e.__class__.__name__} - {e}')
+            finally:
+                # Do not keep the last processed event alive while waiting for
+                # the next queue item.
+                args = None
+                kwargs = None
 
     def attach(self, emitter):
         self._emitter = emitter
