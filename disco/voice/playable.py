@@ -3,10 +3,9 @@ try:
     from audioop import mul as audioop_mul
 except ImportError:
     audioop_mul = None
-from gevent import sleep as gevent_sleep, spawn as gevent_spawn
+from gevent import getcurrent as gevent_getcurrent, sleep as gevent_sleep, spawn as gevent_spawn
 from gevent.lock import Semaphore as GeventSemaphore
 from gevent.subprocess import PIPE as GEVENT_PIPE, Popen as GeventPopen
-from io import BytesIO
 from sys import modules as sys_modules
 from types import GeneratorType
 try:
@@ -83,7 +82,7 @@ class FFmpegInput(BaseInput, AbstractOpus):
             if self.streaming:
                 self._buffer = self.proc.stdout
             else:
-                self._buffer = BytesIO(self.proc.stdout.read())
+                self._buffer = ReclaimingAudioBuffer(self.proc.stdout)
 
         return self._buffer.read(sz)
 
@@ -112,6 +111,97 @@ class FFmpegInput(BaseInput, AbstractOpus):
             ]
             self._proc = GeventPopen(args, stdout=GEVENT_PIPE)
         return self._proc
+
+    def close(self):
+        proc = self._proc
+        self._proc = None
+        if proc is None:
+            return
+
+        try:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1)
+                except Exception:
+                    proc.kill()
+                    proc.wait()
+        finally:
+            if proc.stdout is not None:
+                proc.stdout.close()
+            if self._buffer is not None and self._buffer is not proc.stdout:
+                self._buffer.close()
+            self._buffer = None
+
+
+class ReclaimingAudioBuffer:
+    """
+    Progressively buffer decoded PCM from FFmpeg without waiting for EOF.
+
+    A dedicated greenlet is the sole reader of FFmpeg stdout. The queue is
+    intentionally unbounded so playback never applies backpressure to FFmpeg
+    because it is decoding or downloading faster than playback consumes.
+    """
+
+    CHUNK_SIZE = 4096
+
+    def __init__(self, stream):
+        from gevent.queue import Queue as GeventQueue
+
+        self._stream = stream
+        self._chunks = GeventQueue()
+        self._pending = b''
+        self._pending_position = 0
+        self._eof = False
+        self._error = None
+        self._reader = gevent_spawn(self._read_stream)
+
+    def _read_stream(self):
+        try:
+            while True:
+                # This potentially blocking read runs in its own greenlet, not
+                # in the playback consumer. A bounded chunk limits memory use.
+                chunk = self._stream.read(self.CHUNK_SIZE)
+                if not chunk:
+                    self._chunks.put(None)
+                    return
+                self._chunks.put(chunk)
+        except Exception as exc:
+            self._chunks.put(exc)
+
+    def read(self, size=-1):
+        if size == 0:
+            return b''
+
+        data = bytearray()
+        while size < 0 or len(data) < size:
+            if self._pending_position < len(self._pending):
+                remaining = len(self._pending) - self._pending_position
+                count = remaining if size < 0 else min(remaining, size - len(data))
+                data.extend(self._pending[self._pending_position:self._pending_position + count])
+                self._pending_position += count
+                if self._pending_position == len(self._pending):
+                    self._pending = b''
+                    self._pending_position = 0
+                continue
+
+            if self._eof or self._error is not None:
+                break
+
+            chunk = self._chunks.get()
+            if chunk is None:
+                self._eof = True
+            elif isinstance(chunk, Exception):
+                self._error = chunk
+            else:
+                self._pending = chunk
+                self._pending_position = 0
+
+        if data:
+            return bytes(data)
+        if self._error is not None:
+            raise self._error
+        return b''
 
 
 class YoutubeDLInput(FFmpegInput):
@@ -201,6 +291,7 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
         self.frames = GeventQueue()
         self.frame_buffer = frame_buffer
         self.volume = volume
+        self.audio_processor = kwargs.pop('audio_processor', None)
         self.transmitting = True
         self._encoder_task = None
         self._streaming = None
@@ -216,25 +307,47 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
         self._encoder_task = gevent_spawn(self._encoder_loop)
 
     def _encoder_loop(self):
-        while self.source:
-            if len(self.frames.queue) >= self._frame_buffer:
-                gevent_sleep(0.02)
-                continue
+        try:
+            while self.source:
+                if len(self.frames.queue) >= self._frame_buffer:
+                    gevent_sleep(0.02)
+                    continue
 
-            raw = self.source.read(self.frame_size)
-            if len(raw) < self.frame_size:
-                break
+                raw = self.source.read(self.frame_size)
+                if len(raw) < self.frame_size:
+                    break
 
-            if self.streaming and not self.transmitting:
-                gevent_sleep(0.02)
-                continue
+                if self.streaming and not self.transmitting:
+                    gevent_sleep(0.02)
+                    continue
 
-            if self._volume != 1.0:
-                raw = audioop_mul(raw, 2, min(self._volume, 2.0))
+                if self.audio_processor is not None:
+                    raw = self.audio_processor.process(raw)
 
-            self.frames.put(self.encode(raw, self.samples_per_frame))
+                if self._volume != 1.0:
+                    raw = audioop_mul(raw, 2, min(self._volume, 2.0))
+
+                self.frames.put(self.encode(raw, self.samples_per_frame))
+        finally:
+            self.frames.put(None)
+
+    def close(self):
+        task = self._encoder_task
+        self._encoder_task = None
+        if task is not None and task is not gevent_getcurrent() and not task.dead:
+            task.kill(block=False)
+
+        source = self.source
         self.source = None
-        self.frames.put(None)
+        close = getattr(source, 'close', None)
+        if close is not None:
+            close()
+
+        self.frames.queue.clear()
+        try:
+            self.frames.put_nowait(None)
+        except Exception:
+            pass
 
     def next_frame(self):
         if not self._encoder_task:

@@ -61,7 +61,14 @@ class Player(LoggingClass):
         self.events.emit(self.Events.DISCONNECT)
 
     def skip(self):
-        self.play_task.kill()
+        if self.now_playing:
+            close = getattr(self.now_playing, 'close', None)
+            if close:
+                close()
+
+        if self.play_task and not self.play_task.dead:
+            self.play_task.kill()
+        self.events.emit(self.Events.STOP_PLAY, self)
 
     def pause(self):
         if self.paused:
@@ -207,6 +214,10 @@ class Player(LoggingClass):
             self.play_task = gevent_spawn(self.play, self.now_playing)
             self.play_task.join()
             self.events.emit(self.Events.STOP_PLAY, self)
+
+            close = getattr(self.now_playing, 'close', None)
+            if close:
+                close()
 
             if self.client.state == VoiceState.DISCONNECTED:
                 self.playing = False
