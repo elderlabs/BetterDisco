@@ -115,11 +115,10 @@ class GatewayClient(LoggingClass):
     def heartbeat_task(self, interval):
         while True:
             if not self._heartbeat_acknowledged:
-                self.log.warning('Received HEARTBEAT without HEARTBEAT_ACK, forcing a fresh reconnect')
-                self.last_conn_state = 'HEARTBEAT'
+                self.log.warning('Received HEARTBEAT without HEARTBEAT_ACK')
+                self.last_conn_state = 'HEARTBEAT failure'
                 self._heartbeat_acknowledged = True
-                self.ws.close(status=1000)
-                # self.client.gw.on_close(0, 'HEARTBEAT failure')
+                self.ws.close(status=4000, reason='HEARTBEAT failure')
                 return
             self._last_heartbeat = time()
 
@@ -170,6 +169,7 @@ class GatewayClient(LoggingClass):
             self.resuming = True
         else:
             self.log.warning('Received INVALID_SESSION, forcing a fresh reconnect')
+            self._cached_gateway_url = None
             self.session_id = None
             self.seq = 0
             self.resuming = False
@@ -274,14 +274,17 @@ class GatewayClient(LoggingClass):
         if isinstance(error, KeyboardInterrupt):
             self.shutting_down = True
             self.ws_event.set()
+            raise
         self.resuming = True  # ideally this should be fine
         self._last_http_status = get_http_status(error)
         if self._last_http_status:
+            self.last_conn_state = f'Websocket handshake failure ({self._last_http_status})'
             return self.log.error(f'Websocket handshake failed with HTTP status {self._last_http_status}')  # things are NOT fine... 🔥
         if isinstance(error, WebSocketTimeoutException):
+            self.last_conn_state = 'Websocket timeout'
             return self.log.error('Websocket connection has timed out. An upstream connection issue is likely present.')
-        if not isinstance(error, WebSocketConnectionClosedException):
-            return self.log.error(f'Websocket received error: {error.__class__.__name__} - {error}')
+        if isinstance(error, WebSocketConnectionClosedException):
+            return self.log.warning(f'Websocket received error: {error.__class__.__name__} - {error}')
         return self.log.error(f'Websocket received error: {error.__class__.__name__} - {error}')
 
     def on_open(self):

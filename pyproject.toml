@@ -1,9 +1,10 @@
 [project]
 name = "betterdisco-py"
 description = "A Discord API library, written in Python, for those that like to dance. [QUEUE COWBOY BEBOP THEME]"
-version = "2025.09.24"
-requires-python = ">= 3.10"
-license = {text = "MIT License"}
+version = "2026.10.13"
+requires-python = ">= 3.11"
+license = "MIT"
+license-files = ["LICENSE"]
 readme = {file = "README.md", content-type = "text/markdown"}
 keywords = ["discord", "disco", "disco-py", "bdisco", "betterdisco", "betterdisco-py"]
 dynamic = ["dependencies",]
@@ -17,12 +18,10 @@ maintainers = [
 
 classifiers = [
     "Development Status :: 5 - Production/Stable",
-    "License :: OSI Approved :: MIT License",
     "Intended Audience :: Developers",
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",

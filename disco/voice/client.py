@@ -1,4 +1,5 @@
 from gevent import sleep as gevent_sleep, spawn as gevent_spawn
+from gevent.event import Event as GeventEvent
 from struct import unpack_from as struct_unpack_from
 from time import time
 try:
@@ -6,7 +7,7 @@ try:
 except ImportError:
     from json import JSONDecodeError
 from collections import namedtuple as namedtuple
-from websocket import WebSocketConnectionClosedException, WebSocketTimeoutException
+from websocket import WebSocketTimeoutException
 
 try:
     from davey import DaveSession, MediaType as DaveMediaType, ProposalsOperationType as DaveProposalsOperationType, CommitWelcome as DaveCommitWelcome
@@ -181,6 +182,8 @@ class VoiceClient(LoggingClass):
         self._last_http_status = None
         self._creation_time = time()
         self._ws_creation_time = None
+        self._awaiting_voice_server_update = False
+        self._voice_server_update_event = GeventEvent()
 
         # Latency
         self._last_heartbeat = 0
@@ -250,6 +253,8 @@ class VoiceClient(LoggingClass):
         self.log.info(f'[{self.channel_id}] {self.state} ({endpoint})')
 
         self.endpoint = endpoint
+        if self._awaiting_voice_server_update and self.endpoint and self.token:
+            self._voice_server_update_event.set()
 
         if self.ws and self.ws.sock and self.ws.sock.connected:
             self.ws.close()
@@ -260,6 +265,8 @@ class VoiceClient(LoggingClass):
         if self.token == token:
             return
         self.token = token
+        if self._awaiting_voice_server_update and self.endpoint and self.token:
+            self._voice_server_update_event.set()
         if not self._identified and not self._reconnect_task and not self._ws_task and not self.ws:
             self._ws_task = gevent_spawn(self.connect_and_run)
 
@@ -280,8 +287,8 @@ class VoiceClient(LoggingClass):
             if not self._heartbeat_acknowledged:
                 self.log.warning(f'[{self.channel_id}] Websocket Received HEARTBEAT without HEARTBEAT_ACK, reconnecting...')
                 self._heartbeat_acknowledged = True
-                self.ws.close(status=4000)
-                self.on_close(0, 'HEARTBEAT failure')
+                self.ws.close(status=4000, reason='HEARTBEAT failure')
+                # self.on_close(0, 'HEARTBEAT failure')
                 return
             self._last_heartbeat = time()
 
@@ -595,8 +602,7 @@ class VoiceClient(LoggingClass):
             return self.log.error(f'[{self.channel_id}] Websocket handshake failed with HTTP status {self._last_http_status}')
         if isinstance(error, WebSocketTimeoutException):
             return self.log.error(f'[{self.channel_id}] Websocket connection has timed out. An upstream connection issue is likely present.')
-        if not isinstance(error, WebSocketConnectionClosedException):
-            return self.log.error(f'[{self.channel_id}] Websocket received error: {error.__class__.__name__} - {error}')
+        return self.log.error(f'[{self.channel_id}] Websocket received error: {error.__class__.__name__} - {error}')
 
     def on_open(self):
         self._last_http_status = None
@@ -628,20 +634,38 @@ class VoiceClient(LoggingClass):
             return
         self._ws_task = gevent_spawn(self.connect_and_run)
 
+    def await_voice_server_update(self):
+        if not self._voice_server_update_event.wait(timeout=30):
+            self.log.error(f'[{self.channel_id}] Timed out waiting for a fresh voice server update after close code 4022.')
+            self._reconnect_task = None
+            self._awaiting_voice_server_update = False
+            self.disconnect()
+            return
+
+        self._reconnect_task = None
+        self._awaiting_voice_server_update = False
+        if self.state == VoiceState.DISCONNECTED:
+            return
+
+        self.log.info(f'[{self.channel_id}] Received fresh voice server details; establishing a new voice session.')
+        self._ws_task = gevent_spawn(self.connect_and_run)
+
     def on_close(self, code=None, reason=None):
         gevent_sleep(0.001)
         if self.media:
             self.media.pause()
         self.log.info('[{}] Websocket Closed: {}{}({})'.format(self.channel_id, f'[{code}] ' if code else '', f'{reason} ' if reason else '', self._reconnects))
 
-        for handlers in tuple(self.ws.emitter.event_handlers.values()):
-            handlers.clear()
-        self.ws.emitter = None
+        if self.ws:
+            if self.ws.emitter:
+                for handlers in tuple(self.ws.emitter.event_handlers.values()):
+                    handlers.clear()
+                self.ws.emitter = None
 
-        for attr in ('on_close', 'on_cont_message', 'on_data', 'on_error', 'on_message', 'on_open', 'on_ping', 'on_pong', 'on_reconnect'):
-            setattr(self.ws, attr, None)
+            for attr in ('on_close', 'on_cont_message', 'on_data', 'on_error', 'on_message', 'on_open', 'on_ping', 'on_pong', 'on_reconnect'):
+                setattr(self.ws, attr, None)
 
-        self.ws.sock = None
+            self.ws.sock = None
 
         if self._heartbeat_task:
             self.log.debug(f'[{self.channel_id}] killing heartbeater')
@@ -658,7 +682,26 @@ class VoiceClient(LoggingClass):
         if self.state == VoiceState.DISCONNECTED:
             return
 
-        if code in (4004, 4011, 4012, 4014, 4016, 4017, 4021, 4022):
+        if code == 4022:
+            self.log.warning(f'[{self.channel_id}] Voice gateway requested a fresh voice server session; waiting up to 30 seconds.')
+            if self._reconnect_task:
+                self._reconnect_task.kill()
+                self._reconnect_task = None
+            if self.udp:
+                self.udp.disconnect()
+                self.udp = None
+            self._identified = False
+            self.endpoint = None
+            self.token = None
+            self.seq = -1
+            self._awaiting_voice_server_update = True
+            self._voice_server_update_event.clear()
+            self.set_state(VoiceState.AWAITING_ENDPOINT)
+            self.set_voice_state(self.channel_id, mute=self.mute, deaf=self.deaf, video=self.video_enabled)
+            self._reconnect_task = gevent_spawn(self.await_voice_server_update)
+            return
+
+        if code in (4004, 4011, 4012, 4014, 4016, 4017, 4021):
             self.log.warning(f'[{self.channel_id}] Voice gateway session closed with code {code}. Disconnecting without reconnect.')
             return self.disconnect()
 
