@@ -11,11 +11,16 @@ from disco.util.logging import LoggingClass
 
 def get_http_status(error):
     """
-    Return the HTTP status from a WebSocket handshake failure, if present.
+    Returns a valid HTTP status from a WebSocket handshake failure, if present.
     """
     status = getattr(error, 'status_code', None)
     if status is not None:
-        return status
+        try:
+            status = int(status)
+        except (TypeError, ValueError):
+            return None
+
+        return status if 100 <= status <= 599 else None
 
     match = re_search(r'Handshake status (\d{3})\b', str(error))
     return int(match.group(1)) if match else None

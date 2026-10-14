@@ -717,7 +717,7 @@ class VoiceClient(LoggingClass):
         # request a fresh voice endpoint.
         if http_status:
             if 500 <= http_status <= 599 or http_status == 408:
-                self.log.warning(f'[{self.channel_id}] Voice endpoint returned HTTP {code}. Requesting a fresh voice session.')
+                self.log.warning(f'[{self.channel_id}] Voice endpoint returned HTTP {http_status}. Requesting a fresh voice session.')
                 self._identified = False
                 self.endpoint = None
                 self.token = None
@@ -778,6 +778,8 @@ class VoiceClient(LoggingClass):
                 self.log.info(f'[{self.channel_id or "-"}] Attempting connection to channel id {channel_id}')
                 self.set_state(VoiceState.AWAITING_ENDPOINT)
 
+        self.mute = bool(kwargs.get('mute', False))
+        self.deaf = bool(kwargs.get('deaf', False))
         self.set_voice_state(channel_id, **kwargs)
 
         if not self.state_emitter.once(VoiceState.CONNECTED, timeout=timeout):
