@@ -129,7 +129,7 @@ class FFmpegInput(BaseInput, AbstractOpus):
         finally:
             if proc.stdout is not None:
                 proc.stdout.close()
-            if self._buffer is not None and self._buffer is not proc.stdout:
+            if self._buffer is not None and self._buffer is not proc.stdout and hasattr(self._buffer, 'close'):
                 self._buffer.close()
             self._buffer = None
 

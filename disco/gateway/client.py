@@ -211,7 +211,7 @@ class GatewayClient(LoggingClass):
 
         gateway_url += f'/?v={self.client.config.gateway_version}&encoding={self.encoder.TYPE}'
 
-        if self.zstd_stream_enabled and ('zstandard' in sys_modules.keys() or '_compression' in sys_modules.keys() and sys_version_info >= (3, 14)):
+        if self.zstd_stream_enabled and ('zstandard' in sys_modules.keys() or 'compression.zstd' in sys_modules.keys() and sys_version_info >= (3, 14)):
             gateway_url += '&compress=zstd-stream'
         elif self.zlib_stream_enabled:  # transport compression may not benefit ETF?
             gateway_url += '&compress=zlib-stream'
@@ -292,7 +292,7 @@ class GatewayClient(LoggingClass):
         self.ws.is_closed = False
         if self.zstd_stream_enabled:
             if sys_version_info >= (3, 14):
-                self._zstd = ZstdDecompressor().decompress()
+                self._zstd = ZstdDecompressor()
             else:
                 self._zstd = ZstdDecompressor().decompressobj()
         if self.zlib_stream_enabled and not self._zstd:

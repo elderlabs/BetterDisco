@@ -42,15 +42,14 @@ class Player(LoggingClass):
         self._silence_paused = False
         self._silence_started = None
 
-        # Core task
-        self.run_task = gevent_spawn(self.run)
-
         # Event triggered when playback is complete
         self.complete = GeventEvent()
 
         # Event emitter for metadata
         self.events = Emitter()
 
+        # Core task
+        self.run_task = gevent_spawn(self.run)
         self.client.update_media_silence()
 
     def client(self):
@@ -68,7 +67,6 @@ class Player(LoggingClass):
 
         if self.play_task and not self.play_task.dead:
             self.play_task.kill()
-        self.events.emit(self.Events.STOP_PLAY, self)
 
     def pause(self):
         if self.paused:
