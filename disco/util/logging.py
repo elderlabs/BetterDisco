@@ -1,7 +1,7 @@
 import sys
 from logging import WARNING, INFO, DEBUG, ERROR, CRITICAL, NOTSET, captureWarnings as logging_captureWarnings, \
     getLogger as logging_getLogger, Formatter as logging_Formatter, StreamHandler as logging_StreamHandler
-from warnings import simplefilter as warnings_simplefilter
+from warnings import simplefilter as warnings_simplefilter, filterwarnings as warnings_filterwarnings
 
 LEVEL_OVERRIDES = {
     'requests': INFO,
@@ -80,6 +80,7 @@ def _patch_emitter():
 def setup_logging(**kwargs):
     # Setup warnings module correctly
     warnings_simplefilter('always', DeprecationWarning)
+    warnings_filterwarnings('ignore', message=r"This process \(pid\=\d+\) is multi-threaded, use of fork\(\) may lead to deadlocks in the child", category=DeprecationWarning, module=r"gevent\.os")
     logging_captureWarnings(True)
 
     root = logging_getLogger()

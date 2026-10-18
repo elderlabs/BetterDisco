@@ -105,12 +105,13 @@ class Client(LoggingClass):
         self.packets = Emitter()
 
         self.api = APIClient(self.config.token, self)
+        gw_kwargs = {'max_reconnects': self.config.max_reconnects, 'encoder': self.config.encoder, 'ignored_events': self.config.ignored_events, 'subscribed_events': self.config.subscribed_events}
         if isinstance(self.config.compression, bool) and self.config.compression and sys_version_info >= (3, 14) or not isinstance(self.config.compression, bool) and 'zstd' in self.config.compression:
-            self.gw = GatewayClient(self, self.config.max_reconnects, self.config.encoder, zstd_stream_enabled=True, ignored_events=self.config.ignored_events, subscribed_events=self.config.subscribed_events)
+            self.gw = GatewayClient(self, **gw_kwargs, zstd_stream_enabled=True)
         elif isinstance(self.config.compression, bool) and self.config.compression and sys_version_info < (3, 14) or not isinstance(self.config.compression, bool) and 'zlib' in self.config.compression:
-            self.gw = GatewayClient(self, self.config.max_reconnects, self.config.encoder, zlib_stream_enabled=True, ignored_events=self.config.ignored_events, subscribed_events=self.config.subscribed_events)
+            self.gw = GatewayClient(self, **gw_kwargs, zlib_stream_enabled=True)
         else:
-            self.gw = GatewayClient(self, self.config.max_reconnects, self.config.encoder, ignored_events=self.config.ignored_events, subscribed_events=self.config.subscribed_events)
+            self.gw = GatewayClient(self, **gw_kwargs)
         self.state = State(self, StateConfig(self.config.get('state', {})))
 
         if self.config.manhole_enable:

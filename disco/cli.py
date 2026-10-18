@@ -2,7 +2,6 @@
 The CLI module is a small utility that can be used as an easy entry point for
 creating and running bots/clients.
 """
-from libnacl import nacl  # silences fork() warnings
 from gevent.monkey import patch_all as monkey_patch_all; monkey_patch_all()
 
 from os import path as os_path
