@@ -77,7 +77,7 @@ class GatewayEvent(with_metaclass(GatewayEventMeta, Model)):
                 except AttributeError:
                     pass
 
-            return obj
+        return obj
 
     def __getattr__(self, name):
         try:

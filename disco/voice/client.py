@@ -111,24 +111,24 @@ class VoiceClient(LoggingClass):
 
         # Bind to some WS packets
         self.packets = Emitter()
-        self.packets.on(VoiceOPCode.READY, self.on_voice_ready, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.HEARTBEAT, self.handle_heartbeat, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.SESSION_DESCRIPTION, self.on_voice_sdp, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.SPEAKING, self.on_voice_speaking, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.HEARTBEAT_ACK, self.handle_heartbeat_acknowledge, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.HELLO, self.on_voice_hello, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.RESUMED, self.on_voice_resumed, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.CLIENT_DISCONNECT, self.on_voice_client_disconnect, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.CODECS, self.on_voice_codecs, priority=Priority.BEFORE)
+        self.packets.on(VoiceOPCode.READY, self.on_voice_ready)
+        self.packets.on(VoiceOPCode.HEARTBEAT, self.handle_heartbeat)
+        self.packets.on(VoiceOPCode.SESSION_DESCRIPTION, self.on_voice_sdp)
+        self.packets.on(VoiceOPCode.SPEAKING, self.on_voice_speaking)
+        self.packets.on(VoiceOPCode.HEARTBEAT_ACK, self.handle_heartbeat_acknowledge)
+        self.packets.on(VoiceOPCode.HELLO, self.on_voice_hello)
+        self.packets.on(VoiceOPCode.RESUMED, self.on_voice_resumed)
+        self.packets.on(VoiceOPCode.CLIENT_DISCONNECT, self.on_voice_client_disconnect)
+        self.packets.on(VoiceOPCode.CODECS, self.on_voice_codecs)
         if self.video_enabled:
-            self.packets.on(VoiceOPCode.VIDEO, self.on_video, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.DAVE_TRANSITION_EXECUTE, self.on_dave_transition_execute, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.DAVE_TRANSITION_PREPARE, self.on_dave_transition_prepare, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.DAVE_PREPARE_EPOCH, self.on_dave_prepare_epoch, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.DAVE_MLS_TRANSITION_ANNOUNCE_COMMIT, self.on_dave_mls_transition_announce_commit, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.DAVE_MLS_WELCOME, self.on_dave_mls_welcome, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.DAVE_MLS_EXTERNAL_SENDER, self.on_dave_mls_external_sender, priority=Priority.BEFORE)
-        self.packets.on(VoiceOPCode.DAVE_MLS_PROPOSALS, self.on_dave_mls_proposal, priority=Priority.BEFORE)
+            self.packets.on(VoiceOPCode.VIDEO, self.on_video)
+        self.packets.on(VoiceOPCode.DAVE_TRANSITION_EXECUTE, self.on_dave_transition_execute)
+        self.packets.on(VoiceOPCode.DAVE_TRANSITION_PREPARE, self.on_dave_transition_prepare)
+        self.packets.on(VoiceOPCode.DAVE_PREPARE_EPOCH, self.on_dave_prepare_epoch)
+        self.packets.on(VoiceOPCode.DAVE_MLS_TRANSITION_ANNOUNCE_COMMIT, self.on_dave_mls_transition_announce_commit)
+        self.packets.on(VoiceOPCode.DAVE_MLS_WELCOME, self.on_dave_mls_welcome)
+        self.packets.on(VoiceOPCode.DAVE_MLS_EXTERNAL_SENDER, self.on_dave_mls_external_sender)
+        self.packets.on(VoiceOPCode.DAVE_MLS_PROPOSALS, self.on_dave_mls_proposal)
 
         # State + state change emitter
         self.state = VoiceState.DISCONNECTED
@@ -276,10 +276,10 @@ class VoiceClient(LoggingClass):
         gateway_url += f'/?v={self.VOICE_GATEWAY_VERSION}&encoding={self.encoder.TYPE}'
 
         self.ws = Websocket(gateway_url)
-        self.ws.emitter.on('on_open', self.on_open, priority=Priority.BEFORE)
-        self.ws.emitter.on('on_error', self.on_error, priority=Priority.BEFORE)
-        self.ws.emitter.on('on_close', self.on_close, priority=Priority.BEFORE)
-        self.ws.emitter.on('on_message', self.on_message, priority=Priority.BEFORE)
+        self.ws.emitter.on('on_open', self.on_open)
+        self.ws.emitter.on('on_error', self.on_error)
+        self.ws.emitter.on('on_close', self.on_close)
+        self.ws.emitter.on('on_message', self.on_message)
         self.ws.run_forever(ping_interval=60, ping_timeout=5)
 
     def heartbeat_task(self, interval):

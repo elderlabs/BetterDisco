@@ -9,7 +9,6 @@ from disco.gateway.packets import OPCode, RECV, SEND
 from disco.gateway.events import GatewayEvent
 from disco.gateway.encoding import ENCODERS
 from disco.util.websocket import Websocket, get_http_status
-from disco.util.emitter import Priority
 from disco.util.logging import LoggingClass
 from disco.util.limiter import SimpleLimiter
 
@@ -54,12 +53,12 @@ class GatewayClient(LoggingClass):
         self.limiter = SimpleLimiter(120, 60)
 
         # Create emitter and bind to gateway payloads
-        self.packets.on((RECV, OPCode.DISPATCH), self.handle_dispatch, priority=Priority.BEFORE)
-        self.packets.on((RECV, OPCode.HEARTBEAT), self.handle_heartbeat, priority=Priority.BEFORE)
-        self.packets.on((RECV, OPCode.HEARTBEAT_ACK), self.handle_heartbeat_acknowledge, priority=Priority.BEFORE)
-        self.packets.on((RECV, OPCode.RECONNECT), self.handle_reconnect, priority=Priority.BEFORE)
-        self.packets.on((RECV, OPCode.INVALID_SESSION), self.handle_invalid_session, priority=Priority.BEFORE)
-        self.packets.on((RECV, OPCode.HELLO), self.handle_hello, priority=Priority.BEFORE)
+        self.packets.on((RECV, OPCode.DISPATCH), self.handle_dispatch)
+        self.packets.on((RECV, OPCode.HEARTBEAT), self.handle_heartbeat)
+        self.packets.on((RECV, OPCode.HEARTBEAT_ACK), self.handle_heartbeat_acknowledge)
+        self.packets.on((RECV, OPCode.RECONNECT), self.handle_reconnect)
+        self.packets.on((RECV, OPCode.INVALID_SESSION), self.handle_invalid_session)
+        self.packets.on((RECV, OPCode.HELLO), self.handle_hello)
 
         # Bind to ready payload
         self.events.on('Ready', self.on_ready)
@@ -218,10 +217,10 @@ class GatewayClient(LoggingClass):
 
         self.log.info(f'Opening websocket connection to `{gateway_url}`')
         self.ws = Websocket(gateway_url)
-        self.ws.emitter.on('on_open', self.on_open, priority=Priority.BEFORE)
-        self.ws.emitter.on('on_error', self.on_error, priority=Priority.BEFORE)
-        self.ws.emitter.on('on_close', self.on_close, priority=Priority.BEFORE)
-        self.ws.emitter.on('on_message', self.on_message, priority=Priority.BEFORE)
+        self.ws.emitter.on('on_open', self.on_open)
+        self.ws.emitter.on('on_error', self.on_error)
+        self.ws.emitter.on('on_close', self.on_close)
+        self.ws.emitter.on('on_message', self.on_message)
 
         self.ws.run_forever(ping_interval=60, ping_timeout=5)
 
