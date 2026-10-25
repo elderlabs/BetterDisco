@@ -1,4 +1,7 @@
 from disco.api.http import APIException
+# from disco.types.application import ApplicationCommand
+from disco.types.integration import Integration
+from disco.types.webhook import Webhook
 from disco.types.base import (
     SlottedModel, Field, ListField, AutoDictField, snowflake, text, enum, datetime,
     cached_property, BitsetMap, BitsetValue,
@@ -110,6 +113,12 @@ class RoleTags(SlottedModel):
     guild_connections = Field(bool)  # null = True
 
 
+class RoleColors(SlottedModel):
+    primary_color = Field(text)
+    secondary_color = Field(text)
+    tertiary_color = Field(text)
+
+
 class Role(SlottedModel):
     """
     A role object.
@@ -143,6 +152,7 @@ class Role(SlottedModel):
     hoist = Field(bool)
     managed = Field(bool)
     color = Field(int)
+    colors = Field
     permissions = Field(PermissionValue)
     position = Field(int)
     mentionable = Field(bool)
@@ -151,6 +161,7 @@ class Role(SlottedModel):
     unicode_emoji = Field(text)
     icon = Field(text)
     flags = Field(RoleFlagsValue)
+    description = Field(text)
 
     def __repr__(self):
         return f'<Role id={self.id} name={self.name}>'
@@ -468,6 +479,56 @@ class GuildScheduledEventUser(SlottedModel):
     member = Field(GuildMember)
 
 
+class GuildScheduledEventRecurrenceRuleFrequency:
+    YEARLY = 0
+    MONTHLY = 1
+    WEEKLY = 2
+    DAILY = 3
+
+
+class GuildScheduledEventRecurrenceRuleWeekday:
+    MONDAY = 0
+    TUESDAY = 1
+    WEDNESDAY = 2
+    THURSDAY = 3
+    FRIDAY = 4
+    SATURDAY = 5
+    SUNDAY = 6
+
+
+class GuildScheduledEventRecurrenceRuleNWeekday(SlottedModel):
+    n = Field(int)
+    day = Field(enum(GuildScheduledEventRecurrenceRuleWeekday))
+
+
+class GuildScheduledEventRecurrenceRuleMonth:
+    JANUARY = 1
+    FEBRUARY = 2
+    MARCH = 3
+    APRIL = 4
+    MAY = 5
+    JUNE = 6
+    JULY = 7
+    AUGUST = 8
+    SEPTEMBER = 9
+    OCTOBER = 10
+    NOVEMBER = 11
+    DECEMBER = 12
+
+
+class GuildScheduledEventRecurrenceRule(SlottedModel):
+    start = Field(datetime)
+    end = Field(datetime)
+    frequency = Field(enum(GuildScheduledEventRecurrenceRuleFrequency))
+    interval = Field(int)
+    by_weekday = ListField(enum(GuildScheduledEventRecurrenceRuleWeekday))
+    by_n_weekday = ListField(GuildScheduledEventRecurrenceRuleNWeekday)
+    by_month = ListField(enum(GuildScheduledEventRecurrenceRuleMonth))
+    by_month_day = ListField(int)
+    by_year_day = ListField(int)
+    count = Field(int)
+
+
 class GuildScheduledEvent(SlottedModel):
     id = Field(snowflake)
     guild_id = Field(snowflake)
@@ -516,6 +577,14 @@ class GuildVoiceState(VoiceState):
 
 class InventorySettings(SlottedModel):
     is_emoji_pack_collectible = Field(bool)
+
+
+class IncidentsData(SlottedModel):
+    invites_disabled_until = Field(datetime)
+    dms_disabled_until = Field(datetime)
+    dm_spam_detected_at = Field(datetime)
+    raid_detected_at = Field(datetime)
+    lockdown_duration_hours = Field(datetime)
 
 
 class Guild(SlottedModel, Permissible):
@@ -601,10 +670,11 @@ class Guild(SlottedModel, Permissible):
     widget_enabled = Field(bool)
     widget_channel_id = Field(snowflake)
     verification_level = Field(enum(VerificationLevel))
+    verification_role_id = Field(snowflake)
     default_message_notifications = Field(enum(DefaultMessageNotificationsLevel))
     explicit_content_filter = Field(enum(ExplicitContentFilterLevel))
-    roles = AutoDictField(Role, 'id')
-    emojis = AutoDictField(GuildEmoji, 'id')
+    roles = AutoDictField(Role, 'id', default={})
+    emojis = AutoDictField(GuildEmoji, 'id', default={})
     features = ListField(str)
     mfa_level = Field(enum(MFALevel))
     application_id = Field(snowflake)
@@ -626,30 +696,35 @@ class Guild(SlottedModel, Permissible):
     approximate_presence_count = Field(int)
     welcome_screen = Field(WelcomeScreen)
     nsfw_level = Field(enum(GuildNSFWLevel))
-    stickers = AutoDictField(Sticker, 'id')
+    stickers = AutoDictField(Sticker, 'id', default={})
     premium_progress_bar_enabled = Field(bool)
+    premium_progress_bar_enabled_user_updated_at = Field(datetime)
     safety_alerts_channel_id = Field(snowflake)
     joined_at = Field(datetime)
     large = Field(bool)
     unavailable = Field(bool, default=False)
     member_count = Field(int)
-    voice_states = AutoDictField(GuildVoiceState, 'session_id')
-    members = AutoDictField(GuildMember, 'id')
-    channels = AutoDictField(Channel, 'id')
-    threads = AutoDictField(Thread, 'id')
+    voice_states = AutoDictField(GuildVoiceState, 'session_id', default={})
+    members = AutoDictField(GuildMember, 'id', default={})
+    channels = AutoDictField(Channel, 'id', default={})
+    threads = AutoDictField(Thread, 'id', default={})
     # presences = AutoDictField(Presence, 'status')
-    stage_instances = AutoDictField(StageInstance, 'id')
+    stage_instances = AutoDictField(StageInstance, 'id', default={})
     latest_onboarding_question_id = Field(snowflake)
     lazy = Field(bool)
-    guild_scheduled_events = AutoDictField(GuildScheduledEvent, 'id')
+    guild_scheduled_events = AutoDictField(GuildScheduledEvent, 'id', default={})
     # embedded_activities = ListField(None)
     home_header = Field(text)
     hub_type = Field(text)
     # application_command_counts = Field(None)
-    soundboard_sounds = AutoDictField(GuildSoundboardSound, 'sound_id')
+    soundboard_sounds = AutoDictField(GuildSoundboardSound, 'sound_id', default={})
     inventory_settings = Field(InventorySettings)
-    incidents_data = Field(text)
+    incidents_data = Field(IncidentsData)
     version = Field(int)
+    official_message_color = Field(text)
+    owner_configured_content_level = Field(int)
+    premium_features = Field(dict)
+    # region = Field(text)
 
     def __init__(self, *args, **kwargs):
         super(Guild, self).__init__(*args, **kwargs)
@@ -944,6 +1019,358 @@ class Guild(SlottedModel, Permissible):
         return self.client.api.guilds_discovery_requirements(self.id)
 
 
+class AuditLogActionTypes:
+    GUILD_UPDATE = 1
+    CHANNEL_CREATE = 10
+    CHANNEL_UPDATE = 11
+    CHANNEL_DELETE = 12
+    CHANNEL_OVERWRITE_CREATE = 13
+    CHANNEL_OVERWRITE_UPDATE = 14
+    CHANNEL_OVERWRITE_DELETE = 15
+    MEMBER_KICK = 20
+    MEMBER_PRUNE = 21
+    MEMBER_BAN_ADD = 22
+    MEMBER_BAN_REMOVE = 23
+    MEMBER_UPDATE = 24
+    MEMBER_ROLE_UPDATE = 25
+    MEMBER_MOVE = 26
+    MEMBER_DISCONNECT = 27
+    BOT_ADD = 28
+    ROLE_CREATE = 30
+    ROLE_UPDATE = 31
+    ROLE_DELETE = 32
+    INVITE_CREATE = 40
+    INVITE_UPDATE = 41
+    INVITE_DELETE = 42
+    WEBHOOK_CREATE = 50
+    WEBHOOK_UPDATE = 51
+    WEBHOOK_DELETE = 52
+    EMOJI_CREATE = 60
+    EMOJI_UPDATE = 61
+    EMOJI_DELETE = 62
+    MESSAGE_DELETE = 72
+    MESSAGE_BULK_DELETE = 73
+    MESSAGE_PIN = 74
+    MESSAGE_UNPIN = 75
+    INTEGRATION_CREATE = 80
+    INTEGRATION_UPDATE = 81
+    INTEGRATION_DELETE = 82
+    STAGE_INSTANCE_CREATE = 83
+    STAGE_INSTANCE_UPDATE = 84
+    STAGE_INSTANCE_DELETE = 85
+    STICKER_CREATE = 90
+    STICKER_UPDATE = 91
+    STICKER_DELETE = 92
+    GUILD_SCHEDULED_EVENT_CREATE = 100
+    GUILD_SCHEDULED_EVENT_UPDATE = 101
+    GUILD_SCHEDULED_EVENT_DELETE = 102
+    THREAD_CREATE = 110
+    THREAD_UPDATE = 111
+    THREAD_DELETE = 112
+    APPLICATION_COMMAND_PERMISSION_UPDATE = 121
+    SOUNDBOARD_SOUND_CREATE = 130
+    SOUNDBOARD_SOUND_UPDATE = 131
+    SOUNDBOARD_SOUND_DELETE = 132
+    AUTO_MODERATION_RULE_CREATE = 140
+    AUTO_MODERATION_RULE_UPDATE = 141
+    AUTO_MODERATION_RULE_DELETE = 142
+    AUTO_MODERATION_BLOCK_MESSAGE = 143
+    AUTO_MODERATION_FLAG_TO_CHANNEL = 144
+    AUTO_MODERATION_USER_COMMUNICATION_DISABLED = 145
+    AUTO_MODERATION_QUARANTINE_USER = 146
+    CREATOR_MONETIZATION_REQUEST_CREATED = 150
+    CREATOR_MONETIZATION_TERMS_ACCEPTED = 151
+    ONBOARDING_PROMPT_CREATE = 163
+    ONBOARDING_PROMPT_UPDATE = 164
+    ONBOARDING_PROMPT_DELETE = 165
+    ONBOARDING_CREATE = 166
+    ONBOARDING_UPDATE = 167
+    GUILD_HOME_FEATURE_ITEM = 171
+    GUILD_HOME_REMOVE_ITEM = 172
+    HOME_SETTINGS_CREATE = 190
+    HOME_SETTINGS_UPDATE = 191
+    VOICE_CHANNEL_STATUS_CREATE = 192
+    VOICE_CHANNEL_STATUS_DELETE = 193
+    GUILD_SCHEDULED_EVENT_EXCEPTION_CREATE = 200
+    GUILD_SCHEDULED_EVENT_EXCEPTION_UPDATE = 201
+    GUILD_SCHEDULED_EVENT_EXCEPTION_DELETE = 202
+    GUILD_MEMBER_VERIFICATION_UPDATE = 210
+    GUILD_PROFILE_UPDATE = 211
+    GUILD_MIGRATE_PIN_PERMISSION = 212
+    BYPASS_SLOWMODE_PERMISSION_MIGRATION_COMPLETE = 213
+
+
+GUILD_ACTIONS = (
+    AuditLogActionTypes.GUILD_UPDATE,
+    AuditLogActionTypes.BOT_ADD,
+)
+
+CHANNEL_ACTIONS = (
+    AuditLogActionTypes.CHANNEL_CREATE,
+    AuditLogActionTypes.CHANNEL_UPDATE,
+    AuditLogActionTypes.CHANNEL_DELETE,
+    AuditLogActionTypes.CHANNEL_OVERWRITE_CREATE,
+    AuditLogActionTypes.CHANNEL_OVERWRITE_UPDATE,
+    AuditLogActionTypes.CHANNEL_OVERWRITE_DELETE,
+)
+
+MEMBER_ACTIONS = (
+    AuditLogActionTypes.MEMBER_KICK,
+    AuditLogActionTypes.MEMBER_PRUNE,
+    AuditLogActionTypes.MEMBER_BAN_ADD,
+    AuditLogActionTypes.MEMBER_BAN_REMOVE,
+    AuditLogActionTypes.MEMBER_UPDATE,
+    AuditLogActionTypes.MEMBER_ROLE_UPDATE,
+    AuditLogActionTypes.MEMBER_MOVE,
+    AuditLogActionTypes.MEMBER_DISCONNECT,
+)
+
+ROLE_ACTIONS = (
+    AuditLogActionTypes.ROLE_CREATE,
+    AuditLogActionTypes.ROLE_UPDATE,
+    AuditLogActionTypes.ROLE_DELETE,
+)
+
+INVITE_ACTIONS = (
+    AuditLogActionTypes.INVITE_CREATE,
+    AuditLogActionTypes.INVITE_UPDATE,
+    AuditLogActionTypes.INVITE_DELETE,
+)
+
+WEBHOOK_ACTIONS = (
+    AuditLogActionTypes.WEBHOOK_CREATE,
+    AuditLogActionTypes.WEBHOOK_UPDATE,
+    AuditLogActionTypes.WEBHOOK_DELETE,
+)
+
+EMOJI_ACTIONS = (
+    AuditLogActionTypes.EMOJI_CREATE,
+    AuditLogActionTypes.EMOJI_UPDATE,
+    AuditLogActionTypes.EMOJI_DELETE,
+)
+
+MESSAGE_ACTIONS = (
+    AuditLogActionTypes.MESSAGE_DELETE,
+    AuditLogActionTypes.MESSAGE_BULK_DELETE,
+    AuditLogActionTypes.MESSAGE_PIN,
+    AuditLogActionTypes.MESSAGE_UNPIN,
+)
+
+INTEGRATIONS_ACTIONS = (
+    AuditLogActionTypes.INTEGRATION_CREATE,
+    AuditLogActionTypes.INTEGRATION_UPDATE,
+    AuditLogActionTypes.INTEGRATION_DELETE,
+)
+
+
+class AuditLogObjectChange(SlottedModel):
+    new_value = Field(text)
+    old_value = Field(text)
+    key = Field(text)
+
+
+class AuditLogOptionalEntryInfo(SlottedModel):
+    application_id = Field(snowflake)
+    auto_moderation_rule_name = Field(text)
+    auto_moderation_rule_trigger_type = Field(text)
+    channel_id = Field(snowflake)
+    count = Field(text)
+    delete_member_days = Field(text)
+    event_exception_id = Field(snowflake)
+    id = Field(snowflake)
+    members_removed = Field(text)
+    message_id = Field(snowflake)
+    role_name = Field(text)
+    status = Field(text)
+    type = Field(text)
+    integration_type = Field(text)
+
+
+class AuditLogEntry(SlottedModel):
+    target_id = Field(snowflake)
+    changes = ListField(AuditLogObjectChange)
+    user_id = Field(snowflake)
+    id = Field(snowflake)
+    action_type = Field(enum(AuditLogActionTypes))
+    options = Field(AuditLogOptionalEntryInfo)
+    reason = Field(text)
+    guild_id = Field(snowflake)
+
+    _cached_target = Field(None)
+
+    @classmethod
+    def create(cls, client, users, webhooks, data, **kwargs):
+        self = super(SlottedModel, cls).create(client, data, **kwargs)
+
+        if self.action_type in MEMBER_ACTIONS:
+            self._cached_target = users[self.target_id]
+        elif self.action_type in WEBHOOK_ACTIONS:
+            self._cached_target = webhooks[self.target_id]
+
+        return self
+
+    @cached_property
+    def guild(self):
+        return self.client.state.guilds.get(self.guild_id)
+
+    @cached_property
+    def user(self):
+        return self.client.state.users.get(self.user_id)
+
+    @cached_property
+    def target(self):
+        if self.action_type in GUILD_ACTIONS:
+            return self.guild
+        elif self.action_type in CHANNEL_ACTIONS:
+            return self.guild.channels.get(self.target_id)
+        elif self.action_type in MEMBER_ACTIONS:
+            return self._cached_target or self.state.users.get(self.target_id)
+        elif self.action_type in ROLE_ACTIONS:
+            return self.guild.roles.get(self.target_id)
+        elif self.action_type in WEBHOOK_ACTIONS:
+            return self._cached_target
+        elif self.action_type in EMOJI_ACTIONS:
+            return self.guild.emojis.get(self.target_id)
+
+
+class AuditLogChangeKey(SlottedModel):
+    name = Field(text)  # any
+    description = Field(text)  # Guild or Sticker
+    icon_hash = Field(text)  # Guild
+    splash_hash = Field(text)  # Guild
+    discovery_splash_hash = Field(text)  # Guild
+    banner_hash = Field(text)  # Guild
+    owner_id = Field(snowflake)  # Guild
+    region = Field(text)  # Guild
+    preferred_locale = Field(text)  # Guild
+    afk_channel_id = Field(snowflake)  # Guild
+    afk_timeout = Field(int)  # Guild
+    rules_channel_id = Field(snowflake)  # Guild
+    public_updates_channel_id = Field(snowflake)  # Guild
+    mfa_level = Field(int)  # Guild
+    verification_level = Field(int)  # Guild
+    explicit_content_filter = Field(int)  # Guild
+    default_message_notifications = Field(int)  # Guild
+    vanity_url_code = Field(text)  # Guild
+    _add = ListField(Role)  # Guild
+    _remove = ListField(Role)  # Guild
+    prune_delete_days = Field(int)  # Guild
+    widget_enabled = Field(bool)  # Guild
+    widget_channel_id = Field(snowflake)  # Guild
+    system_channel_id = Field(snowflake)  # Guild
+    position = Field(int)  # Channel
+    topic = Field(text)  # Channel or StageInstance
+    bitrate = Field(int)  # Channel
+    overwrites = AutoDictField(PermissionOverwrite, 'id', alias='permission_overwrites')  # Channel
+    nsfw = Field(bool)  # Channel
+    application_id = Field(snowflake)  # Channel
+    rate_limit_per_user = Field(int)  # Channel
+    permissions = Field(PermissionValue)  # Role
+    color = Field(int)  # Role
+    hoist = Field(bool)  # Role
+    mentionable = Field(bool)  # Role
+    allow = Field(text)  # Role
+    deny = Field(text)  # Role
+    code = Field(text)  # Invite
+    channel_id = Field(snowflake)  # Invite
+    inviter_id = Field(snowflake)  # Invite
+    max_uses = Field(int)  # Invite
+    uses = Field(int)  # Invite
+    max_age = Field(int)  # Invite
+    temporary = Field(bool)  # Invite
+    deaf = Field(bool)  # User
+    mute = Field(bool)  # User
+    nick = Field(text)  # User
+    avatar_hash = Field(text)  # User
+    id = Field(snowflake)  # any
+    type = Field(text)  # any
+    enable_emoticons = Field(bool)  # Integration
+    expire_behavior = Field(int)  # Integration
+    expire_grace_period = Field(int)  # Integration
+    user_limit = Field(int)  # Channel (Voice)
+    privacy_level = Field(StageInstancePrivacyLevel)  # StageInstance
+    tags = Field(text)  # Sticker
+    format_type = Field(StickerFormatTypes)  # Sticker
+    asset = Field(text)  # Sticker
+    available = Field(bool)  # Sticker
+    guild_id = Field(snowflake)  # Sticker
+    archived = Field(bool)  # Channel (Thread)
+    locked = Field(bool)  # Channel (Thread)
+    auto_archive_duration = Field(int)  # Channel (Thread)
+    default_auto_archive_duration = Field(int)  # Channel
+
+
+class AutoModerationEventTypes:
+    MESSAGE_SEND = 1
+    MEMBER_UPDATE = 2
+
+
+class AutoModerationActionTypes:
+    BLOCK_MESSAGE = 1
+    SEND_ALERT_MESSAGE = 2
+    TIMEOUT = 3
+    BLOCK_MEMBER_INTERACTION = 4
+
+
+class AutoModerationActionMetadata(SlottedModel):
+    channel_id = Field(snowflake)
+    duration_seconds = Field(int)
+    custom_message = Field(text)
+
+
+class AutoModerationAction(SlottedModel):
+    type = Field(enum(AutoModerationActionTypes))
+    metadata = Field(AutoModerationActionMetadata)
+
+
+class AutoModerationKeywordPresetTypes:
+    PROFANITY = 1
+    SEXUAL_CONTENT = 2
+    SLURS = 3
+
+
+class AutoModerationTriggerTypes:
+    KEYWORD = 1
+    SPAM = 3
+    KEYWORD_PRESET = 4
+    MENTION_SPAM = 5
+    MEMBER_PROFILE = 6
+
+
+class AutoModerationTriggerMetadata(SlottedModel):
+    keyword_filter = ListField(text)
+    regex_patterns = ListField(text)
+    presets = ListField(enum(AutoModerationKeywordPresetTypes))
+    allow_list = ListField(text)
+    mention_total_limit = Field(int)
+    mention_raid_protection_enabled = Field(bool)
+
+
+class AutoModerationRule(SlottedModel):
+    id = Field(snowflake)
+    guild_id = Field(snowflake)
+    name = Field(text)
+    creator_id = Field(snowflake)
+    event_type = Field(enum(AutoModerationEventTypes))
+    trigger_type = Field(enum(AutoModerationTriggerTypes))
+    trigger_metadata = Field(AutoModerationTriggerMetadata)
+    actions = ListField(AutoModerationAction)
+    enabled = Field(bool)
+    exempt_roles = ListField(snowflake)
+    exempt_channels = ListField(snowflake)
+
+
+class AuditLog(SlottedModel):
+    application_commands = ListField(dict)
+    audit_log_entries = ListField(AuditLogEntry)
+    auto_moderation_rules = ListField(AutoModerationRule)
+    guild_scheduled_events = ListField(GuildScheduledEvent)
+    integrations = ListField(Integration)
+    threads = ListField(Thread)
+    users = ListField(User)
+    webhooks = ListField(Webhook)
+
+
 class DiscoveryRequirementsHealthScore(SlottedModel):
     avg_nonnew_communicators = Field(int)
     avg_nonnew_participators = Field(int)
@@ -1003,3 +1430,40 @@ class GuildTemplate(SlottedModel):
     serialized_source_guild = Field(Guild)
     is_dirty = Field(bool)
 
+
+class AutoModerationActionExecute(SlottedModel):
+    guild_id = Field(snowflake)
+    action = Field(AutoModerationAction)
+    rule_id = Field(snowflake)
+    rule_trigger_type = Field(enum(AutoModerationTriggerTypes))
+    user_id = Field(snowflake)
+    channel_id = Field(snowflake)
+    message_id = Field(snowflake)
+    alert_system_message_id = Field(snowflake)
+    content = Field(text)
+    matched_keyword = Field(text)
+    matched_content = Field(text)
+
+
+class GuildEntitlementTypes:
+    PURCHASE = 1
+    PREMIUM_SUBSCRIPTION = 2
+    DEVELOPER_GIFT = 3
+    TEST_MODE_PURCHASE = 4
+    FREE_PURCHASE = 5
+    USER_GIFT = 6
+    PREMIUM_PURCHASE = 7
+    APPLICATION_SUBSCRIPTION = 8
+
+
+class GuildEntitlement(SlottedModel):
+    id = Field(snowflake)
+    sku_id = Field(snowflake)
+    application_id = Field(snowflake)
+    user_id = Field(snowflake)
+    type = Field(enum(GuildEntitlementTypes))
+    deleted = Field(bool)
+    starts_at = Field(datetime)
+    ends_at = Field(datetime)
+    guild_id = Field(snowflake)
+    consumed = Field(bool)

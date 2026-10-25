@@ -10,11 +10,11 @@ jobs:
 
     steps:
     - name: Pull Repository
-      uses: actions/checkout@v4
-    - name: Setup Python 3.12
-      uses: actions/setup-python@v5
+      uses: actions/checkout@v6
+    - name: Setup Python 3.13
+      uses: actions/setup-python@v6
       with:
-        python-version: "3.12"
+        python-version: "3.13"
     - name: Install Dependencies
       run: |
         python -m pip install --no-cache-dir --upgrade pip
@@ -26,7 +26,7 @@ jobs:
       run: |
         python -m build
     - name: Store distribution packages
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: python-package-distributions
         path: dist/
@@ -44,7 +44,7 @@ jobs:
 
     steps:
     - name: Download Distributions
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v3
       with:
         name: python-package-distributions
         path: dist/
@@ -64,17 +64,17 @@ jobs:
       id-token: write  # IMPORTANT: mandatory for sigstore
 
     steps:
-    - name: Setup Python 3.12
-      uses: actions/setup-python@v5
+    - name: Setup Python 3.13
+      uses: actions/setup-python@v6
       with:
-        python-version: "3.12"
+        python-version: "3.13"
     - name: Download Distributions
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v3
       with:
         name: python-package-distributions
         path: dist/
     - name: Sign
-      uses: sigstore/gh-action-sigstore-python@v3.0.0
+      uses: sigstore/gh-action-sigstore-python@v3.3.0
       with:
         inputs: |
           ./dist/*.tar.gz

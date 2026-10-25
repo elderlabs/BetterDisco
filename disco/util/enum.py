@@ -112,7 +112,7 @@ def Enum(*args, **kwargs):
     return _T
 
 
-def get_enum_members(enum):
+def get_enum_members(enum, order='name'):
     for k, v in enum.__dict__.items():
         if not isinstance(k, str):
             continue
@@ -120,7 +120,10 @@ def get_enum_members(enum):
         if k.startswith('_') or not k.isupper():
             continue
 
-        yield k, v
+        if 'name' in order:
+            yield k, v
+        elif 'value' in order:
+            yield v, k
 
 
 def get_enum_value_by_name(enum, name):
@@ -129,3 +132,9 @@ def get_enum_value_by_name(enum, name):
     for k, v in get_enum_members(enum):
         if k.lower() == name:
             return v
+
+
+def get_enum_name_by_value(enum, value):
+    for k, v in get_enum_members(enum):
+        if v == value:
+            return k

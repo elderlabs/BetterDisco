@@ -93,7 +93,7 @@ class BasePluginDeco:
     @classmethod
     def listen_packet(cls, *args, **kwargs):
         """
-        Binds the function to listen for a given gateway op code.
+        Binds the function to listen for a given gateway opcode.
         """
         return cls.add_meta_deco({
             'type': 'listener',
@@ -258,7 +258,7 @@ class Plugin(LoggingClass, PluginDeco):
         self.listeners = []
         self.commands = []
         self.schedules = {}
-        self.greenlets = set()
+        self.greenlets = WeakSet()
 
         self._pre = {'command': [], 'listener': []}
         self._post = {'command': [], 'listener': []}
@@ -325,6 +325,7 @@ class Plugin(LoggingClass, PluginDeco):
                 return res
             finally:
                 self.ctx.drop()
+                self.greenlets.discard(gevent_getcurrent())
 
         obj = spawner(wrapped, *args, **kwargs)
         self.greenlets.add(obj)
@@ -349,6 +350,8 @@ class Plugin(LoggingClass, PluginDeco):
             return False
         finally:
             self.ctx.drop()
+            if not event.command.oob:
+                self.greenlets.discard(gevent_getcurrent())
 
     def register_trigger(self, typ, when, func):
         """
@@ -360,31 +363,36 @@ class Plugin(LoggingClass, PluginDeco):
         # Link the greenlet with our exception handler
         gevent_getcurrent().link_exception(lambda g: self.handle_exception(g, event))
 
-        # TODO: this is ugly
+        greenlet = gevent_getcurrent()
         if typ != 'command':
-            self.greenlets.add(gevent_getcurrent())
+            self.greenlets.add(greenlet)
 
-        self.ctx['plugin'] = self
+        try:
+            self.ctx['plugin'] = self
 
-        if hasattr(event, 'guild'):
-            self.ctx['guild'] = event.guild
-        if hasattr(event, 'channel'):
-            self.ctx['channel'] = event.channel
-        if hasattr(event, 'author'):
-            self.ctx['user'] = event.author
+            if hasattr(event, 'guild'):
+                self.ctx['guild'] = event.guild
+            if hasattr(event, 'channel'):
+                self.ctx['channel'] = event.channel
+            if hasattr(event, 'author'):
+                self.ctx['user'] = event.author
 
-        for pre in self._pre[typ]:
-            event = pre(func, event, args, kwargs)
+            for pre in self._pre[typ]:
+                event = pre(func, event, args, kwargs)
 
-        if event is None:
-            return False
+            if event is None:
+                return False
 
-        result = func(event, *args, **kwargs)
+            result = func(event, *args, **kwargs)
 
-        for post in self._post[typ]:
-            post(func, event, args, kwargs, result)
+            for post in self._post[typ]:
+                post(func, event, args, kwargs, result)
 
-        return True
+            return True
+        finally:
+            if typ != 'command':
+                self.greenlets.discard(greenlet)
+            self.ctx.drop()
 
     def register_listener(self, func, what, *args, **kwargs):
         """
@@ -470,14 +478,17 @@ class Plugin(LoggingClass, PluginDeco):
         """
         Called when the plugin is unloaded.
         """
-        for greenlet in self.greenlets:
+        for greenlet in tuple(self.greenlets):
             greenlet.kill()
+        self.greenlets.clear()
 
-        for listener in self.listeners:
+        for listener in tuple(self.listeners):
             listener.remove()
+        self.listeners.clear()
 
-        for schedule in self.schedules.values():
+        for schedule in tuple(self.schedules.values()):
             schedule.kill()
+        self.schedules.clear()
 
     def reload(self):
         self.bot.reload_plugin(self.__class__)

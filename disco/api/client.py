@@ -1,12 +1,7 @@
-try:
-    from ujson import dumps as json_dumps
-except ImportError:
-    from json import dumps as json_dumps
-from warnings import warn as warnings_warn
-
 from contextlib import contextmanager
 from gevent.local import local
 from urllib.parse import quote
+from warnings import warn as warnings_warn
 
 from disco.api.http import Routes, HTTPClient, APIException
 from disco.util.functional import optional
@@ -69,10 +64,11 @@ class APIClient(LoggingClass):
         super(APIClient, self).__init__()
 
         self.client = client
-        self.http = HTTPClient(token, self._after_requests)
+        self.http = HTTPClient(token, self._after_requests, http_gateway_url=client.config.http_gateway_url, gateway_version=client.config.gateway_version, shutdown_on_cloudflare_429=client.config.shutdown_on_cloudflare_429, max_queries_per_second=client.config.max_queries_per_second)
         self.token = token
 
         self._captures = local()
+        self.log.info(f'Disco APIClient initialized - {client.config.http_gateway_url}/v{client.config.gateway_version}')
 
     def __repr__(self):
         return '<Disco APIClient{}>'.format(f' shard_id={self.client.config.shard_id}' if self.client else '')

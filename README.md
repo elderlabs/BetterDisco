@@ -12,15 +12,15 @@ _Buzzwords **100**._ WYSIWYG.
 ## Installation
 Disco is designed to run both as a generic-use library, and as a standalone bot toolkit. Installing disco is as easy as running `pip install betterdisco-py --upgrade --no-cache-dir`, however, additional options are available for extended features, performance, and support:
 
-| _This_                        | Installs _these_                                            | _Why?_                                                                         |
-|-------------------------------|-------------------------------------------------------------|--------------------------------------------------------------------------------|
-| `betterdisco-py`              | `gevent`, `requests`, `websocket-client`                    | Required for base Disco functionality.                                         |
-| `betterdisco-py[http]`        | `flask`                                                     | Useful for hosting an API to interface with your bot.                          |
-| `betterdisco-py[performance]` | `erlpack`, `isal`, `regex`, `pylibyaml`, `ujson`, `wsaccel` | Useful for performance improvement in several areas. _I am speed._             |
-| `betterdisco-py[sharding]`    | `gipc`, `dill`                                              | Required for auto-sharding and inter-process communication.                    |
-| `betterdisco-py[voice]`       | `libnacl`                                                   | Required for VC connectivity and features.                                     |
-| `betterdisco-py[yaml]`        | `pyyaml`                                                    | Required for YAML support, particularly if using `config.yaml`.                |
-| `betterdisco-py[all]`         | _**All of the above**, unless otherwise noted._             | **All additional packages**, for the poweruser that _absolutely needs it all_. |
+| _This_                        | Installs _these_                                                       | _Why?_                                                                         |
+|-------------------------------|------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| `betterdisco-py`              | `gevent`, `requests`, `websocket-client`                               | Required for base Disco functionality.                                         |
+| `betterdisco-py[http]`        | `flask`                                                                | Useful for hosting an API to interface with your bot.                          |
+| `betterdisco-py[performance]` | `brotli`, `erlpack`, `isal`, `pylibyaml`, `orjson`, `regex`, `wsaccel` | Useful for performance improvement in several areas. _I am speed._             |
+| `betterdisco-py[sharding]`    | `gipc`, `dill`, `psutil`                                               | Required for auto-sharding and inter-process communication.                    |
+| `betterdisco-py[voice]`       | `audioop-lts`, `davey`, `libnacl`                                      | Required for VC connectivity and features.                                     |
+| `betterdisco-py[yaml]`        | `pyyaml`                                                               | Required for YAML support, particularly if using `config.yaml`.                |
+| `betterdisco-py[all]`         | _**All of the above**, unless otherwise noted._                        | **All additional packages**, for the poweruser that _absolutely needs it all_. |
 
 
 ## Examples

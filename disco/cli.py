@@ -26,6 +26,11 @@ parser.add_argument('--log-level', help='log level', default=None)
 parser.add_argument('--manhole', action='store_true', help='Enable the manhole', default=None)
 parser.add_argument('--manhole-bind', help='host:port for the manhole to bind to', default=None)
 parser.add_argument('--encoder', help='Encoder for gateway data', default=None)
+parser.add_argument('--gateway_url', help='WS API endpoint to connect to', default=None)
+parser.add_argument('--http_gateway_url', help='HTTP API endpoint to connect to', default=None)
+parser.add_argument('--gateway_version', help='API endpoint version', default=None)
+parser.add_argument('--shutdown_on_cloudflare_429', help='Shutdown on Cloudflare ratelimiting', default=False)
+parser.add_argument('--max_queries_per_second', help='Max number of outbound queries to the API per second', default=None)
 
 
 # Mapping of argument names to configuration overrides
@@ -38,6 +43,11 @@ CONFIG_OVERRIDE_MAPPING = {
     'manhole': 'manhole_enable',
     'manhole_bind': 'manhole_bind',
     'encoder': 'encoder',
+    'gateway_url': 'gateway_url',
+    'http_gateway_url': 'http_gateway_url',
+    'gateway_version': 'gateway_version',
+    'shutdown_on_cloudflare_429': 'shutdown_on_cloudflare_429',
+    'max_queries_per_second': 'max_queries_per_second',
 }
 
 
@@ -103,4 +113,10 @@ def disco_main(run=False):
 
 
 if __name__ == '__main__':
-    disco_main(True)
+    try:
+        disco_main(True)
+    except KeyboardInterrupt:
+        print('\nShutting down...')
+    finally:
+        from sys import exit as sys_exit
+        sys_exit(0)

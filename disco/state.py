@@ -1,9 +1,11 @@
 from collections import deque, namedtuple
 from copy import copy
+from gevent import sleep
 from gevent.event import Event
 from weakref import WeakValueDictionary
 
 from disco.types.channel import Thread, Channel
+# from disco.types.guild import Guild
 from disco.util.config import Config
 from disco.util.string import underscore
 from disco.util.hashmap import HashMap, DefaultHashMap
@@ -109,7 +111,9 @@ class State:
         self.config = config
 
         self.ready = Event()
-        self.guilds_waiting_sync = 0
+        self.guilds_awaiting_sync = []
+        self.ignored_guild_attrs = []
+        self._channel_queue = {}
 
         self.me = None
         self.guilds = HashMap()
@@ -123,7 +127,6 @@ class State:
         self.voice_clients = HashMap(WeakValueDictionary())
         self.voice_states = HashMap(WeakValueDictionary())
 
-        # If message tracking is enabled, listen to those events
         if self.config.track_messages:
             self.messages = DefaultHashMap(lambda: deque(maxlen=self.config.track_messages_size))
             self.EVENTS += ['MessageDelete', 'MessageDeleteBulk',]
@@ -133,33 +136,53 @@ class State:
 
         if self.config.sync_guild_members:
             self.EVENTS += ['GuildMemberAdd', 'GuildMemberRemove', 'GuildMembersChunk', 'GuildMemberUpdate', 'PresenceUpdate',]
+        else:
+            self.ignored_guild_attrs += ['members', 'presences']
 
         if self.config.cache_channels or self.config.cache_dm_channels:
             self.EVENTS += ['ChannelCreate', 'ChannelDelete', 'ChannelTopicUpdate', 'ChannelUpdate', 'VoiceChannelStatusUpdate',]
+        elif not self.config.cache_channels:
+            self.ignored_guild_attrs.append('channels')
 
         if self.config.cache_threads:
             self.EVENTS += ['ThreadCreate', 'ThreadDelete', 'ThreadListSync', 'ThreadUpdate',]
+        else:
+            self.ignored_guild_attrs.append('threads')
 
         if self.config.cache_roles:
             self.EVENTS += ['GuildRoleCreate', 'GuildRoleDelete', 'GuildRoleUpdate',]
+        else:
+            self.ignored_guild_attrs.append('roles')
 
         if self.config.cache_voice_states:
             self.EVENTS += ['VoiceStateUpdate',]
+        else:
+            self.ignored_guild_attrs.append('voice_states')
 
         if self.config.cache_emojis:
             self.EVENTS += ['GuildEmojisUpdate',]
+        else:
+            self.ignored_guild_attrs.append('emojis')
 
         if self.config.cache_stickers:
             self.EVENTS += ['GuildStickersUpdate',]
+        else:
+            self.ignored_guild_attrs.append('stickers')
 
         if self.config.cache_soundboard:
             self.EVENTS += ['GuildSoundboardSoundCreate', 'GuildSoundboardSoundDelete', 'GuildSoundboardSoundUpdate',]
+        else:
+            self.ignored_guild_attrs.append('soundboard_sounds')
 
         if self.config.cache_scheduled_events:
             self.EVENTS += ['GuildScheduledEventCreate', 'GuildScheduledEventDelete', 'GuildScheduledEventUpdate',]
+        else:
+            self.ignored_guild_attrs.append('guild_scheduled_events')
 
         if self.config.cache_stage_instances:
             self.EVENTS += ['StageInstanceCreate', 'StageInstanceDelete', 'StageInstanceUpdate',]
+        else:
+            self.ignored_guild_attrs.append('stage_instances')
 
         # The bound listener objects
         self.listeners = []
@@ -172,7 +195,8 @@ class State:
         """
         Unbinds all bound event listeners for this state object.
         """
-        map(lambda k: k.unbind(), self.listeners)
+        for listener in self.listeners:
+            listener.unbind()
         self.listeners = []
 
     def bind(self):
@@ -184,7 +208,7 @@ class State:
 
         for event in self.EVENTS:
             func = 'on_' + underscore(event)
-            self.listeners.append(self.client.events.on(event, getattr(self, func), priority=Priority.AFTER))
+            self.listeners.append(self.client.events.on(event, getattr(self, func), priority=Priority.STATE))
 
     def fill_messages(self, channel):
         for message in reversed(next(channel.messages_iter(bulk=True))):
@@ -192,8 +216,20 @@ class State:
                 StackMessage(message.id, message.channel_id, message.author.id))
 
     def on_ready(self, event):
+        self.guilds.clear()
+        self.channels.clear()
+        self.commands.clear()
+        self.dms.clear()
+        self.emojis.clear()
+        self.stickers.clear()
+        self.threads.clear()
+        self.users.clear()
+        self.voice_states.clear()
+        if hasattr(self, 'messages'):
+            self.messages.clear()
+
         self.me = event.user
-        self.guilds_waiting_sync = len(event.guilds)
+        self.guilds_awaiting_sync = [i.id for i in event.guilds]
         self.ready.clear()
 
     def on_user_update(self, event):
@@ -215,15 +251,16 @@ class State:
         # in the event we gain access to a thread or channel suddenly...
         if self.config.cache_channels and event.message.channel_id not in self.channels and event.message.channel_id not in self.threads:
             channel = event.message.channel
-            if self.config.cache_threads and isinstance(channel, Thread):
-                self.threads[event.message.channel_id] = channel
-                self.guilds[event.message.guild_id].threads[event.message.channel_id] = channel
-            elif isinstance(channel, Channel):
-                if self.config.cache_dm_channels and channel.is_dm and event.message.channel_id not in self.dms:
-                    self.dms[event.message.channel_id] = channel
-                elif self.config.cache_channels and not channel.is_dm:
-                    self.channels[event.message.channel_id] = channel
-                    self.guilds[event.message.guild_id].channels[event.message.channel_id] = channel
+            if 'CHANNEL_OBFUSCATED' not in tuple(channel.flags):
+                if self.config.cache_threads and isinstance(channel, Thread):
+                    self.threads[event.message.channel_id] = channel
+                    self.guilds[event.message.guild_id].threads[event.message.channel_id] = channel
+                elif isinstance(channel, Channel):
+                    if self.config.cache_dm_channels and channel.is_dm and event.message.channel_id not in self.dms:
+                        self.dms[event.message.channel_id] = channel
+                    elif self.config.cache_channels and not channel.is_dm:
+                        self.channels[event.message.channel_id] = channel
+                        self.guilds[event.message.guild_id].channels[event.message.channel_id] = channel
 
         if event.message.channel_id in self.channels:
             self.channels[event.message.channel_id].last_message_id = event.message.id
@@ -262,7 +299,7 @@ class State:
         if self.config.sync_guild_members and event.guild and event.guild.id in self.guilds:
             if event.interaction.member.id not in self.guilds[event.guild.id].members:
                 self.guilds[event.guild.id].members = event.interaction.member.id
-        if event.channel:
+        if event.channel and 'CHANNEL_OBFUSCATED' not in tuple(event.channel.flags):
             if self.config.cache_threads and event.channel.is_thread and event.channel.id not in self.threads:
                 self.threads[event.channel.id] = event.channel
                 self.guilds[event.guild.id].threads[event.channel.id] = event.channel
@@ -273,45 +310,25 @@ class State:
                 self.dms[event.channel.id] = event.channel
 
     def on_guild_create(self, event):
-        if not self.ready.is_set():
-            self.guilds_waiting_sync -= 1
-            if self.guilds_waiting_sync <= 0:
-                self.ready.set()
+        # self.guilds[event.guild.id] = Guild.create(self.client, {k: v for k, v in event.raw_data['guild'].items() if k not in self.ignored_guild_attrs})
 
         guild = copy(event.guild)
-
-        if not self.config.sync_guild_members:
-            guild.members = {}
-        if not self.config.cache_channels:
-            guild.channels = {}
-        if not self.config.cache_threads:
-            guild.threads = {}
-        if not self.config.cache_roles:
-            guild.roles = {}
-        if not self.config.cache_emojis:
-            guild.emojis = {}
-        if not self.config.cache_stickers:
-            guild.stickers = {}
-        if not self.config.cache_voice_states:
-            guild.voice_states = {}
-        if not self.config.cache_soundboard:
-            guild.soundboard_sounds = {}
-        if not self.config.cache_scheduled_events and hasattr(guild, 'scheduled_events'):
-            guild.scheduled_events = {}
-        if not self.config.cache_stage_instances:
-            guild.stage_instances = {}
-
+        for i in self.ignored_guild_attrs:
+            setattr(guild, i, {})
         self.guilds[event.guild.id] = guild
 
-        self.channels.update(guild.channels)
-        self.threads.update(guild.threads)
-        self.emojis.update(guild.emojis)
-        self.stickers.update(guild.stickers)
+        self.channels.update((k, v) for k, v in self.guilds[event.guild.id].channels.items() if 'CHANNEL_OBFUSCATED' not in tuple(v.flags))
+        self.threads.update((k, v) for k, v in self.guilds[event.guild.id].threads.items() if 'CHANNEL_OBFUSCATED' not in tuple(v.flags))
+        self.emojis.update(self.guilds[event.guild.id].emojis)
+        self.stickers.update(self.guilds[event.guild.id].stickers)
 
         if self.config.cache_voice_states:
             for voice_state in event.guild.voice_states.values():
                 if voice_state.session_id not in self.voice_states:
                     self.voice_states[voice_state.session_id] = voice_state
+
+        if event.guild.id in self.voice_clients:
+            self.voice_clients[event.guild.id].update_media_silence()
 
         if self.config.cache_users:
             for member in event.guild.members.values():
@@ -332,8 +349,17 @@ class State:
                 if self.config.cache_users and voice_state.user_id not in self.users and voice_state.member.user:
                     self.users[voice_state.user_id] = voice_state.member.user
 
+        if not self.ready.is_set():
+            try:
+                self.guilds_awaiting_sync.remove(event.id)
+            except ValueError:
+                pass
+            if len(self.guilds_awaiting_sync) <= 0:
+                self.ready.set()
+
     def on_guild_update(self, event):
         ignored = ['channels', 'emojis', 'members', 'stickers', 'threads', 'voice_states', 'presences']
+        ignored += [i for i in self.ignored_guild_attrs if i not in ignored]
         if not hasattr(event.guild, 'widget_enabled'):
             ignored.append('widget_enabled')
         self.guilds[event.guild.id].inplace_update(event.guild, ignored=ignored)
@@ -376,7 +402,7 @@ class State:
                 del self.voice_states[vstate]
 
     def on_channel_create(self, event):
-        if self.config.cache_channels and event.channel.is_guild and event.channel.guild_id in self.guilds:
+        if self.config.cache_channels and event.channel.is_guild and event.channel.guild_id in self.guilds and 'CHANNEL_OBFUSCATED' not in tuple(event.channel.flags):
             self.guilds[event.channel.guild_id].channels[event.channel.id] = event.channel
             self.channels[event.channel.id] = event.channel
 
@@ -457,6 +483,8 @@ class State:
                     self.voice_clients[event.state.guild_id]._safe_reconnect_state = True
                     self.voice_clients[event.state.guild_id]._session_id = event.state.session_id
                     self.voice_clients[event.state.guild_id].channel_id = event.state.channel_id
+                if event.state.guild_id in self.voice_clients:
+                    self.voice_clients[event.state.guild_id].update_media_silence()
             # Disconnection
             else:
                 if event.state.guild_id in self.guilds:
@@ -468,6 +496,8 @@ class State:
                     del self.voice_states[event.state.session_id]
                 except KeyError:
                     return
+                if event.state.guild_id in self.voice_clients:
+                    self.voice_clients[event.state.guild_id].update_media_silence()
         # New connection
         elif event.state.channel_id:
             if event.state.guild_id in self.guilds:
@@ -482,6 +512,8 @@ class State:
             if event.state.user_id == self.me.id and event.state.guild_id in self.voice_clients:
                 self.voice_clients[event.state.guild_id]._session_id = event.state.session_id
                 self.voice_clients[event.state.guild_id].channel_id = event.state.channel_id
+            if event.state.guild_id in self.voice_clients:
+                self.voice_clients[event.state.guild_id].update_media_silence()
 
     def on_guild_member_add(self, event):
         if self.config.cache_users and event.member.user.id not in self.users:
@@ -493,7 +525,7 @@ class State:
             return
 
         # Avoid adding duplicate events to member_count.
-        if event.member.user.id not in self.guilds[event.guild_id].members:
+        if event.member.user.id not in self.guilds[event.guild_id].members and self.guilds[event.guild_id].member_count:
             self.guilds[event.guild_id].member_count += 1
 
         if self.config.sync_guild_members:
@@ -519,7 +551,9 @@ class State:
         if event.guild_id not in self.guilds:
             return
 
-        self.guilds[event.guild_id].member_count -= 1
+        if self.guilds[event.guild_id].member_count:
+            self.guilds[event.guild_id].member_count -= 1
+
         if self.config.sync_guild_members and event.user.id in self.guilds[event.guild_id].members:
             del self.guilds[event.guild_id].members[event.user.id]
 
@@ -641,17 +675,21 @@ class State:
 
     def on_channel_topic_update(self, event):
         if self.config.cache_channels:
-            if event.guild_id in self.guilds:
-                self.guilds[event.guild_id].channels[event.id].topic = event.topic
             if event.id in self.channels:
                 self.channels[event.id].topic = event.topic
+            else:
+                return
+            if event.guild_id in self.guilds:
+                self.guilds[event.guild_id].channels[event.id].topic = event.topic
 
     def on_voice_channel_status_update(self, event):
         if self.config.cache_channels:
-            if event.guild_id in self.guilds:
-                self.guilds[event.guild_id].channels[event.id].status = event.status
             if event.id in self.channels:
                 self.channels[event.id].status = event.status
+            else:
+                return
+            if event.guild_id in self.guilds:
+                self.guilds[event.guild_id].channels[event.id].status = event.status
 
     def on_guild_soundboard_sound_create(self, event):
         if self.config.cache_soundboard and event.guild_id in self.guilds:
@@ -669,3 +707,30 @@ class State:
         if self.config.cache_soundboard and event.guild_id in self.guilds:
             for sound in event.soundboard_sounds:
                 self.guilds[event.guild_id].soundboard_sounds[sound.sound_id] = sound
+
+    def _get_channel(self, event, channel_id):
+        """
+        This monstrosity should buffer API queries for uncached channels briefly while we await a reply from the API,
+        instead of making x > 1 calls for the same information when we suddenly see multiple messages before the API
+        can realistically respond, typically seen during spam events.
+        """
+        if channel_id in self._channel_queue.keys():
+            loop_count = 0
+            self._channel_queue[channel_id]['queries'].append(event.id)
+
+            while channel_id in self._channel_queue.keys() and not self._channel_queue[channel_id]['channel']:
+                loop_count += 1
+                sleep(max(self.client.gw.latency / 1000, 0.1))
+                if loop_count >= 100:
+                    self._channel_queue[channel_id]['queries'].remove(event.id)
+                    raise Exception  # TODO
+
+        if channel_id not in self._channel_queue.keys():
+            self._channel_queue[channel_id] = {'channel': None, 'queries': [event.id]}
+            self._channel_queue[channel_id]['channel'] = self.client.api.channels_get(channel_id)
+
+        channel = self._channel_queue[channel_id]['channel']
+        self._channel_queue[channel_id]['queries'].remove(event.id)
+        if not len(self._channel_queue[channel_id]['queries']):
+            del self._channel_queue[channel_id]
+        return channel

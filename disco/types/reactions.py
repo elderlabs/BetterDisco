@@ -104,6 +104,7 @@ class Sticker(SlottedModel):
     guild_id = Field(snowflake)
     user = Field(User)
     sort_value = Field(int)
+    asset = Field(text)
 
     def __repr__(self):
         return '<Sticker {} name={}>'.format('id=' + str(self.id) if self.id else '', self.name)

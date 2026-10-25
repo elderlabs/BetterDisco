@@ -5,6 +5,7 @@ class VoiceState(SlottedModel):
     guild_id = Field(snowflake)
     channel_id = Field(snowflake)
     user_id = Field(snowflake)
+    # member = Field(GuildMember)
     session_id = Field(text)
     deaf = Field(bool)
     mute = Field(bool)
@@ -14,6 +15,8 @@ class VoiceState(SlottedModel):
     self_video = Field(bool)
     suppress = Field(bool)
     request_to_speak_timestamp = Field(datetime)
+    discoverable = Field(bool)
+    user_volume = Field(float)
 
     def __repr__(self):
         return f'<VoiceState session_id={self.session_id} channel_id={self.channel_id}>'

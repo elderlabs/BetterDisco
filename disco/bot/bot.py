@@ -166,12 +166,14 @@ class Bot(LoggingClass):
             try:
                 from flask import Flask
             except ImportError:
+                Flask = None
                 self.log.warning('Failed to enable HTTP server, Flask is not installed')
 
-            self.log.info(f'Starting HTTP server bound to {self.config.http_host}:{self.config.http_port}')
-            self.http = Flask('disco')
-            self.http_server = WSGIServer((self.config.http_host, self.config.http_port), self.http, log=self.log if self.config.http_logging else None)
-            self.http_server_greenlet = gevent_spawn(self.http_server.serve_forever)
+            if Flask:
+                self.log.info(f'Starting HTTP server bound to {self.config.http_host}:{self.config.http_port}')
+                self.http = Flask('disco')
+                self.http_server = WSGIServer((self.config.http_host, self.config.http_port), self.http, log=self.log if self.config.http_logging else None)
+                self.http_server_greenlet = gevent_spawn(self.http_server.serve_forever)
 
         self.plugins = {}
         self.group_abbrev = {}

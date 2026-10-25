@@ -1,17 +1,30 @@
 from gevent import sleep as gevent_sleep, spawn as gevent_spawn
+from gevent.event import Event as GeventEvent
+from struct import unpack_from as struct_unpack_from
 from time import time
-
+try:
+    from orjson import JSONDecodeError
+except ImportError:
+    from json import JSONDecodeError
 from collections import namedtuple as namedtuple
-from websocket import WebSocketConnectionClosedException, WebSocketTimeoutException
+from websocket import WebSocketTimeoutException
+
+try:
+    from davey import DaveSession, MediaType as DaveMediaType, ProposalsOperationType as DaveProposalsOperationType, CommitWelcome as DaveCommitWelcome
+except ImportError:
+    DaveSession = None
+    DaveMediaType = None
+    DaveProposalsOperationType = None
+    DaveCommitWelcome = None
 
 from disco.gateway.encoding import ENCODERS
 from disco.gateway.packets import OPCode
 from disco.types.base import cached_property
-from disco.util.emitter import Emitter
+from disco.util.emitter import Emitter, Priority
 from disco.util.logging import LoggingClass
-from disco.util.websocket import Websocket
+from disco.util.websocket import Websocket, get_http_status
 from disco.voice.packets import VoiceOPCode
-from disco.voice.udp import AudioCodecs, RTPPayloadTypes, UDPVoiceClient, VideoCodecs
+from disco.voice.udp import AudioCodecs, RTPPayloadTypes, UDPVoiceClient, VideoCodecs, OPUS_SILENCE_FRAME
 
 
 class SpeakingFlags:
@@ -68,7 +81,7 @@ class VoiceException(Exception):
 
 
 class VoiceClient(LoggingClass):
-    VOICE_GATEWAY_VERSION = 8
+    VOICE_GATEWAY_VERSION = 9
 
     SUPPORTED_MODES = {
         'aead_aes256_gcm_rtpsize',
@@ -86,6 +99,7 @@ class VoiceClient(LoggingClass):
         self.max_reconnects = max_reconnects
         self.video_enabled = video_enabled
         self.media = None
+        self._initial_silence = False
 
         self.deaf = False
         self.mute = False
@@ -108,6 +122,13 @@ class VoiceClient(LoggingClass):
         self.packets.on(VoiceOPCode.CODECS, self.on_voice_codecs)
         if self.video_enabled:
             self.packets.on(VoiceOPCode.VIDEO, self.on_video)
+        self.packets.on(VoiceOPCode.DAVE_TRANSITION_EXECUTE, self.on_dave_transition_execute)
+        self.packets.on(VoiceOPCode.DAVE_TRANSITION_PREPARE, self.on_dave_transition_prepare)
+        self.packets.on(VoiceOPCode.DAVE_PREPARE_EPOCH, self.on_dave_prepare_epoch)
+        self.packets.on(VoiceOPCode.DAVE_MLS_TRANSITION_ANNOUNCE_COMMIT, self.on_dave_mls_transition_announce_commit)
+        self.packets.on(VoiceOPCode.DAVE_MLS_WELCOME, self.on_dave_mls_welcome)
+        self.packets.on(VoiceOPCode.DAVE_MLS_EXTERNAL_SENDER, self.on_dave_mls_external_sender)
+        self.packets.on(VoiceOPCode.DAVE_MLS_PROPOSALS, self.on_dave_mls_proposal)
 
         # State + state change emitter
         self.state = VoiceState.DISCONNECTED
@@ -132,17 +153,37 @@ class VoiceClient(LoggingClass):
         self.secure_frames_version = None
         self.seq = -1
 
+        # DAVE - E2EE
+        self.dave_handler = None
+        self.dave_privacy_key = None
+
+        self.max_dave_protocol_version = 1
+        self.dave_protocol_version = 0
+        self.dave_epoch = 0
+        self.dave_identity = 0
+        self.dave_credential_type = 1
+        self.dave_signature_key = None
+
+        self._dave_transition_id = None
+        self.dave_pending_transitions = {}
+        self.dave_downgraded = False
+
         # Websocket connection
         self.ws = None
+        self._ws_task = None
 
         self._session_id = None
         self._reconnects = 0
         self._heartbeat_task = None
+        self._reconnect_task = None
         self._heartbeat_acknowledged = True
         self._identified = False
         self._safe_reconnect_state = False
+        self._last_http_status = None
         self._creation_time = time()
         self._ws_creation_time = None
+        self._awaiting_voice_server_update = False
+        self._voice_server_update_event = GeventEvent()
 
         # Latency
         self._last_heartbeat = 0
@@ -168,6 +209,21 @@ class VoiceClient(LoggingClass):
     def user_id(self):
         return self.client.state.me.id
 
+    def update_media_silence(self):
+        if not self.media or self.is_dm or self.channel_id is None:
+            return
+
+        guild = self.client.state.guilds.get(self.server_id)
+        if not guild:
+            return
+
+        for voice_state in guild.voice_states.values():
+            if voice_state.channel_id == self.channel_id and voice_state.user_id != self.user_id:
+                self.media.set_silenced(False)
+                return
+
+        self.media.set_silenced(True)
+
     @property
     def ssrc_audio(self):
         return self.ssrc
@@ -185,23 +241,23 @@ class VoiceClient(LoggingClass):
         return self.ssrc + 3
 
     def set_state(self, state):
-        self.log.info('[{}] state {} -> {}'.format(self.channel_id or '-', self.state, state))
+        self.log.info(f'[{self.channel_id or "-"}] state {self.state} -> {state}')
         prev_state = self.state
         self.state = state
         self.state_emitter.emit(state, prev_state)
 
     def set_endpoint(self, endpoint):
-        endpoint = endpoint.split(':', 1)[0]
         if self.endpoint == endpoint:
             return
 
-        self.log.info('[{}] {} ({})'.format(self.channel_id, self.state, endpoint))
+        self.log.info(f'[{self.channel_id}] {self.state} ({endpoint})')
 
         self.endpoint = endpoint
+        if self._awaiting_voice_server_update and self.endpoint and self.token:
+            self._voice_server_update_event.set()
 
         if self.ws and self.ws.sock and self.ws.sock.connected:
             self.ws.close()
-            self.ws = None
 
         self._identified = False
 
@@ -209,8 +265,10 @@ class VoiceClient(LoggingClass):
         if self.token == token:
             return
         self.token = token
-        if not self._identified:
-            self.connect_and_run()
+        if self._awaiting_voice_server_update and self.endpoint and self.token:
+            self._voice_server_update_event.set()
+        if not self._identified and not self._reconnect_task and not self._ws_task and not self.ws:
+            self._ws_task = gevent_spawn(self.connect_and_run)
 
     def connect_and_run(self, gateway_url=None):
         if not gateway_url:
@@ -227,10 +285,10 @@ class VoiceClient(LoggingClass):
     def heartbeat_task(self, interval):
         while True:
             if not self._heartbeat_acknowledged:
-                self.log.warning('[{}] WS Received HEARTBEAT without HEARTBEAT_ACK, reconnecting...'.format(self.channel_id))
+                self.log.warning(f'[{self.channel_id}] Websocket Received HEARTBEAT without HEARTBEAT_ACK, reconnecting...')
                 self._heartbeat_acknowledged = True
-                self.ws.close(status=4000)
-                self.on_close(0, 'HEARTBEAT failure')
+                self.ws.close(status=4000, reason='HEARTBEAT failure')
+                # self.on_close(0, 'HEARTBEAT failure')
                 return
             self._last_heartbeat = time()
 
@@ -242,7 +300,7 @@ class VoiceClient(LoggingClass):
         self.send(VoiceOPCode.HEARTBEAT, {'seq_ack': self.seq, 't': int(time())})
 
     def handle_heartbeat_acknowledge(self, _):
-        self.log.debug('[{}] Received WS HEARTBEAT_ACK'.format(self.channel_id))
+        self.log.debug(f'[{self.channel_id}] Received Websocket HEARTBEAT_ACK')
         self._heartbeat_acknowledged = True
         self.latency = self.ws.last_pong_tm and float('{:.2f}'.format((self.ws.last_pong_tm - self.ws.last_ping_tm) * 1000))
 
@@ -280,15 +338,24 @@ class VoiceClient(LoggingClass):
 
     def send(self, op, data):
         if self.ws and self.ws.sock and self.ws.sock.connected:
-            self.log.debug('[{}] sending OP {} (data = {})'.format(self.channel_id, op, data))
-            self.ws.send(self.encoder.encode({'op': op, 'd': data}), self.encoder.OPCODE)
+            self.log.debug(f'[{self.channel_id}] sending OP {op}')
+            self.ws.send_text(self.encoder.encode({'op': op, 'd': data}))
         else:
-            self.log.debug('[{}] dropping because WS is closed OP {} (data = {})'.format(self.channel_id, op, data))
+            self.log.debug(f'[{self.channel_id}] dropping, Websocket is closed - OP {op}')
+
+    def send_binary(self, op, data):
+        if self.ws and self.ws.sock and self.ws.sock.connected:
+            self.log.debug(f'[{self.channel_id}] sending OP {op}')
+            self.ws.send_bytes(bytes([op]) + data)
+        else:
+            self.log.debug(f'[{self.channel_id}] dropping, Websocket is closed - OP {op}')
 
     def on_voice_client_disconnect(self, data):
         user_id = int(data['user_id'])
-        for ssrc in self.audio_ssrcs.keys():
+        for ssrc in list(self.audio_ssrcs.keys()):
             if self.audio_ssrcs[ssrc] == user_id:
+                if self.udp:
+                    self.udp.remove_audio_ssrc(ssrc, user_id)
                 del self.audio_ssrcs[ssrc]
                 break
 
@@ -312,12 +379,12 @@ class VoiceClient(LoggingClass):
         # self.udp.set_audio_codec(data['audio_codec'])  # bypass because the audio codec will always be opus
 
     def on_voice_hello(self, packet):
-        self.log.info('[{}] Received HELLO payload, starting heartbeater'.format(self.channel_id))
+        self.log.info(f'[{self.channel_id}] Received HELLO payload, starting heartbeater')
         self._heartbeat_task = gevent_spawn(self.heartbeat_task, packet['heartbeat_interval'])
         self.set_state(VoiceState.AUTHENTICATED)
 
     def on_voice_ready(self, data):
-        self.log.info('[{}] Received READY payload, RTC connecting'.format(self.channel_id))
+        self.log.info(f'[{self.channel_id}] Received READY payload, RTC connecting')
         self.set_state(VoiceState.CONNECTING)
         self.ssrc = data['ssrc']
         self.audio_ssrcs[self.ssrc] = self.client.state.me.id
@@ -333,17 +400,17 @@ class VoiceClient(LoggingClass):
         for mode in self.enc_modes:
             if mode in self.SUPPORTED_MODES:
                 self.mode = mode
-                self.log.info('[{}] Selected mode {}'.format(self.channel_id, mode))
+                self.log.info(f'[{self.channel_id}] Selected mode {mode}')
                 break
         else:
             raise Exception('Failed to find a supported voice mode')
 
-        self.log.debug('[{}] Attempting IP discovery over UDP to {}:{}'.format(self.channel_id, self.ip, self.port))
+        self.log.debug(f'[{self.channel_id}] Attempting IP discovery over UDP to {self.ip}:{self.port}')
         self.udp = UDPVoiceClient(self)
         ip, port = self.udp.connect(self.ip, self.port)
 
         if not ip:
-            self.log.error('[{}] Failed to discover bot IP, perhaps a network configuration error is present.'.format(self.channel_id))
+            self.log.error(f'[{self.channel_id}] Failed to discover bot IP, a network configuration error is likely present.')
             self.disconnect()
             return
 
@@ -368,11 +435,11 @@ class VoiceClient(LoggingClass):
                         'name': codec,
                         'payload_type': ptype.value,
                         'priority': 1000 * idx,
-                        'rtxPayloadType': ptype.value + 1,
+                        'rtxPayloadType': RTPPayloadTypes.get(codec.lower() + '_rtx').value,
                         'type': 'video',
                     })
 
-        self.log.debug('[{}] IP discovery completed ({}:{}), sending SELECT_PROTOCOL'.format(self.channel_id, ip, port))
+        self.log.debug(f'[{self.channel_id}] IP discovery completed ({ip}:{port}), sending SELECT_PROTOCOL')
         self.send(VoiceOPCode.SELECT_PROTOCOL, {
             'protocol': 'udp',
             'data': {
@@ -389,20 +456,21 @@ class VoiceClient(LoggingClass):
             'rtx_ssrc': 0,
         })
 
-    def on_voice_resumed(self, data):
-        self.log.info('[{}] WS Resumed'.format(self.channel_id))
+    def on_voice_resumed(self, _):
+        self.log.info(f'[{self.channel_id}] Websocket Resumed')
         self.set_state(VoiceState.CONNECTED)
         self._reconnects = 0
+        self._safe_reconnect_state = False
         if self.media:
             self.media.resume()
 
     def on_voice_sdp(self, sdp):
-        self.log.info('[{}] Received session description; connected'.format(self.channel_id))
-
+        self.log.info(f'[{self.channel_id}] Received session description; connected')
         self.mode = sdp['mode']  # UDP-only, does not apply to webRTC
         self.audio_codec = sdp['audio_codec']
         self.transport_id = sdp['media_session_id']  # analytics
         self.secure_frames_version = sdp['secure_frames_version']
+        self.dave_protocol_version = sdp['dave_protocol_version']
         if 'sdp' in sdp.keys():
             self.sdp = sdp['sdp']  # webRTC only
 
@@ -418,7 +486,17 @@ class VoiceClient(LoggingClass):
         # Create a secret box for encryption/decryption
         self.udp.setup_encryption(bytes(bytearray(sdp['secret_key'])))  # UDP only
 
+        if sdp['dave_protocol_version']:
+            self.dave_reset()
+
         self.set_state(VoiceState.CONNECTED)
+
+        self._initial_silence = True
+        self.update_media_silence()
+        self.send_silence()
+        self._initial_silence = False
+        if self.media and self.media.silenced:
+            self.set_speaking(False)
 
         self._reconnects = 0
 
@@ -505,19 +583,33 @@ class VoiceClient(LoggingClass):
             self.packets.emit(data['op'], data['d'])
             if 'seq' in data.keys():
                 self.seq = data['seq']
-        except Exception:
-            self.log.error('Failed to parse voice gateway message: ')
+        except JSONDecodeError:
+            if type(msg) is bytes:  # Hello DAVE
+                data = {}
+                data['seq'] = int.from_bytes(msg[:2], 'big', signed=False)
+                self.seq = data['seq']
+                data['op'] = msg[2]  # third byte
+                data['d'] = msg[3:]  # everything else after three-byte header
+                self.log.debug(f'[{self.channel_id}] Received OP {data["op"]}, SEQ {data["seq"]}')
+                self.packets.emit(data['op'], data['d'])
+
+        except Exception as e:
+            self.log.error(f'Failed to parse voice gateway message: {e.__class__.__name__} - {e}')
 
     def on_error(self, error):
+        self._last_http_status = get_http_status(error)
+        if self._last_http_status:
+            return self.log.error(f'[{self.channel_id}] Websocket handshake failed with HTTP status {self._last_http_status}')
         if isinstance(error, WebSocketTimeoutException):
-            return self.log.error('[{}] WS has timed out. An upstream connection issue is likely present.'.format(self.channel_id))
-        if not isinstance(error, WebSocketConnectionClosedException):
-            self.log.error('[{}] WS received error: {}'.format(self.channel_id, error))
+            return self.log.error(f'[{self.channel_id}] Websocket connection has timed out. An upstream connection issue is likely present.')
+        return self.log.error(f'[{self.channel_id}] Websocket received error: {error.__class__.__name__} - {error}')
 
     def on_open(self):
+        self._last_http_status = None
         if self._identified:
             self.send(VoiceOPCode.RESUME, {
                 'server_id': self.server_id,
+                'channel_id': self.channel_id,
                 'session_id': self._session_id,
                 'token': self.token,
                 'seq_ack': self.seq,
@@ -526,83 +618,168 @@ class VoiceClient(LoggingClass):
             self.seq = -1
             self.send(VoiceOPCode.IDENTIFY, {
                 'server_id': self.server_id,
+                'channel_id': self.channel_id,
                 'user_id': self.user_id,
                 'session_id': self._session_id,
                 'token': self.token,
                 'video': self.video_enabled,
+                # 'streams': [],
+                'max_dave_protocol_version': self.max_dave_protocol_version,
             })
+
+    def reconnect(self, wait_time):
+        gevent_sleep(wait_time)
+        self._reconnect_task = None
+        if self.state == VoiceState.DISCONNECTED:
+            return
+        self._ws_task = gevent_spawn(self.connect_and_run)
+
+    def await_voice_server_update(self):
+        if not self._voice_server_update_event.wait(timeout=30):
+            self.log.error(f'[{self.channel_id}] Timed out waiting for a fresh voice server update after close code 4022.')
+            self._reconnect_task = None
+            self._awaiting_voice_server_update = False
+            self.disconnect()
+            return
+
+        self._reconnect_task = None
+        self._awaiting_voice_server_update = False
+        if self.state == VoiceState.DISCONNECTED:
+            return
+
+        self.log.info(f'[{self.channel_id}] Received fresh voice server details; establishing a new voice session.')
+        self._ws_task = gevent_spawn(self.connect_and_run)
 
     def on_close(self, code=None, reason=None):
         gevent_sleep(0.001)
         if self.media:
             self.media.pause()
-        self.log.info('[{}] WS Closed: {}{}({})'.format(self.channel_id, f'[{code}] ' if code else '', f'{reason} ' if reason else '', self._reconnects))
+        self.log.info('[{}] Websocket Closed: {}{}({})'.format(self.channel_id, f'[{code}] ' if code else '', f'{reason} ' if reason else '', self._reconnects))
+
+        if self.ws:
+            if self.ws.emitter:
+                for handlers in tuple(self.ws.emitter.event_handlers.values()):
+                    handlers.clear()
+                self.ws.emitter = None
+
+            for attr in ('on_close', 'on_cont_message', 'on_data', 'on_error', 'on_message', 'on_open', 'on_ping', 'on_pong', 'on_reconnect'):
+                setattr(self.ws, attr, None)
+
+            self.ws.sock = None
 
         if self._heartbeat_task:
-            self.log.info('[{}] WS Closed: killing heartbeater'.format(self.channel_id))
+            self.log.debug(f'[{self.channel_id}] killing heartbeater')
             self._heartbeat_task.kill()
             self._heartbeat_task = None
 
         self.ws = None
+        self._ws_task = None
         self._heartbeat_acknowledged = True
+        http_status = self._last_http_status
+        self._last_http_status = None
 
         # If we killed the connection, don't try resuming
         if self.state == VoiceState.DISCONNECTED:
             return
 
-        if not code and self._safe_reconnect_state or (code and code in (4009, 4015)):
-            self.log.info('[{}] Attempting WS resumption'.format(self.channel_id))
+        if code == 4022:
+            self.log.warning(f'[{self.channel_id}] Voice gateway requested a fresh voice server session; waiting up to 30 seconds.')
+            if self._reconnect_task:
+                self._reconnect_task.kill()
+                self._reconnect_task = None
+            if self.udp:
+                self.udp.disconnect()
+                self.udp = None
+            self._identified = False
+            self.endpoint = None
+            self.token = None
+            self.seq = -1
+            self._awaiting_voice_server_update = True
+            self._voice_server_update_event.clear()
+            self.set_state(VoiceState.AWAITING_ENDPOINT)
+            self.set_voice_state(self.channel_id, mute=self.mute, deaf=self.deaf, video=self.video_enabled)
+            self._reconnect_task = gevent_spawn(self.await_voice_server_update)
+            return
+
+        if code in (4004, 4011, 4012, 4014, 4016, 4017, 4021):
+            self.log.warning(f'[{self.channel_id}] Voice gateway session closed with code {code}. Disconnecting without reconnect.')
+            return self.disconnect()
+
         self.set_state(VoiceState.RECONNECTING)
         self._reconnects += 1
 
         if self.max_reconnects and self._reconnects > self.max_reconnects:
-            self.log.error('[{}] Failed to reconnect after {} attempts, giving up'.format(self.channel_id, self.max_reconnects))
+            self.log.error(f'[{self.channel_id}] Failed to reconnect after {self.max_reconnects} attempts, giving up')
             return self.disconnect()
 
-        # Check if code is not None, was not from us
-        if code and (4000 < code <= 4016 or code in (1000, 1001)):
-            self._identified = False
-            try:
-                del self.client.state.voice_states[self.server_id]
-            except KeyError:
-                pass
+        # Cloudflare can reject the WebSocket handshake with an HTTP status rather than a Discord close code.
+        # Retry transient failures using the current voice session first; if the endpoint continues failing,
+        # request a fresh voice endpoint.
+        if http_status:
+            if 500 <= http_status <= 599 or http_status == 408:
+                self.log.warning(f'[{self.channel_id}] Voice endpoint returned HTTP {http_status}. Requesting a fresh voice session.')
+                self._identified = False
+                self.endpoint = None
+                self.token = None
+                self.seq = -1
+                self.set_state(VoiceState.AWAITING_ENDPOINT)
+                self.set_voice_state(self.channel_id, mute=self.mute, deaf=self.deaf, video=self.video_enabled)
+                return
+            if http_status == 429:  # this should NEVER fire
+                self.log.error(f'[{self.channel_id}] Cloudflare sent 429. Give up.')
+                return self.disconnect()
 
+        if code is not None and (4000 <= code <= 4022 or code in (1000, 1001)):
             if self.udp and self.udp.connected:
                 self.udp.disconnect()
 
-            # every other code is a failure, except these
-            if code not in (1001, 4006, 4009, 4015) and not self._safe_reconnect_state:
-                self.log.warning('[{}] Session unexpectedly terminated. Not reconnecting.'.format(self.channel_id))
-                return self.disconnect()
+            # 4006 and 4009 invalidate the voice session. Discord requires a new VOICE_STATE_UPDATE
+            # and VOICE_SERVER_UPDATE before opening a new voice socket.
+            if code in (4006, 4009):
+                self.log.warning(f'[{self.channel_id}] Voice session invalidated. Requesting a fresh voice session.')
+                self._identified = False
+                self.endpoint = None
+                self.token = None
+                self.seq = -1
+                self.set_state(VoiceState.AWAITING_ENDPOINT)
+                self.set_voice_state(self.channel_id, mute=self.mute, deaf=self.deaf, video=self.video_enabled)
+                return
 
-            if code == 4006 or (code == 0 and 'HEARTBEAT' in reason):
-                self.log.warning(f'[{self.channel_id}] Session invalidated. Spawning fresh connection to channel.')
-                return self.connect(self.channel_id, mute=self.mute, deaf=self.deaf, video=self.video_enabled)
+            # A heartbeat failure is a transport failure.
+            # Resume the existing voice session rather than leaving/rejoining the channel.
+            if code == 0 and reason and 'HEARTBEAT' in reason:
+                self.log.info(f'[{self.channel_id}] Voice heartbeat failed; reconnecting.')
+
+        if self._identified and (self._safe_reconnect_state or code == 4015):
+            self.log.info(f'[{self.channel_id}] Attempting Websocket resumption')
 
         wait_time = (self._reconnects * 5) - 5
 
         self.log.info('[{}] {} in {} second{}'.format(self.channel_id, 'Resuming' if self._identified else 'Reconnecting', wait_time, 's' if wait_time != 1 else ''))
-        gevent_sleep(wait_time)
-        self.connect_and_run()
+        if self._reconnect_task:
+            self._reconnect_task.kill()
+        self._reconnect_task = gevent_spawn(self.reconnect, wait_time)
 
     def connect(self, channel_id, timeout=10, **kwargs):
         if self.is_dm:
             channel_id = self.server_id
 
         if not channel_id:
-            raise VoiceException('[{}] cannot connect to an empty channel id'.format(self.channel_id), self)
+            raise VoiceException(f'[{self.channel_id}] cannot connect to an empty channel id', self)
 
         if self.channel_id == channel_id:
             if self.state == VoiceState.CONNECTED:
-                self.log.debug('[{}] Already connected to {}, returning'.format(self.channel_id, self.channel))
+                self.log.info(f'[{self.channel_id}] Already connected to {self.channel}, returning')
                 return self
         else:
             if self.state == VoiceState.CONNECTED:
-                self.log.debug('[{}] Moving to channel {}'.format(self.channel_id, channel_id))
+                self.log.info(f'[{self.channel_id}] Moving to channel {channel_id}')
             else:
-                self.log.debug('[{}] Attempting connection to channel id {}'.format(self.channel_id or '-', channel_id))
+                self.log.info(f'[{self.channel_id or "-"}] Attempting connection to channel id {channel_id}')
                 self.set_state(VoiceState.AWAITING_ENDPOINT)
 
+        self.mute = bool(kwargs.get('mute', False))
+        self.deaf = bool(kwargs.get('deaf', False))
         self.set_voice_state(channel_id, **kwargs)
 
         if not self.state_emitter.once(VoiceState.CONNECTED, timeout=timeout):
@@ -612,18 +789,27 @@ class VoiceClient(LoggingClass):
             self._ws_creation_time = time()
             return self
 
-    def disconnect(self):
-        self._safe_reconnect_state = False
+    def disconnect(self, reconnect=False):
+        if reconnect:
+            self._safe_reconnect_state = True
+        else:
+            self._safe_reconnect_state = False
+
         if self.state == VoiceState.DISCONNECTED:
             return
 
+        if self._reconnect_task:
+            self._reconnect_task.kill()
+            self._reconnect_task = None
+
         self.set_state(VoiceState.DISCONNECTED)
 
-        try:
-            self.media.now_playing.source.proc.kill()
-            self.media.now_playing.source = None
-        except:
-            pass
+        if not reconnect:
+            try:
+                self.media.now_playing.source.proc.kill()
+                self.media.now_playing.source = None
+            except:
+                pass
 
         if self.ws and self.ws.sock and self.ws.sock.connected:
             self.ws.close()
@@ -637,16 +823,157 @@ class VoiceClient(LoggingClass):
         if self.udp:
             self.udp.disconnect()
 
-        if self.client.state.voice_clients.get(self.server_id):
-            del self.client.state.voice_clients[self.server_id]
+        if not reconnect:
+            if self.client.state.voice_clients.get(self.server_id):
+                del self.client.state.voice_clients[self.server_id]
 
-        if self.client.state.voice_states.get(self._session_id):
-            del self.client.state.voice_states[self._session_id]
+            if self.client.state.voice_states.get(self._session_id):
+                del self.client.state.voice_states[self._session_id]
 
         return self.client.events.emit('VoiceDisconnect', self)
 
-    def send_frame(self, *args, **kwargs):
-        self.udp.send_frame(*args, **kwargs)
+    def send_silence(self, frames=5):
+        if self.state != VoiceState.CONNECTED or not self.udp:
+            return
+
+        self.set_speaking(True)
+        for _ in range(frames):
+            self.udp.send_silence(1)
+            gevent_sleep(0.02)
+
+    def send_frame(self, frame, *args, **kwargs):
+        if self.dave_handler and not self.dave_downgraded:
+            try:
+                frame = self.dave_handler.encrypt_opus(frame)
+            except ValueError:
+                pass
+        self.udp.send_frame(frame, *args, **kwargs)
+
+    def decrypt_voice_frame(self, user_id, frame):
+        if not self.dave_handler or not user_id or frame == OPUS_SILENCE_FRAME or DaveMediaType is None:
+            return frame
+
+        can_decrypt = (self.dave_protocol_version and not self.dave_downgraded and self.dave_handler.ready) or \
+                      (self.dave_handler.ready and self.dave_handler.can_passthrough(user_id))
+        if not can_decrypt:
+            return frame
+
+        return self.dave_handler.decrypt(user_id, DaveMediaType.audio, frame)
+
+    def decrypt_video_frame(self, user_id, frame):
+        if not self.dave_handler or not user_id or DaveMediaType is None:
+            return frame
+
+        can_decrypt = (self.dave_protocol_version and not self.dave_downgraded and self.dave_handler.ready) or \
+                      (self.dave_handler.ready and self.dave_handler.can_passthrough(user_id))
+        if not can_decrypt:
+            return frame
+
+        return self.dave_handler.decrypt(user_id, DaveMediaType.video, frame)
 
     def increment_timestamp(self, *args, **kwargs):
         self.udp.increment_timestamp(*args, **kwargs)
+
+    # Discord End-to-End Encryption Protocol Support (DAVE); RFC9420
+    def on_dave_transition_execute(self, transition_id):  # OP: 22
+        if isinstance(transition_id, dict):
+            transition_id = transition_id['transition_id']
+        self.log.info(f'[{self.channel_id}] DAVE Execute Transition {transition_id}')
+        if transition_id not in self.dave_pending_transitions.keys():
+            return
+        if transition_id != self.dave_protocol_version and not self.dave_protocol_version:
+            self.dave_downgraded = True  # connection is downgraded and unchanged
+            self.log.info(f'[{self.channel_id}] DAVE Execute Transition {transition_id} downgraded')
+        elif transition_id and self.dave_downgraded:
+            self.dave_downgraded = False
+            if self.dave_handler:
+                self.dave_handler.set_passthrough_mode(True, 10)
+            self.log.info(f'[{self.channel_id}] DAVE Execute Transition {transition_id} upgraded')
+        self.log.info(f'[{self.channel_id}] DAVE Execute Transition {transition_id} complete')
+
+    # received on connection downgrade
+    def on_dave_transition_prepare(self, data):  # OP: 21
+        self.log.info(f'[{self.channel_id}] DAVE Preparing Transition')
+        self.dave_protocol_version = data['protocol_version']
+        self._dave_transition_id = data['transition_id']
+        self.dave_pending_transitions[self._dave_transition_id] = self.dave_protocol_version
+
+        if self._dave_transition_id == 0:
+            self.on_dave_transition_execute(self._dave_transition_id)
+        elif not self.dave_protocol_version and self.dave_handler:
+            self.dave_handler.set_passthrough_mode(True, 120)
+
+        self.dave_transition_ready(self._dave_transition_id)
+
+    def on_dave_prepare_epoch(self, data):  # OP: 24
+        self.log.info(f'[{self.channel_id}] DAVE Preparing EPOCH {data["epoch"]}')
+        if data['epoch'] == 1:
+            self.dave_protocol_version = data['protocol_version']
+            self.dave_reset()
+
+    # binary received from welcome
+    def on_dave_mls_transition_announce_commit(self, data):  # OP: 29
+        transition_id = struct_unpack_from('>H', data)[0]
+        try:
+            self.dave_handler.process_commit(data[2:])
+            if transition_id != 0:
+                self.dave_pending_transitions[transition_id] = self.dave_protocol_version
+                self.dave_transition_ready(transition_id)
+            self.log.info(f'[{self.channel_id}] DAVE MLS Commit transition {transition_id} processed')
+        except:
+            self.dave_mls_commit_welcome_invalid(transition_id)
+
+    def on_dave_mls_welcome(self, data):  # OP: 30
+        transition_id = struct_unpack_from('>H', data)[0]
+        try:
+            self.dave_handler.process_welcome(data[2:])
+            if transition_id != 0:
+                self.dave_pending_transitions[transition_id] = self.dave_protocol_version
+                self.dave_transition_ready(transition_id)
+            self.log.info(f'[{self.channel_id}] DAVE MLS Welcome transition {transition_id} processed')
+        except:
+            self.dave_mls_commit_welcome_invalid(transition_id)
+
+    # contains creds and key to join an MLS group in binary
+    def on_dave_mls_external_sender(self, data):  # OP: 25
+        self.dave_handler.set_external_sender(data)
+        self.log.info(f'[{self.channel_id}] DAVE MLS External Sender set')
+
+    # contains list of proposals to be added or removed
+    def on_dave_mls_proposal(self, data):  # OP: 27
+        result = self.dave_handler.process_proposals(DaveProposalsOperationType.append if data[0] == 0 else DaveProposalsOperationType.revoke, data[1:])
+        if isinstance(result, DaveCommitWelcome):
+            self.dave_mls_commit_welcome(result)
+        self.log.info(f'[{self.channel_id}] DAVE MLS Proposals processed')
+
+    def dave_transition_ready(self, transition_id):  # OP: 23
+        self.log.info(f'[{self.channel_id}] DAVE Transition {transition_id} ready')
+        self.send(VoiceOPCode.DAVE_TRANSITION_READY, {'transition_id': transition_id,})
+
+    # sends key package in binary
+    def dave_mls_key_package(self):  # OP: 26
+        self.log.info(f'[{self.channel_id}] DAVE MLS Key Package sending')
+        self.send_binary(VoiceOPCode.DAVE_MLS_KEY_PACKAGE, self.dave_handler.get_serialized_key_package())
+
+    # sends commit and welcome on new user join
+    def dave_mls_commit_welcome(self, data):  # OP: 28
+        self.send_binary(VoiceOPCode.DAVE_MLS_WELCOME_COMMIT, data.commit + data.welcome if data.welcome else data.commit)
+
+    def dave_mls_commit_welcome_invalid(self, transition_id):  # OP: 31
+        self.log.info(f'[{self.channel_id}] DAVE MLS Key Commit Welcome transition {transition_id} invalid')
+        self.send(VoiceOPCode.DAVE_MLS_WELCOME_INVALID_COMMIT, {'transition_id': transition_id,})
+        self.dave_reset()
+
+    def dave_reset(self):
+        if self.dave_protocol_version:
+            if self.dave_handler:
+                self.log.info(f'[{self.channel_id}] DAVE reinitializing')
+                self.dave_handler.reinit(self.dave_protocol_version, self.client.state.me.id, self.channel_id)
+            else:
+                self.log.info(f'[{self.channel_id}] DAVE initializing')
+                self.dave_handler = DaveSession(self.dave_protocol_version, self.client.state.me.id, self.channel_id)
+            self.dave_mls_key_package()
+        elif self.dave_handler:
+            self.log.info(f'[{self.channel_id}] DAVE shutting down')
+            self.dave_handler.reset()
+            self.dave_handler.set_passthrough_mode(True, 10)

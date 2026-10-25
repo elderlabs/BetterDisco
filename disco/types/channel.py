@@ -37,9 +37,24 @@ class VideoQualityModes:
 
 
 class ChannelFlags(BitsetMap):
+    GUILD_FEED_REMOVED = 1 << 0
     PINNED = 1 << 1
+    ACTIVE_CHANNELS_REMOVED = 1 << 2
     REQUIRE_TAG = 1 << 4
+    IS_SPAM = 1 << 5
+    IS_GUILD_RESOURCE_CHANNEL = 1 << 7
+    CLYDE_AI = 1 << 8
+    IS_SCHEDULED_FOR_DELETION = 1 << 9
+    # IS_MEDIA_CHANNEL = 1 << 10
+    SUMMARIES_DISABLED = 1 << 11
+    # APPLICATION_SHELF_CONSENT = 1 << 12
+    IS_ROLE_SUBSCRIPTION_TEMPLATE_PREVIEW_CHANNEL = 1 << 13
+    IS_BROADCASTING = 1 << 14
     HIDE_MEDIA_DOWNLOAD_OPTIONS = 1 << 15
+    IS_JOIN_REQUEST_INTERVIEW_CHANNEL = 1 << 16
+    CHANNEL_OBFUSCATED = 1 << 17
+    IS_MODERATOR_REPORT_CHANNEL = 1 << 19
+    IS_SPOILER_CHANNEL = 1 << 21
 
 
 class ChannelFlagsValue(BitsetValue):
@@ -172,6 +187,17 @@ class ForumTag(SlottedModel):
     emoji_name = Field(text)
 
 
+class ForumSortOrderTypes:
+    LATEST_ACTIVITY = 0
+    CREATION_DATE = 1
+
+
+class ForumLayoutTypes:
+    NOT_SET = 0
+    LIST_VIEW = 1
+    GALLERY_VIEW = 3
+
+
 class Channel(SlottedModel, Permissible):
     """
     Represents a Discord Channel.
@@ -226,8 +252,8 @@ class Channel(SlottedModel, Permissible):
     available_tags = ListField(ForumTag)
     default_reaction_emoji = Field(DefaultReaction, create=False)
     default_thread_rate_limit_per_user = Field(int)
-    default_sort_order = Field(int)
-    default_forum_layout = Field(int)
+    default_sort_order = Field(enum(ForumSortOrderTypes))
+    default_forum_layout = Field(enum(ForumLayoutTypes))
     auto_archive_duration = Field(int)
     status = Field(text)
     icon_emoji = Field(Emoji)

@@ -1,6 +1,5 @@
-from array import array
 from ctypes import POINTER, Structure as ctypes_Structure, c_int, c_int16, c_int32, c_float, c_char_p, cdll, \
-    util as c_util, byref as c_byref, c_char, cast as c_cast
+    util as c_util, byref as c_byref, c_char, cast as c_cast, string_at as c_string_at
 from platform import system as platform_system
 
 from disco.util.logging import LoggingClass
@@ -85,6 +84,7 @@ class OpusEncoder(BaseOpus):
         self.application = application
 
         self._inst = None
+        self._data = (c_char * 1275)()
 
     @property
     def inst(self):
@@ -129,16 +129,63 @@ class OpusEncoder(BaseOpus):
             self._inst = None
 
     def encode(self, pcm, frame_size):
-        max_data_bytes = len(pcm)
         pcm = c_cast(pcm, c_int16_ptr)
-        data = (c_char * max_data_bytes)()
-
-        ret = self.opus_encode(self.inst, pcm, frame_size, data, max_data_bytes)
+        ret = self.opus_encode(self.inst, pcm, frame_size, self._data, 1275)
         if ret < 0:
             raise Exception('Failed to encode: {}'.format(ret))
 
-        return array('b', data[:ret]).tobytes()
+        return c_string_at(self._data, ret)
 
 
 class OpusDecoder(BaseOpus):
-    pass
+    EXPORTED = {
+        'opus_decoder_get_size': ([c_int], c_int),
+        'opus_decoder_create': ([c_int, c_int, c_int_ptr], DecoderStructPtr),
+        'opus_decode': ([DecoderStructPtr, c_char_p, c_int, c_int16_ptr, c_int, c_int], c_int),
+        'opus_decoder_destroy': ([DecoderStructPtr], None),
+    }
+
+    MAX_FRAME_SAMPLES = 5760
+
+    def __init__(self, sampling_rate, channels, library_path=None):
+        super(OpusDecoder, self).__init__(library_path)
+        self.sampling_rate = sampling_rate
+        self.channels = channels
+
+        self._inst = None
+        self._data = (c_int16 * (self.MAX_FRAME_SAMPLES * channels))()
+
+    @property
+    def inst(self):
+        if not self._inst:
+            self._inst = self.create()
+        return self._inst
+
+    def create(self):
+        ret = c_int()
+        result = self.opus_decoder_create(self.sampling_rate, self.channels, c_byref(ret))
+
+        if ret.value != 0:
+            raise Exception('Failed to create opus decoder: {}'.format(ret.value))
+
+        return result
+
+    def __del__(self):
+        if hasattr(self, '_inst') and self._inst:
+            self.opus_decoder_destroy(self._inst)
+            self._inst = None
+
+    def decode(self, data, decode_fec=False):
+        ret = self.opus_decode(
+            self.inst,
+            data,
+            len(data),
+            self._data,
+            self.MAX_FRAME_SAMPLES,
+            int(decode_fec),
+        )
+
+        if ret < 0:
+            raise Exception('Failed to decode: {}'.format(ret))
+
+        return c_string_at(self._data, ret * self.channels * 2), ret

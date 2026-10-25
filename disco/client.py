@@ -1,5 +1,6 @@
-from time import time
 from gevent import spawn as gevent_spawn
+from time import time
+from sys import version_info as sys_version_info
 
 from disco.state import State, StateConfig
 from disco.api.client import APIClient
@@ -47,12 +48,21 @@ class ClientConfig(Config):
     max_reconnects = 5
     log_level = 'info'
     log_unknown_events = False
+    ignored_events = []
+    subscribed_events = []
 
     manhole_enable = False
     manhole_bind = ('127.0.0.1', 8484)
 
     encoder = 'json'
     compression = True
+
+    gateway_url = 'https://discord.com/api'
+    http_gateway_url = gateway_url
+    gateway_version = '9'
+
+    shutdown_on_cloudflare_429 = True
+    max_queries_per_second = 50
 
 
 class Client(LoggingClass):
@@ -95,7 +105,13 @@ class Client(LoggingClass):
         self.packets = Emitter()
 
         self.api = APIClient(self.config.token, self)
-        self.gw = GatewayClient(self, self.config.max_reconnects, self.config.encoder, self.config.compression)
+        gw_kwargs = {'max_reconnects': self.config.max_reconnects, 'encoder': self.config.encoder, 'ignored_events': self.config.ignored_events, 'subscribed_events': self.config.subscribed_events}
+        if isinstance(self.config.compression, bool) and self.config.compression and sys_version_info >= (3, 14) or not isinstance(self.config.compression, bool) and 'zstd' in self.config.compression:
+            self.gw = GatewayClient(self, **gw_kwargs, zstd_stream_enabled=True)
+        elif isinstance(self.config.compression, bool) and self.config.compression and sys_version_info < (3, 14) or not isinstance(self.config.compression, bool) and 'zlib' in self.config.compression:
+            self.gw = GatewayClient(self, **gw_kwargs, zlib_stream_enabled=True)
+        else:
+            self.gw = GatewayClient(self, **gw_kwargs)
         self.state = State(self, StateConfig(self.config.get('state', {})))
 
         if self.config.manhole_enable:

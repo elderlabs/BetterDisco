@@ -81,7 +81,7 @@ class GatewayEvent(with_metaclass(GatewayEventMeta, Model)):
                 except AttributeError:
                     pass
 
-            return obj
+        return obj
 
     def __getattr__(self, name):
         try:
@@ -1205,3 +1205,19 @@ class MessagePollVoteRemove(GatewayEvent):
     message_id = Field(snowflake)
     guild_id = Field(snowflake)
     answer_id = Field(int)
+
+
+class GuildAppliedBoostsUpdate(GatewayEvent):
+    pass
+
+
+class VoiceChannelStartTimeUpdate(GatewayEvent):
+    pass
+
+
+class GuildPowerupEntitlementsCreate(GatewayEvent):
+    pass
+
+
+class GuildPowerupEntitlementsDelete(GatewayEvent):
+    pass

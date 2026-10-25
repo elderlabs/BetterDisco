@@ -1,11 +1,13 @@
 from gevent import sleep as gevent_sleep
 from math import ceil as math_ceil
+from platform import python_version
 from random import randint as random_randint
 from requests import Session as RequestsSession, __version__ as requests_version, ConnectionError, Timeout
-from platform import python_version
+from requests.exceptions import JSONDecodeError
+from time import monotonic
 
 from disco import VERSION as disco_version
-from disco.util.logging import LoggingClass
+from disco.util.logging import LoggingClass, find_external_caller
 from disco.api.ratelimit import RateLimiter
 
 
@@ -34,6 +36,14 @@ class Routes:
     Simple Python object-enum of all method/url route combinations available to this client.
     """
     APPLICATIONS = '/applications/{application}'
+    APPLICATIONS_EMOJIS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/emojis')
+    APPLICATIONS_EMOJIS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/emojis/{emoji}')
+    APPLICATIONS_EMOJIS_GET = (HTTPMethod.GET, APPLICATIONS + '/emojis/{emoji}')
+    APPLICATIONS_EMOJIS_LIST = (HTTPMethod.GET, APPLICATIONS + '/emojis')
+    APPLICATIONS_EMOJIS_MODIFY = (HTTPMethod.PATCH, APPLICATIONS + '/emojis/{emoji}')
+    APPLICATIONS_ENTITLEMENTS_CONSUME = (HTTPMethod.GET, APPLICATIONS + '/entitlements/{entitlement}/consume')
+    APPLICATIONS_ENTITLEMENTS_CREATE = (HTTPMethod.GET, APPLICATIONS + '/entitlements')
+    APPLICATIONS_ENTITLEMENTS_DELETE = (HTTPMethod.GET, APPLICATIONS + '/entitlements')
     APPLICATIONS_GLOBAL_COMMANDS_BULK_OVERWRITE = (HTTPMethod.PUT, APPLICATIONS + '/commands')
     APPLICATIONS_GLOBAL_COMMANDS_CREATE = (HTTPMethod.POST, APPLICATIONS + '/commands')
     APPLICATIONS_GLOBAL_COMMANDS_DELETE = (HTTPMethod.DELETE, APPLICATIONS + '/commands/{command}')
@@ -61,6 +71,7 @@ class Routes:
     CHANNELS_FOLLOW = (HTTPMethod.POST, CHANNELS + '/followers')
     CHANNELS_GET = (HTTPMethod.GET, CHANNELS)
     CHANNELS_INVITES_CREATE = (HTTPMethod.POST, CHANNELS + '/invites')
+    CHANNELS_INVITES_GET = (HTTPMethod.GET, CHANNELS + '/invites')
     CHANNELS_INVITES_LIST = (HTTPMethod.GET, CHANNELS + '/invites')
     CHANNELS_MESSAGES_BULK_DELETE = (HTTPMethod.POST, CHANNELS + '/messages/bulk-delete')
     CHANNELS_MESSAGES_CREATE = (HTTPMethod.POST, CHANNELS + '/messages')
@@ -96,6 +107,7 @@ class Routes:
     CHANNELS_THREAD_MEMBERS_LIST = (HTTPMethod.GET, CHANNELS_THREAD_MEMBERS)
     CHANNELS_THREAD_MEMBERS_REMOVE = (HTTPMethod.DELETE, CHANNELS_THREAD_MEMBERS + '/{member}')
     CHANNELS_TYPING = (HTTPMethod.POST, CHANNELS + '/typing')
+    CHANNELS_VOICE_EFFECT_CREATE = (HTTPMethod.POST, CHANNELS + '/voice-channel-effects')
     CHANNELS_WEBHOOKS_CREATE = (HTTPMethod.POST, CHANNELS + '/webhooks')
     CHANNELS_WEBHOOKS_LIST = (HTTPMethod.GET, CHANNELS + '/webhooks')
 
@@ -125,11 +137,14 @@ class Routes:
     GUILDS_EMOJIS_GET = (HTTPMethod.GET, GUILDS + '/emojis/{emoji}')
     GUILDS_EMOJIS_LIST = (HTTPMethod.GET, GUILDS + '/emojis')
     GUILDS_EMOJIS_MODIFY = (HTTPMethod.PATCH, GUILDS + '/emojis/{emoji}')
+    GUILDS_EVENTS_CREATE = (HTTPMethod.POST, GUILDS + '/scheduled-events')
     GUILDS_EVENTS_DELETE = (HTTPMethod.DELETE, GUILDS + '/scheduled-events/{event}')
     GUILDS_EVENTS_GET = (HTTPMethod.GET, GUILDS + '/scheduled-events/{event}')
+    GUILDS_EVENTS_LIST = (HTTPMethod.GET, GUILDS + '/scheduled-events')
     GUILDS_EVENTS_MODIFY = (HTTPMethod.PATCH, GUILDS + '/scheduled-events/{event}')
     GUILDS_EVENTS_USERS_LIST = (HTTPMethod.GET, GUILDS + '/scheduled-events/{event}/users')
     GUILDS_GET = (HTTPMethod.GET, GUILDS)
+    GUILDS_INCIDENTS_ACTION_MODIFY = (HTTPMethod.PUT, GUILDS + '/incident-actions')
     GUILDS_INTEGRATIONS_CREATE = (HTTPMethod.POST, GUILDS + '/integrations')
     GUILDS_INTEGRATIONS_DELETE = (HTTPMethod.DELETE, GUILDS + '/integrations/{integration}')
     GUILDS_INTEGRATIONS_LIST = (HTTPMethod.GET, GUILDS + '/integrations')
@@ -160,6 +175,7 @@ class Routes:
     GUILDS_ROLES_DELETE = (HTTPMethod.DELETE, GUILDS + '/roles/{role}')
     GUILDS_ROLES_LIST = (HTTPMethod.GET, GUILDS + '/roles')
     GUILDS_ROLES_MODIFY = (HTTPMethod.PATCH, GUILDS + '/roles/{role}')
+    GUILDS_ROLES_MEMBER_COUNT_GET = (HTTPMethod.GET, GUILDS + '/roles/member-counts')
     GUILDS_STICKERS = GUILDS + '/stickers'
     GUILDS_STICKERS_CREATE = (HTTPMethod.POST, GUILDS_STICKERS)
     GUILDS_STICKERS_DELETE = (HTTPMethod.DELETE, GUILDS_STICKERS + '/{sticker}')
@@ -203,6 +219,9 @@ class Routes:
     INVITES = '/invites/{invite}'
     INVITES_DELETE = (HTTPMethod.DELETE, INVITES)
     INVITES_GET = (HTTPMethod.GET, INVITES)
+    INVITES_TARGET_USERS_GET = (HTTPMethod.GET, INVITES + '/target-users')
+    INVITES_TARGET_USERS_MODIFY = (HTTPMethod.PUT, INVITES + '/target-users')
+    INVITES_TARGET_USERS_JOB_STATUS_GET = (HTTPMethod.GET, INVITES + '/target-users/job-status')
 
     OAUTH2 = '/oauth2'
     OAUTH2_APPLICATIONS_ME_GET = (HTTPMethod.GET, OAUTH2 + '/applications/@me')
@@ -221,6 +240,13 @@ class Routes:
     STICKERS_GET = (HTTPMethod.GET, STICKERS + '/{sticker}')
     STICKERS_NITRO_GET = (HTTPMethod.GET, '/sticker-packs')
 
+    STREAMS = '/streams'
+    STREAMS_MODIFY = (HTTPMethod.PATCH, STREAMS + '/{stream_key}/stream')
+    STREAMS_NOTIFY_CREATE = (HTTPMethod.POST, STREAMS + '/{stream_key}/notify')
+    STREAMS_PREVIEW_CREATE = (HTTPMethod.POST, STREAMS + '/{stream_key}/preview')
+    STREAMS_PREVIEW_GET = (HTTPMethod.GET, STREAMS + '/{stream_key}/preview')
+    STREAMS_PREVIEW_VIDEO_CREATE = (HTTPMethod.POST, STREAMS + '/{stream_key}/preview/video')
+
     USERS = '/users'
     USERS_GET = (HTTPMethod.GET, USERS + '/{user}')
     USERS_ME_CONNECTIONS_LIST = (HTTPMethod.GET, USERS + '/@me/connections')
@@ -237,6 +263,9 @@ class Routes:
 
     VOICE = '/voice'
     VOICE_REGIONS_LIST = (HTTPMethod.GET, VOICE + '/regions')
+    VOICE_PUBLIC_KEYS_LIST = (HTTPMethod.GET, VOICE + '/public-keys')
+    VOICE_PUBLIC_KEY_VERIFY = (HTTPMethod.POST, VOICE + '/{user}/match-public-key')
+    VOICE_FILTER_CATALOG_GET = (HTTPMethod.GET, '/voice-filters/catalog')
 
     WEBHOOKS = '/webhooks/{webhook}'
     WEBHOOKS_DELETE = (HTTPMethod.DELETE, WEBHOOKS)
@@ -307,19 +336,24 @@ class APIException(Exception):
 
 class HTTPClient(LoggingClass):
     """
-    A simple HTTP client which wraps the requests library, adding support for
+    A simple HTTP client which wraps the `requests` library, adding support for
     Discords rate-limit headers, authorization, and request/response validation.
     """
-    BASE_URL = 'https://discord.com/api/v10'
     MAX_RETRIES = 5
 
-    def __init__(self, token, after_request=None):
+    def __init__(self, token, after_request=None, http_gateway_url='https://discord.com/api', gateway_version=9, shutdown_on_cloudflare_429=True, max_queries_per_second=50):
         super(HTTPClient, self).__init__()
 
         py_version = python_version()
 
-        self.limiter = RateLimiter()
+        self.limiter = RateLimiter(max_queries_per_second=max_queries_per_second)
+        self.invalid_requests = []
         self.after_request = after_request
+
+        self.http_gateway_url = http_gateway_url
+        self.gateway_version = gateway_version
+
+        self.shutdown_on_cloudflare_429 = shutdown_on_cloudflare_429
 
         self.session = RequestsSession()
         self.session.headers.update({
@@ -352,7 +386,7 @@ class HTTPClient(LoggingClass):
             to create the requestable route. The HTTPClient uses this to track
             rate limits as well.
         kwargs : dict
-            Keyword arguments that will be passed along to the requests library.
+            Keyword arguments that will be passed along to the `requests` library.
 
         Raises
         ------
@@ -370,19 +404,22 @@ class HTTPClient(LoggingClass):
 
         # Build the bucket URL
         args = {k: v for k, v in args.items()}
-        filtered = {k: (v if k in ('guild', 'channel') else '') for k, v in args.items()}
+        filtered = {k: (v if k in ('guild', 'channel', 'webhook', 'token') else '') for k, v in args.items()}
         bucket = (route[0], route[1].format(**filtered))
 
+        r = None
         response = APIResponse()
 
         # Possibly wait if we're rate limited
         response.rate_limited_duration = self.limiter.check(bucket)
 
-        self.log.debug('KW: %s', kwargs)
+        if kwargs:
+            self.log.debug('KW: %s', kwargs)
 
         # Make the actual request
-        url = self.BASE_URL + route[1].format(**args)
-        self.log.info('%s %s %s', route[0], url, '({})'.format(kwargs.get('params')) if kwargs.get('params') else '')
+        url = self.http_gateway_url + f'/v{self.gateway_version}' + route[1].format(**args)
+        _trace = find_external_caller()
+        self.log.info(' '.join(i for i in (route[0], route[1].format(**args), str(kwargs.get('params')) if kwargs.get('params') else '', f'\033[1;30m=> {_trace}' if _trace else '') if i))
         try:
             r = self.session.request(route[0], url, **kwargs)
 
@@ -393,53 +430,72 @@ class HTTPClient(LoggingClass):
             # Update rate limiter
             self.limiter.update(bucket, r)
 
+            if r.status_code in (401, 403, 404, 429):
+                now = monotonic()
+
+                # Drop old entries (10 minutes)
+                self.invalid_requests = [t for t in self.invalid_requests if now - t < 600]
+                self.invalid_requests.append(now)
+
+                if len(self.invalid_requests) >= 10000:
+                    self.log.error('Hit API invalid request limit (10000/10min), backing off')
+
+                    delay = 600 - (now - self.invalid_requests[0])
+                    if delay > 0:
+                        gevent_sleep(delay)
+
+                elif len(self.invalid_requests) >= 9000:
+                    gevent_sleep(0.5)
+
             # If we got a success status code, just return the data
             if r.status_code < 400:
                 return r
-            elif r.status_code != 429 and 400 <= r.status_code < 500:
-                err = r.json()
+            elif r.status_code not in [408, 429] and 400 <= r.status_code < 500:
+                try:
+                    err = r.json()
+                except JSONDecodeError:
+                    err = None
                 if err and 'code' in err and 'message' in err:
-                    self.log.warning(f'Request failed with status code {r.status_code}: {err["code"]} - {err["message"]}')
+                    self.log.warning(f'Request failed with status code {r.status_code}: {err["code"]} - {err["message"]} ({route[1].format(**args)})')
                 else:
-                    self.log.warning(f'Request failed with status code {r.status_code}: {str(r.content, "utf=8")}')
+                    self.log.warning(f'Request failed with status code {r.status_code}: {str(r.content, "utf-8")}')
                 response.exception = APIException(r)
                 raise response.exception
-            elif r.status_code in [429, 500, 502, 503]:
-                if r.status_code == 429:
-                    self.log.warning('Request responded w/ 429, retrying (but this should not happen, check your clock sync)')
-
-                # If we hit the max retries, throw an error
+            elif r.status_code in [408, 429, 500, 502, 503] or not r.status_code:
                 retry += 1
                 if retry > self.MAX_RETRIES:
                     self.log.error('Failing request, hit max retries')
                     raise APIException(r, retries=self.MAX_RETRIES)
 
                 backoff = random_backoff()
-                if r.status_code in [500, 502, 503]:
-                    self.log.warning('Request to `{}` failed with code {}, retrying after {}s'.format(
-                        url, r.status_code, backoff,
-                    ))
+                if r.status_code in [408, 500, 502, 503]:
+                    self.log.warning(f'Request to `{url}` failed with code {r.status_code}, retrying after {backoff}s')
                 elif r.status_code == 429:
-                    self.log.warning('Request to `{}` failed with code {}, retrying after {}s'.format(
-                        url, r.status_code, r.json()["retry_after"],
-                    ))
-                    backoff = math_ceil(r.json()["retry_after"])
+                    if 'retry_after' in r.json():
+                        self.log.warning(f'Request to `{url}` failed with code {r.status_code}, retrying after {r.json()["retry_after"]}s')
+                        backoff = math_ceil(r.json()["retry_after"])
+                    else:
+                        self.log.error(f'Request to `{url}` cancelled, no `retry_after` provided by API (Cloudflare rate-limited?)')
+                        if self.shutdown_on_cloudflare_429:
+                            from sys import exit as sys_exit
+                            return sys_exit(1)
+                        return
                 else:
-                    self.log.warning('Request to `{}` failed with code {}, retrying after {}s ({})'.format(
-                        url, r.status_code, backoff, str(r.content, "utf=8"),
+                    self.log.warning('Request to `{}` failed{}, retrying after {}s ({})'.format(
+                        url, f' with code {r.status_code}' if r.status_code else '', backoff, str(r.content, "utf-8")
                     ))
                 gevent_sleep(backoff)
 
-                # Otherwise just recurse and try again
                 return self(route, args, retry_number=retry, **kwargs)
-        except ConnectionError:
-            # Catch ConnectionResetError
+            return r.raise_for_status()
+        except (ConnectionError, Timeout) as e:
             backoff = random_backoff()
-            self.log.warning('Request to `{}` failed with ConnectionError, retrying after {}s'.format(url, backoff))
+            self.log.warning(f'Request to `{url}` failed with {e.__class__.__name__}, retrying after {backoff}s')
             gevent_sleep(backoff)
             return self(route, args, retry_number=retry, **kwargs)
-        except Timeout:
-            backoff = random_backoff()
-            self.log.warning('Request to `{}` failed with ConnectionTimeout, retrying after {}s')
-            gevent_sleep(backoff)
-            return self(route, args, retry_number=retry, **kwargs)
+        except Exception as e:
+            if not isinstance(e, APIException):
+                self.log.critical(f'Request to `{url}` failed with {e.__class__.__name__}: {e}')
+            raise e
+        finally:
+            r and r.close()

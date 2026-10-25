@@ -1,15 +1,25 @@
 from abc import ABCMeta, abstractmethod as abc_abstractmethod
-from warnings import warn as warnings_warn
 try:
     from audioop import mul as audioop_mul
 except ImportError:
-    warnings_warn('audioop-lts is not installed, voice volume support is disabled')
-from gevent import sleep as gevent_sleep, spawn as gevent_spawn
+    audioop_mul = None
+from gevent import getcurrent as gevent_getcurrent, sleep as gevent_sleep, spawn as gevent_spawn
 from gevent.lock import Semaphore as GeventSemaphore
 from gevent.subprocess import PIPE as GEVENT_PIPE, Popen as GeventPopen
-from io import BytesIO
 from sys import modules as sys_modules
 from types import GeneratorType
+try:
+    from yt_dlp import YoutubeDL
+    from yt_dlp.utils import DownloadError
+    from yt_dlp.networking.exceptions import HTTPError
+    from yt_dlp.networking.impersonate import ImpersonateTarget
+    try:
+        import curl_cffi
+        from random import choice as random_choice
+    except ImportError:
+        curl_cffi = None
+except ImportError:
+    YoutubeDL = None
 
 from disco.util.metaclass import add_metaclass
 from disco.voice.opus import OpusEncoder
@@ -69,12 +79,10 @@ class FFmpegInput(BaseInput, AbstractOpus):
 
     def read(self, sz):
         if not self._buffer:
-            # allows time for a buffer to form, otherwise there is nothing to send
-            gevent_sleep(1)
             if self.streaming:
                 self._buffer = self.proc.stdout
             else:
-                self._buffer = BytesIO(self.proc.stdout.read())
+                self._buffer = ReclaimingAudioBuffer(self.proc.stdout)
 
         return self._buffer.read(sz)
 
@@ -88,15 +96,14 @@ class FFmpegInput(BaseInput, AbstractOpus):
                 self.source, self.metadata = self.source
 
             args = [
-                'stdbuf', '-oL',
                 self.command,
+                '-nostdin',
                 '-user_agent', '"Mozilla/5.0 (Linux x86_64; rv:102.0) Gecko/20100101 Firefox/102.0"',
                 '-i', str(self.source),
+                '-vn',
                 '-f', 's16le',
                 '-ar', str(self.sampling_rate),
                 '-ac', str(self.channels),
-                '-ab', '192k',
-                '-bufsize', str(self.sampling_rate),
                 '-loglevel', 'fatal',
                 '-hls_time', '10',
                 '-hls_playlist_type', 'event',
@@ -105,14 +112,105 @@ class FFmpegInput(BaseInput, AbstractOpus):
             self._proc = GeventPopen(args, stdout=GEVENT_PIPE)
         return self._proc
 
+    def close(self):
+        proc = self._proc
+        self._proc = None
+        if proc is None:
+            return
+
+        try:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1)
+                except Exception:
+                    proc.kill()
+                    proc.wait()
+        finally:
+            if proc.stdout is not None:
+                proc.stdout.close()
+            if self._buffer is not None and self._buffer is not proc.stdout and hasattr(self._buffer, 'close'):
+                self._buffer.close()
+            self._buffer = None
+
+
+class ReclaimingAudioBuffer:
+    """
+    Progressively buffer decoded PCM from FFmpeg without waiting for EOF.
+
+    A dedicated greenlet is the sole reader of FFmpeg stdout. The queue is
+    intentionally unbounded so playback never applies backpressure to FFmpeg
+    because it is decoding or downloading faster than playback consumes.
+    """
+
+    CHUNK_SIZE = 4096
+
+    def __init__(self, stream):
+        from gevent.queue import Queue as GeventQueue
+
+        self._stream = stream
+        self._chunks = GeventQueue()
+        self._pending = b''
+        self._pending_position = 0
+        self._eof = False
+        self._error = None
+        self._reader = gevent_spawn(self._read_stream)
+
+    def _read_stream(self):
+        try:
+            while True:
+                # This potentially blocking read runs in its own greenlet, not
+                # in the playback consumer. A bounded chunk limits memory use.
+                chunk = self._stream.read(self.CHUNK_SIZE)
+                if not chunk:
+                    self._chunks.put(None)
+                    return
+                self._chunks.put(chunk)
+        except Exception as exc:
+            self._chunks.put(exc)
+
+    def read(self, size=-1):
+        if size == 0:
+            return b''
+
+        data = bytearray()
+        while size < 0 or len(data) < size:
+            if self._pending_position < len(self._pending):
+                remaining = len(self._pending) - self._pending_position
+                count = remaining if size < 0 else min(remaining, size - len(data))
+                data.extend(self._pending[self._pending_position:self._pending_position + count])
+                self._pending_position += count
+                if self._pending_position == len(self._pending):
+                    self._pending = b''
+                    self._pending_position = 0
+                continue
+
+            if self._eof or self._error is not None:
+                break
+
+            chunk = self._chunks.get()
+            if chunk is None:
+                self._eof = True
+            elif isinstance(chunk, Exception):
+                self._error = chunk
+            else:
+                self._pending = chunk
+                self._pending_position = 0
+
+        if data:
+            return bytes(data)
+        if self._error is not None:
+            raise self._error
+        return b''
+
 
 class YoutubeDLInput(FFmpegInput):
     def __init__(self, url=None, ie_info=None, *args, **kwargs):
-        try:
-            from yt_dlp import YoutubeDL
-            from yt_dlp.utils import DownloadError
+        if YoutubeDL and curl_cffi:
+            self.ytdl = YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'default_search': 'ytsearch', 'http_handler': 'curl_cffi', 'impersonate': ImpersonateTarget.from_str(random_choice(('chrome', 'firefox', 'safari')))})
+        elif YoutubeDL:
             self.ytdl = YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'default_search': 'ytsearch'})
-        except ImportError:
+        else:
             self.ytdl = None
         super(YoutubeDLInput, self).__init__(None, *args, **kwargs)
         self._url = url
@@ -128,8 +226,8 @@ class YoutubeDLInput(FFmpegInput):
                 if self._url:
                     try:
                         results = self.ytdl.extract_info(self._url, download=False)
-                    except self.ytdl.utils.DownloadError:
-                        return  # something
+                    except (DownloadError, HTTPError) as e:
+                        return self.log.error(f'YTDL Error - {e.__class__.__name__}: {e}')
                     if 'entries' not in results:
                         self._ie_info = results
                     else:
@@ -193,34 +291,79 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
         self.frames = GeventQueue()
         self.frame_buffer = frame_buffer
         self.volume = volume
+        self.audio_processor = kwargs.pop('audio_processor', None)
+        self.transmitting = True
+        self._encoder_task = None
+        self._streaming = None
 
         # Call the AbstractOpus constructor, as we need properties it sets
         AbstractOpus.__init__(self, *args, **kwargs)
 
-        # Then call the OpusEncoder constructor, which requires some properties
-        #  that AbstractOpus sets up
+    def _start_encoder(self):
+        # The encoder and its source should not be started until this playable
+        # becomes active. This is particularly meaningful for playlist queues.
         OpusEncoder.__init__(self, self.sampling_rate, self.channels)
-
-        # Spawn the encoder loop
-        gevent_spawn(self._encoder_loop)
+        self._frame_buffer = self.frame_buffer if self.streaming else min(self.frame_buffer, 25)
+        self._encoder_task = gevent_spawn(self._encoder_loop)
 
     def _encoder_loop(self):
-        while self.source:
-            if len(self.frames.queue) < self.frame_buffer:
-                if self._volume != 1.0:
-                    raw = audioop_mul(self.source.read(self.frame_size), 2, min(self._volume, 2.0))
-                else:
-                    raw = self.source.read(self.frame_size)
+        try:
+            while self.source:
+                if len(self.frames.queue) >= self._frame_buffer:
+                    gevent_sleep(0.02)
+                    continue
+
+                raw = self.source.read(self.frame_size)
                 if len(raw) < self.frame_size:
                     break
 
+                if self.streaming and not self.transmitting:
+                    gevent_sleep(0.02)
+                    continue
+
+                if self.audio_processor is not None:
+                    raw = self.audio_processor.process(raw)
+
+                if self._volume != 1.0:
+                    raw = audioop_mul(raw, 2, min(self._volume, 2.0))
+
                 self.frames.put(self.encode(raw, self.samples_per_frame))
-            gevent_sleep(0.002)
+        finally:
+            self.frames.put(None)
+
+    def close(self):
+        task = self._encoder_task
+        self._encoder_task = None
+        if task is not None and task is not gevent_getcurrent() and not task.dead:
+            task.kill(block=False)
+
+        source = self.source
         self.source = None
-        self.frames.put(None)
+        close = getattr(source, 'close', None)
+        if close is not None:
+            close()
+
+        self.frames.queue.clear()
+        try:
+            self.frames.put_nowait(None)
+        except Exception:
+            pass
 
     def next_frame(self):
+        if not self._encoder_task:
+            self._start_encoder()
         return self.frames.get()
+
+    def set_transmitting(self, transmitting):
+        self.transmitting = transmitting
+        if self.streaming and not transmitting:
+            self.frames.queue.clear()
+
+    @property
+    def streaming(self):
+        if self._streaming is None:
+            self._streaming = self.source.streaming
+        return self._streaming
 
     @property
     def volume(self):
@@ -228,10 +371,11 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
 
     @volume.setter
     def volume(self, value):
-        if 'audioop' not in sys_modules:
-            raise Exception('audioop-lts not installed. Voice volume support is disabled.')
+        if 'audioop' not in sys_modules.keys():
+            self._volume = 1.0
+            raise Exception('audioop-lts not installed. Volume support is unavailable.')
         if 0.0 > value:
-            raise Exception('Volume accepts float values between 0.0 and 2.0 only')
+            raise Exception('Volume accepts float values between 0.0 and 2.0 only.')
         self._volume = min(value, 2.0)
 
 
