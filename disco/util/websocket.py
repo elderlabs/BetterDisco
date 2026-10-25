@@ -36,14 +36,10 @@ class Websocket(LoggingClass, WebSocketApp):
     """
     def __init__(self, *args, **kwargs):
         LoggingClass.__init__(self)
-
-        if platform.system() not in ["Windows", "Darwin"]:
-            websocket.setdefaulttimeout(5)
-        else:
-            self.log.warning("Running on Windows/OSX may result in websocket timeouts using the defaulttimeout of 5, so the value is boosted.")
-            websocket.setdefaulttimeout(45)
-        
-        websocket.WebSocketApp.__init__(self, *args, **kwargs)
+        # All other tested operating systems suffer with a timeout of 5 seconds
+        if platform_system() == 'Linux':
+            setdefaulttimeout(5)
+        WebSocketApp.__init__(self, *args, **kwargs)
 
         self.is_closed = False
         self.emitter = Emitter()
