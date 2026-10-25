@@ -68,6 +68,7 @@ class AuditLogActionTypes:
     AUTO_MODERATION_BLOCK_MESSAGE = 143
     AUTO_MODERATION_FLAG_TO_CHANNEL = 144
     AUTO_MODERATION_USER_COMMUNICATION_DISABLED = 145
+    AUTO_MODERATION_QUARANTINE_USER = 146
     CREATOR_MONETIZATION_REQUEST_CREATED = 150
     CREATOR_MONETIZATION_TERMS_ACCEPTED = 151
     ONBOARDING_PROMPT_CREATE = 163
@@ -75,8 +76,19 @@ class AuditLogActionTypes:
     ONBOARDING_PROMPT_DELETE = 165
     ONBOARDING_CREATE = 166
     ONBOARDING_UPDATE = 167
+    GUILD_HOME_FEATURE_ITEM = 171
+    GUILD_HOME_REMOVE_ITEM = 172
     HOME_SETTINGS_CREATE = 190
     HOME_SETTINGS_UPDATE = 191
+    VOICE_CHANNEL_STATUS_CREATE = 192
+    VOICE_CHANNEL_STATUS_DELETE = 193
+    GUILD_SCHEDULED_EVENT_EXCEPTION_CREATE = 200
+    GUILD_SCHEDULED_EVENT_EXCEPTION_UPDATE = 201
+    GUILD_SCHEDULED_EVENT_EXCEPTION_DELETE = 202
+    GUILD_MEMBER_VERIFICATION_UPDATE = 210
+    GUILD_PROFILE_UPDATE = 211
+    GUILD_MIGRATE_PIN_PERMISSION = 212
+    BYPASS_SLOWMODE_PERMISSION_MIGRATION_COMPLETE = 213
 
 
 GUILD_ACTIONS = (
@@ -155,10 +167,12 @@ class AuditLogOptionalEntryInfo(SlottedModel):
     channel_id = Field(snowflake)
     count = Field(text)
     delete_member_days = Field(text)
+    event_exception_id = Field(snowflake)
     id = Field(snowflake)
     members_removed = Field(text)
     message_id = Field(snowflake)
     role_name = Field(text)
+    status = Field(text)
     type = Field(text)
     integration_type = Field(text)
 
