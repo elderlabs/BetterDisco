@@ -447,9 +447,13 @@ class UDPVoiceClient(LoggingClass):
         self.conn.sendto(data, (self.ip, self.port))
 
     def disconnect(self):
+        self.connected = False
         if self._run_task:
             self._run_task.kill()
             self._run_task = None
+        if self.conn:
+            self.conn.close()
+            self.conn = None
         self._opus_decoders.clear()
         self._audio_state.clear()
         return

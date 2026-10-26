@@ -1,6 +1,6 @@
 from gevent import spawn as gevent_spawn
 from time import time
-from sys import version_info as sys_version_info
+from sys import version_info as sys_version_info, modules as sys_modules
 
 from disco.state import State, StateConfig
 from disco.api.client import APIClient
@@ -106,7 +106,7 @@ class Client(LoggingClass):
 
         self.api = APIClient(self.config.token, self)
         gw_kwargs = {'max_reconnects': self.config.max_reconnects, 'encoder': self.config.encoder, 'ignored_events': self.config.ignored_events, 'subscribed_events': self.config.subscribed_events}
-        if isinstance(self.config.compression, bool) and self.config.compression and sys_version_info >= (3, 14) or not isinstance(self.config.compression, bool) and 'zstd' in self.config.compression:
+        if isinstance(self.config.compression, bool) and self.config.compression and (sys_version_info >= (3, 14) or sys_version_info < (3, 14) and 'zstandard' in sys_modules.keys()) or not isinstance(self.config.compression, bool) and 'zstd' in self.config.compression:
             self.gw = GatewayClient(self, **gw_kwargs, zstd_stream_enabled=True)
         elif isinstance(self.config.compression, bool) and self.config.compression and sys_version_info < (3, 14) or not isinstance(self.config.compression, bool) and 'zlib' in self.config.compression:
             self.gw = GatewayClient(self, **gw_kwargs, zlib_stream_enabled=True)
