@@ -335,7 +335,9 @@ class VoiceClient(LoggingClass):
             'guild_id': None if self.is_dm else self.server_id,
             'channel_id': channel_id,
         })
-        return
+        if channel_id:
+            self.deaf = bool(deaf)
+            self.update_media_sink_wants()
 
     def send(self, op, data):
         if self.ws and self.ws.sock and self.ws.sock.connected:
@@ -353,19 +355,25 @@ class VoiceClient(LoggingClass):
 
     def on_voice_client_disconnect(self, data):
         user_id = int(data['user_id'])
-        for ssrc in list(self.audio_ssrcs.keys()):
-            if self.audio_ssrcs[ssrc] == user_id:
+        video_ssrcs = []
+
+        for ssrc, uid in self.audio_ssrcs.items():
+            if uid == user_id:
                 if self.udp:
                     self.udp.remove_audio_ssrc(ssrc, user_id)
                 del self.audio_ssrcs[ssrc]
-                break
 
-        payload = VoiceUser(
-            user_id=user_id,
-            flags=None,
-            platform=None,
-        )
+        for ssrc, uid in self.video_ssrcs.items():
+            if uid == user_id:
+                video_ssrcs.append(ssrc)
+                del self.video_ssrcs[ssrc]
 
+        for ssrc, uid in self.rtx_ssrcs.items():
+            if uid == user_id:
+                del self.rtx_ssrcs[ssrc]
+
+        self.update_media_sink_wants()
+        payload = VoiceUser(user_id=user_id, flags=None, platform=None)
         self.client.events.emit('VoiceUserLeave', payload)
 
     def on_voice_codecs(self, data):
@@ -392,6 +400,7 @@ class VoiceClient(LoggingClass):
         if self.video_enabled:
             self.video_ssrcs[self.ssrc + 1] = self.client.state.me.id
             self.rtx_ssrcs[self.ssrc + 2] = self.client.state.me.id
+        self.update_media_sink_wants()
         self.ip = data['ip']
         self.port = data['port']
         self.enc_modes = data['modes']
@@ -460,6 +469,7 @@ class VoiceClient(LoggingClass):
     def on_voice_resumed(self, _):
         self.log.info(f'[{self.channel_id}] Websocket Resumed')
         self.set_state(VoiceState.CONNECTED)
+        self.update_media_sink_wants()
         self._reconnects = 0
         self._safe_reconnect_state = False
         if self.media:
@@ -512,10 +522,8 @@ class VoiceClient(LoggingClass):
 
     def on_voice_speaking(self, data):
         user_id = int(data['user_id'])
-
         self.audio_ssrcs[data['ssrc']] = user_id
 
-        # Maybe rename speaking to voice in future
         payload = VoiceSpeaking(
             client=self,
             user_id=user_id,
@@ -525,27 +533,16 @@ class VoiceClient(LoggingClass):
         )
 
         self.client.events.emit('VoiceSpeaking', payload)
+        self.update_media_sink_wants()
 
     def on_client_connect(self, data):
         user_id = int(data['user_id'])
-
-        payload = VoiceUser(
-            user_id=user_id,
-            flags=data['flags'],
-            platform=None,
-        )
-
+        payload = VoiceUser(user_id=user_id, flags=data['flags'], platform=None)
         self.client.events.emit('VoiceUserJoin', payload)
 
     def on_platform(self, data):
         user_id = int(data['user_id'])
-
-        payload = VoiceUser(
-            user_id=user_id,
-            flags=None,
-            platform=data['platform'],
-        )
-
+        payload = VoiceUser(user_id=user_id, flags=None, platform=data['platform'])
         self.client.events.emit('VoiceUserPlatform', payload)
 
     def on_video(self, data):
@@ -553,17 +550,31 @@ class VoiceClient(LoggingClass):
         video_ssrc = data['video_ssrc']
 
         if video_ssrc:
-            self.video_ssrcs[data['video_ssrc']] = user_id
-            self.rtx_ssrcs[video_ssrc + 1] = user_id
+            streams = data.get('streams') or ()
+            rtx_ssrc = None
+            self.video_ssrcs[video_ssrc] = user_id
+
+            for stream in streams:
+                ssrc = stream.get('ssrc')
+                stream_rtx_ssrc = stream.get('rtx_ssrc')
+                if ssrc:
+                    self.video_ssrcs[ssrc] = user_id
+                if stream_rtx_ssrc:
+                    self.rtx_ssrcs[stream_rtx_ssrc] = user_id
+                    if ssrc == video_ssrc:
+                        rtx_ssrc = stream_rtx_ssrc
+
+            if rtx_ssrc is None:
+                rtx_ssrc = video_ssrc + 1
+                self.rtx_ssrcs[rtx_ssrc] = user_id
+
         else:
             for ssrc, uid in self.video_ssrcs.items():
                 if uid == user_id:
                     del self.video_ssrcs[ssrc]
-                    break
             for ssrc, uid in self.rtx_ssrcs.items():
                 if uid == user_id:
                     del self.rtx_ssrcs[ssrc]
-                    break
 
         payload = VideoStream(
             client=self,
@@ -573,7 +584,9 @@ class VoiceClient(LoggingClass):
             audio_ssrc=data['audio_ssrc'],
         )
 
-        if data['video_ssrc']:
+        self.update_media_sink_wants()
+
+        if video_ssrc:
             self.client.events.emit('VideoStreamStart', payload)
         else:
             self.client.events.emit('VideoStreamEnd', payload)
@@ -876,6 +889,21 @@ class VoiceClient(LoggingClass):
     def increment_timestamp(self, *args, **kwargs):
         self.udp.increment_timestamp(*args, **kwargs)
 
+    def update_media_sink_wants(self):
+        wants = {'any': 0}
+
+        if not self.deaf:
+            for ssrc, user_id in self.audio_ssrcs.items():
+                if user_id != self.client.state.me.id:
+                    wants[str(ssrc)] = 100
+
+        if self.video_enabled:
+            for ssrc, user_id in self.video_ssrcs.items():
+                if user_id != self.client.state.me.id:
+                    wants[str(ssrc)] = 100
+
+        self.send(VoiceOPCode.MEDIA_SINK_WANTS, wants)
+
     # Discord End-to-End Encryption Protocol Support (DAVE); RFC9420
     def on_dave_transition_execute(self, transition_id):  # OP: 22
         if isinstance(transition_id, dict):
@@ -905,7 +933,6 @@ class VoiceClient(LoggingClass):
                 # Allow late packets from the previous encryption state.
                 self.dave_session.set_passthrough_mode(False)
             self.log.info(f'[{self.channel_id}] DAVE Execute Transition {transition_id} upgraded')
-
         self.log.info(f'[{self.channel_id}] DAVE Execute Transition {transition_id} complete ({previous_version} -> {self.dave_protocol_version})')
 
     # received on connection downgrade
